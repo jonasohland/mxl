@@ -96,7 +96,7 @@ include(CTest)
 include(Catch)
 catch_discover_tests(mxl-tests)
 
-if (MXL_FABRICS)
+if (MXL_FABRICS_OFI)
     add_subdirectory(fabrics)
 endif()
 

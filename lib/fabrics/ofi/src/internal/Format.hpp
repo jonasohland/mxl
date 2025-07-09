@@ -1,0 +1,25 @@
+#pragma once
+
+#include <fmt/format.h>
+#include <mxl/fabrics.h>
+
+template<>
+struct fmt::formatter<mxlFabricsProvider>
+{
+    constexpr auto parse(fmt::format_parse_context& ctx)
+    {
+        return ctx.begin();
+    }
+
+    template<typename Context>
+    constexpr auto format(mxlFabricsProvider const& provider, Context& ctx) const
+    {
+        switch (provider)
+        {
+            case MXL_SHARING_PROVIDER_AUTO:  return fmt::format_to(ctx.out(), "auto");
+            case MXL_SHARING_PROVIDER_TCP:   return fmt::format_to(ctx.out(), "tcp");
+            case MXL_SHARING_PROVIDER_VERBS: return fmt::format_to(ctx.out(), "verbs");
+            case MXL_SHARING_PROVIDER_EFA:   return fmt::format_to(ctx.out(), "efa");
+        }
+    }
+};
