@@ -71,6 +71,7 @@ set(mxl_fabrics_sources
         src/fabrics.cpp
         src/internal/FabricsInstance.cpp
         src/internal/Exception.cpp
+        src/internal/FILogging.cpp
         src/internal/FIInfo.cpp
         src/internal/FIVersion.cpp
         src/internal/Fabric.cpp

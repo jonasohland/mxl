@@ -102,6 +102,7 @@ namespace mxl::lib::fabrics::ofi
 
     private:
         explicit FIInfoList(::fi_info*) noexcept;
+        void free();
 
         ::fi_info* _begin;
     };

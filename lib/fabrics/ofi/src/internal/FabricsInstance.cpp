@@ -1,19 +1,18 @@
 #include "FabricsInstance.hpp"
 #include <internal/Logging.hpp>
 #include "Exception.hpp"
+#include "FILogging.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
     FabricsInstance::FabricsInstance(mxl::lib::Instance* instance)
         : _mxlInstance(instance)
     {
-        MXL_INFO("mxl fabrics instance created");
+        fiInitLogging();
     }
 
     FabricsInstance::~FabricsInstance()
-    {
-        MXL_INFO("mxl fabrics instance destroyed");
-    }
+    {}
 
     TargetWrapper* FabricsInstance::createTarget()
     {
