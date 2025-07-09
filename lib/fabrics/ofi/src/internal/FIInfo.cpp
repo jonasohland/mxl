@@ -1,7 +1,6 @@
 #include "FIInfo.hpp"
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
-#include "mxl/mxl.h"
 #include "Exception.hpp"
 #include "FIVersion.hpp"
 
@@ -11,11 +10,7 @@ namespace mxl::lib::fabrics::ofi
     {
         ::fi_info* info;
 
-        auto res = ::fi_getinfo(fiVersion(), node.c_str(), service.c_str(), 0, nullptr, &info);
-        if (res != FI_SUCCESS)
-        {
-            throw Exception::make(MXL_ERR_UNKNOWN, "Failed to get provider info: code {}", res);
-        }
+        fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), 0, nullptr, &info);
 
         return FIInfoList{info};
     }
@@ -26,11 +21,7 @@ namespace mxl::lib::fabrics::ofi
 
     FIInfoList::~FIInfoList()
     {
-        if (_begin != nullptr)
-        {
-            ::fi_freeinfo(_begin);
-            _begin = nullptr;
-        }
+        free();
     }
 
     FIInfoList::FIInfoList(FIInfoList&& other) noexcept
@@ -41,6 +32,8 @@ namespace mxl::lib::fabrics::ofi
 
     FIInfoList& FIInfoList::operator=(FIInfoList&& other) noexcept
     {
+        free();
+
         _begin = other._begin;
         other._begin = nullptr;
         return *this;
@@ -74,5 +67,14 @@ namespace mxl::lib::fabrics::ofi
     FIInfoList::const_iterator FIInfoList::cend() const noexcept
     {
         return const_iterator{nullptr};
+    }
+
+    void FIInfoList::free()
+    {
+        if (_begin != nullptr)
+        {
+            ::fi_freeinfo(_begin);
+            _begin = nullptr;
+        }
     }
 }
