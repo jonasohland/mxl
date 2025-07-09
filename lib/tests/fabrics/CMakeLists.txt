@@ -27,8 +27,13 @@ target_sources(mxl-fabrics-tests
 target_link_libraries(mxl-fabrics-tests
     PRIVATE
         mxl
-        mxl-fabrics
+        mxl-fabrics-static
         Catch2::Catch2WithMain
+)
+
+target_include_directories(mxl-fabrics-tests
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../fabrics/ofi/src/internal"
 )
 
 include(CTest)

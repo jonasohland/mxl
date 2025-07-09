@@ -16,7 +16,7 @@ extern "C"
     /// MXL SDK Status codes.
     typedef enum mxlStatus
     {
-        MXL_STATUS_OK,
+        MXL_STATUS_OK = 0,
         MXL_ERR_UNKNOWN,
         MXL_ERR_FLOW_NOT_FOUND,
         MXL_ERR_OUT_OF_RANGE_TOO_LATE,
@@ -26,6 +26,9 @@ extern "C"
         MXL_ERR_TIMEOUT,
         MXL_ERR_INVALID_ARG,
         MXL_ERR_CONFLICT,
+
+        /* fabrics.h errors */
+        MXL_ERR_STRLEN = 1024,
     } mxlStatus;
 
     /// MXL SDK Semantic versionning structure.

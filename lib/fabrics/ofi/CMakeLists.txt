@@ -5,11 +5,17 @@ find_package(PkgConfig)
 pkg_check_modules(libfabric REQUIRED IMPORTED_TARGET libfabric)
 
 add_library(mxl-fabrics SHARED)
+add_library(mxl-fabrics-static STATIC)
 
 target_compile_features(mxl-fabrics
         PRIVATE
             cxx_std_20
     )
+
+target_compile_features(mxl-fabrics-static
+    PRIVATE
+        cxx_std_20
+)
 
 set_target_properties(mxl-fabrics
         PROPERTIES
@@ -28,7 +34,17 @@ target_link_libraries(mxl-fabrics
         mxl
 )
 
+target_link_libraries(mxl-fabrics-static
+    PUBLIC
+        mxl
+)
+
 target_include_directories(mxl-fabrics
+    PUBLIC
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../src"
+)
+
+target_include_directories(mxl-fabrics-static
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/../../src"
 )
@@ -42,11 +58,28 @@ target_link_libraries(mxl-fabrics
         picojson::picojson
 )
 
-target_sources(mxl-fabrics
+target_link_libraries(mxl-fabrics-static
     PRIVATE
+        PkgConfig::libfabric
+        stduuid
+        spdlog::spdlog
+        fmt::fmt
+        picojson::picojson
+)
+
+set(mxl_fabrics_sources
         src/fabrics.cpp
         src/internal/FabricsInstance.cpp
+        src/internal/Exception.cpp
+        src/internal/FIInfo.cpp
+        src/internal/FIVersion.cpp
+        src/internal/Fabric.cpp
+        src/internal/Target.cpp
+        src/internal/TargetInfo.cpp
         src/internal/Domain.cpp
         src/internal/Address.cpp
         src/internal/MemoryRegion.cpp
 )
+
+target_sources(mxl-fabrics PRIVATE ${mxl_fabrics_sources})
+target_sources(mxl-fabrics-static PRIVATE ${mxl_fabrics_sources})

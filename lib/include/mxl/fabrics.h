@@ -6,6 +6,8 @@
 #include "mxl/platform.h"
 #include "flow.h"
 
+#define MXL_FABRICS_UNUSED(x) (void)x
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -13,6 +15,7 @@ extern "C"
 
     typedef struct mxlFabricsInstance_t* mxlFabricsInstance;
     typedef struct mxlFabricsTarget_t* mxlFabricsTarget;
+    typedef struct mxlTargetInfo_t* mxlTargetInfo;
     typedef struct mxlFabricsInitiator_t* mxlFabricsInitiator;
 
     typedef enum mxlFabricsProvider
@@ -23,12 +26,6 @@ extern "C"
         MXL_SHARING_PROVIDER_EFA = 3,
     } mxlFabricsProvider;
 
-    typedef struct mxlMemoryRegion_t
-    {
-        uint8_t const* address;
-        uint64_t size;
-    } mxlMemoryRegion;
-
     typedef struct mxlEndpointAddress_t
     {
         char const* node;
@@ -38,21 +35,15 @@ extern "C"
     typedef struct mxlTargetConfig_t
     {
         mxlEndpointAddress endpointAddress;
-        mxlMemoryRegion memoryRegion;
         mxlFabricsProvider provider;
+        char const* flowId;
     } mxlTargetConfig;
-
-    typedef struct mxlTargetInfo_t
-    {
-        mxlEndpointAddress endpointAddress;
-        char const* shmInfo;
-    } mxlTargetInfo;
 
     typedef struct mxlInitiatorConfig_t
     {
         mxlEndpointAddress endpointAddress;
-        mxlMemoryRegion memoryRegion;
         mxlFabricsProvider provider;
+        char const* flowId;
     } mxlInitiatorConfig;
 
     typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
@@ -253,7 +244,7 @@ extern "C"
      * \param in_stringSize The size of the output string.
      */ 
     MXL_EXPORT
-    mxlStatus mxlFabricsTargetInfoToString(mxlTargetInfo const* in_targetInfo, char* out_string, size_t* in_stringSize);
+    mxlStatus mxlFabricsTargetInfoToString(mxlTargetInfo const in_targetInfo, char* out_string, size_t* in_stringSize);
 
     /**
      * Convert a string to a  target information.
@@ -262,6 +253,14 @@ extern "C"
      */
     MXL_EXPORT
     mxlStatus mxlFabricsTargetInfoFromString(char const* in_string, mxlTargetInfo* out_targetInfo);
+
+    /**
+     * Free a mxlTargetInfo object obtained from mxlFabricsTargetSetup() or mxlFabricsTargetInfoFromString().
+     * \param in_info A mxlTargetInfo object
+     * \return MXL_STATUS_OK if the mxlTargetInfo object was freed.
+     */
+    MXL_EXPORT
+    mxlStatus mxlFabricsFreeTargetInfo(mxlTargetInfo in_info);
 
 #ifdef __cplusplus
 }
