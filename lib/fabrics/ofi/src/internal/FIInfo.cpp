@@ -6,6 +6,108 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+    FIInfo::FIInfo(::fi_info const* raw) noexcept
+        : _raw(::fi_dupinfo(raw))
+    {}
+
+    FIInfo::~FIInfo() noexcept
+    {
+        free();
+    }
+
+    FIInfo::FIInfo(FIInfo const& other) noexcept
+        : _raw(::fi_dupinfo(other._raw))
+    {}
+
+    void FIInfo::operator=(FIInfo const& other) noexcept
+    {
+        free();
+
+        _raw = ::fi_dupinfo(other._raw);
+    }
+
+    FIInfo::FIInfo(FIInfo&& other) noexcept
+        : _raw(other._raw)
+    {
+        other._raw = nullptr;
+    }
+
+    FIInfo& FIInfo::operator=(FIInfo&& other) noexcept
+    {
+        _raw = other._raw;
+        other._raw = nullptr;
+
+        return *this;
+    }
+
+    ::fi_info& FIInfo::operator*() noexcept
+    {
+        return *_raw;
+    }
+
+    ::fi_info const& FIInfo::operator*() const noexcept
+    {
+        return *_raw;
+    }
+
+    ::fi_info* FIInfo::raw() noexcept
+    {
+        return _raw;
+    }
+
+    ::fi_info const* FIInfo::raw() const noexcept
+    {
+        return _raw;
+    }
+
+    void FIInfo::free() noexcept
+    {
+        if (_raw != nullptr)
+        {
+            ::fi_freeinfo(_raw);
+            _raw = nullptr;
+        }
+    }
+
+    FIInfoView::FIInfoView(::fi_info* raw)
+        : _raw(raw)
+    {}
+
+    ::fi_info& FIInfoView::operator*() noexcept
+    {
+        return *_raw;
+    }
+
+    ::fi_info const& FIInfoView::operator*() const noexcept
+    {
+        return *_raw;
+    }
+
+    ::fi_info* FIInfoView::operator->() noexcept
+    {
+        return _raw;
+    }
+
+    ::fi_info const* FIInfoView::operator->() const noexcept
+    {
+        return _raw;
+    }
+
+    ::fi_info* FIInfoView::raw() noexcept
+    {
+        return _raw;
+    }
+
+    ::fi_info const* FIInfoView::raw() const noexcept
+    {
+        return _raw;
+    }
+
+    FIInfo FIInfoView::owned() noexcept
+    {
+        return {_raw};
+    }
+
     FIInfoList FIInfoList::get(std::string node, std::string service)
     {
         ::fi_info* info;

@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <rdma/fabric.h>
+#include "FIInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -16,7 +17,11 @@ namespace mxl::lib::fabrics::ofi
         Fabric(Fabric&&) noexcept;
         Fabric& operator=(Fabric&&);
 
-        static std::shared_ptr<Fabric> open(::fi_fabric_attr* attr);
+        ::fid_fabric* raw() noexcept;
+        [[nodiscard]]
+        ::fid_fabric const* raw() const noexcept;
+
+        static std::shared_ptr<Fabric> open(FIInfoView info);
 
     private:
         void close();

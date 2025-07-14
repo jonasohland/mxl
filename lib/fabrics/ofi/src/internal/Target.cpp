@@ -5,20 +5,20 @@
 #include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
+#include "Domain.hpp"
+#include "Exception.hpp"
+#include "Fabric.hpp"
 #include "FIInfo.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
+#include "RMATarget.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
     TargetWrapper::TargetWrapper()
-    {
-        MXL_INFO("Target created");
-    }
+    {}
 
     TargetWrapper::~TargetWrapper()
-    {
-        MXL_INFO("Target destroyed");
-    }
+    {}
 
     std::pair<mxlStatus, std::unique_ptr<TargetInfo>> TargetWrapper::setup(mxlTargetConfig const& config)
     {
@@ -30,7 +30,16 @@ namespace mxl::lib::fabrics::ofi
             config.provider,
             config.flowId);
 
-        auto infoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service);
+        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service);
+
+        auto bestFabricInfo = RMATarget::findBestFabric(fabricInfoList, config.provider);
+        if (!bestFabricInfo)
+        {
+            throw Exception::make(MXL_ERR_NO_FABRIC, "No suitable fabric available");
+        }
+
+        auto fabric = Fabric::open(*bestFabricInfo);
+        auto domain = Domain::open(*bestFabricInfo, fabric);
 
         return {MXL_STATUS_OK, std::make_unique<TargetInfo>()};
     }

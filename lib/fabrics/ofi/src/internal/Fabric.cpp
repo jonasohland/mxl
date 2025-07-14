@@ -7,11 +7,11 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    std::shared_ptr<Fabric> Fabric::open(::fi_fabric_attr* attr)
+    std::shared_ptr<Fabric> Fabric::open(FIInfoView info)
     {
         ::fid_fabric* fid;
 
-        fiCall(::fi_fabric, "Failed to open fabric", attr, &fid, nullptr);
+        fiCall(::fi_fabric2, "Failed to open fabric", info.raw(), &fid, 0, nullptr);
 
         // expose the private constructor to std::make_shared inside this function
         struct MakeSharedEnabler : public Fabric
@@ -47,6 +47,16 @@ namespace mxl::lib::fabrics::ofi
         other._raw = nullptr;
 
         return *this;
+    }
+
+    ::fid_fabric* Fabric::raw() noexcept
+    {
+        return _raw;
+    }
+
+    ::fid_fabric const* Fabric::raw() const noexcept
+    {
+        return _raw;
     }
 
     void Fabric::close()
