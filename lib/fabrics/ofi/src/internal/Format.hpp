@@ -20,6 +20,12 @@ struct fmt::formatter<mxlFabricsProvider>
             case MXL_SHARING_PROVIDER_TCP:   return fmt::format_to(ctx.out(), "tcp");
             case MXL_SHARING_PROVIDER_VERBS: return fmt::format_to(ctx.out(), "verbs");
             case MXL_SHARING_PROVIDER_EFA:   return fmt::format_to(ctx.out(), "efa");
+            default:                         return fmt::format_to(ctx.out(), "unknown");
         }
     }
 };
+
+namespace mxl::lib::fabrics::ofi
+{
+    std::string fiProtocolToString(uint64_t) noexcept;
+}

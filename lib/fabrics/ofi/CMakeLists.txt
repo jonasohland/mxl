@@ -77,6 +77,7 @@ set(mxl_fabrics_sources
         src/internal/Fabric.cpp
         src/internal/Target.cpp
         src/internal/TargetInfo.cpp
+        src/internal/RMATarget.cpp
         src/internal/Domain.cpp
         src/internal/Address.cpp
         src/internal/MemoryRegion.cpp
