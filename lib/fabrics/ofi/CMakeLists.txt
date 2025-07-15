@@ -69,18 +69,25 @@ target_link_libraries(mxl-fabrics-static
 
 set(mxl_fabrics_sources
         src/fabrics.cpp
-        src/internal/FabricsInstance.cpp
+        src/internal/Address.cpp
+        src/internal/CompletionQueue.cpp
+        src/internal/CompletionQueueEntry.cpp
+        src/internal/Domain.cpp
+        src/internal/Endpoint.cpp
+        src/internal/EventQueue.cpp
+        src/internal/EventQueueEntry.cpp
         src/internal/Exception.cpp
-        src/internal/FILogging.cpp
-        src/internal/FIInfo.cpp
-        src/internal/FIVersion.cpp
         src/internal/Fabric.cpp
+        src/internal/FabricsInstance.cpp
+        src/internal/FIInfo.cpp
+        src/internal/FILogging.cpp
+        src/internal/FIVersion.cpp
+        src/internal/MemoryRegion.cpp
+        src/internal/PassiveEndpoint.cpp
+        src/internal/RMATarget.cpp
         src/internal/Target.cpp
         src/internal/TargetInfo.cpp
-        src/internal/RMATarget.cpp
-        src/internal/Domain.cpp
-        src/internal/Address.cpp
-        src/internal/MemoryRegion.cpp
+
 )
 
 target_sources(mxl-fabrics PRIVATE ${mxl_fabrics_sources})

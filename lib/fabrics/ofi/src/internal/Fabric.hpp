@@ -21,13 +21,18 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::fid_fabric const* raw() const noexcept;
 
+        [[nodiscard]]
+        FIInfo& info() noexcept;
+
         static std::shared_ptr<Fabric> open(FIInfoView info);
 
     private:
         void close();
 
-        Fabric(::fid_fabric* raw);
+        Fabric(::fid_fabric* raw, FIInfo info);
+
         ::fid_fabric* _raw;
+        FIInfo _info;
     };
 
 }

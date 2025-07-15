@@ -3,6 +3,7 @@
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
 #include "Exception.hpp"
+#include "FIInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -16,16 +17,17 @@ namespace mxl::lib::fabrics::ofi
         // expose the private constructor to std::make_shared inside this function
         struct MakeSharedEnabler : public Fabric
         {
-            MakeSharedEnabler(::fid_fabric* raw)
-                : Fabric(raw)
+            MakeSharedEnabler(::fid_fabric* raw, FIInfo info)
+                : Fabric(raw, info)
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(fid);
+        return std::make_shared<MakeSharedEnabler>(fid, info.owned());
     }
 
-    Fabric::Fabric(::fid_fabric* raw)
+    Fabric::Fabric(::fid_fabric* raw, FIInfo info)
         : _raw(raw)
+        , _info(std::move(info))
     {}
 
     Fabric::~Fabric()
@@ -35,6 +37,7 @@ namespace mxl::lib::fabrics::ofi
 
     Fabric::Fabric(Fabric&& other) noexcept
         : _raw(other._raw)
+        , _info(other._info)
     {
         other._raw = nullptr;
     }
@@ -44,6 +47,7 @@ namespace mxl::lib::fabrics::ofi
         close();
 
         _raw = other._raw;
+        _info = other._info;
         other._raw = nullptr;
 
         return *this;
@@ -57,6 +61,11 @@ namespace mxl::lib::fabrics::ofi
     ::fid_fabric const* Fabric::raw() const noexcept
     {
         return _raw;
+    }
+
+    FIInfo& Fabric::info() noexcept
+    {
+        return _info;
     }
 
     void Fabric::close()

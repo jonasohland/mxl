@@ -5,9 +5,8 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    Domain::Domain(::fid_domain* raw, FIInfo sourceInfo, std::shared_ptr<Fabric> fabric)
+    Domain::Domain(::fid_domain* raw, std::shared_ptr<Fabric> fabric)
         : _raw(raw)
-        , _sourceInfo(std::move(sourceInfo))
         , _fabric(std::move(fabric))
     {}
 
@@ -16,20 +15,20 @@ namespace mxl::lib::fabrics::ofi
         close();
     }
 
-    std::shared_ptr<Domain> Domain::open(FIInfoView info, std::shared_ptr<Fabric> fabric)
+    std::shared_ptr<Domain> Domain::open(std::shared_ptr<Fabric> fabric)
     {
         ::fid_domain* domain;
 
-        fiCall(::fi_domain2, "Failed to open domain", fabric->raw(), info.raw(), &domain, 0, nullptr);
+        fiCall(::fi_domain2, "Failed to open domain", fabric->raw(), fabric->info().raw(), &domain, 0, nullptr);
 
         struct MakeSharedEnabler : public Domain
         {
-            MakeSharedEnabler(::fid_domain* domain, FIInfo sourceInfo, std::shared_ptr<Fabric> fabric)
-                : Domain(domain, std::move(sourceInfo), std::move(fabric))
+            MakeSharedEnabler(::fid_domain* domain, std::shared_ptr<Fabric> fabric)
+                : Domain(domain, std::move(fabric))
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(domain, info.owned(), std::move(fabric));
+        return std::make_shared<MakeSharedEnabler>(domain, std::move(fabric));
     }
 
     void Domain::close()
@@ -43,7 +42,6 @@ namespace mxl::lib::fabrics::ofi
 
     Domain::Domain(Domain&& other) noexcept
         : _raw(other._raw)
-        , _sourceInfo(std::move(other._sourceInfo))
         , _fabric(std::move(other._fabric))
     {
         other._raw = nullptr;
@@ -57,7 +55,6 @@ namespace mxl::lib::fabrics::ofi
         other._raw = nullptr;
 
         _fabric = std::move(other._fabric);
-        _sourceInfo = std::move(other._sourceInfo);
 
         return *this;
     }

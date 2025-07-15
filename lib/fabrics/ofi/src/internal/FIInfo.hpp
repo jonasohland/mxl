@@ -31,6 +31,8 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::fi_info const* raw() const noexcept;
 
+        static FIInfo from_raw(::fi_info const* raw) noexcept;
+
     private:
         friend class FIInfoView;
 
@@ -125,6 +127,7 @@ namespace mxl::lib::fabrics::ofi
          * node/service
          */
         static FIInfoList get(std::string node, std::string service);
+        static FIInfoList owned(::fi_info* info) noexcept;
 
         // Type aliases for const and non-const versions of the iterator template
         using iterator = FIInfoIterator<false>;
@@ -159,6 +162,7 @@ namespace mxl::lib::fabrics::ofi
 
     private:
         explicit FIInfoList(::fi_info*) noexcept;
+
         void free();
 
         ::fi_info* _begin;
