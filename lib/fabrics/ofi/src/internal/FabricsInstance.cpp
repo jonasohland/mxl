@@ -1,7 +1,9 @@
 #include "FabricsInstance.hpp"
 #include <internal/Logging.hpp>
+#include "mxl/fabrics.h"
 #include "Exception.hpp"
 #include "FILogging.hpp"
+#include "Target.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -16,7 +18,7 @@ namespace mxl::lib::fabrics::ofi
 
     TargetWrapper* FabricsInstance::createTarget()
     {
-        return &_targets.emplace_back();
+        return &_targets.emplace_back(); // Wow c++.. This syntax is insane
     }
 
     void FabricsInstance::destroyTarget(TargetWrapper* wrapper)

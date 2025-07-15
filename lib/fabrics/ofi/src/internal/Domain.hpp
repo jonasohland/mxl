@@ -3,7 +3,6 @@
 #include <memory>
 #include <rdma/fi_domain.h>
 #include "Fabric.hpp"
-#include "FIInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -22,15 +21,20 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::fid_domain const* raw() const noexcept;
 
-        static std::shared_ptr<Domain> open(FIInfoView info, std::shared_ptr<Fabric> fabric);
+        static std::shared_ptr<Domain> open(std::shared_ptr<Fabric> fabric);
+
+        [[nodiscard]]
+        std::shared_ptr<Fabric> fabric() const noexcept
+        {
+            return _fabric;
+        }
 
     private:
         void close();
 
-        Domain(::fid_domain*, FIInfo, std::shared_ptr<Fabric>);
+        Domain(::fid_domain*, std::shared_ptr<Fabric>);
 
         ::fid_domain* _raw;
-        FIInfo _sourceInfo;
         std::shared_ptr<Fabric> _fabric;
     };
 }

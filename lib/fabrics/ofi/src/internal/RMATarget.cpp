@@ -56,7 +56,7 @@ namespace mxl::lib::fabrics::ofi
         ranges::stable_sort(candidates, cmpPreferProgressAuto);
         ranges::stable_sort(candidates, cmpPreferCapHMEM);
         ranges::stable_sort(candidates, cmpPreferSHM);
-        ranges::stable_sort(candidates, cmpPreferProtoXRC);
+        ranges::stable_sort(candidates, cmpPreferProtoXRC); //TODO: I think this is not required
         ranges::stable_sort(candidates, cmpPreferVerbs);
         ranges::stable_sort(candidates, cmpPreferEFA);
 

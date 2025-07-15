@@ -60,6 +60,14 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
+    FIInfo FIInfo::from_raw(::fi_info const* raw) noexcept
+    {
+        if (!raw)
+        {
+            // TODO throw?
+        }
+    }
+
     void FIInfo::free() noexcept
     {
         if (_raw != nullptr)
@@ -110,10 +118,28 @@ namespace mxl::lib::fabrics::ofi
 
     FIInfoList FIInfoList::get(std::string node, std::string service)
     {
-        ::fi_info* info;
+        ::fi_info *info, *hints;
 
-        fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), 0, nullptr, &info);
+        hints = fi_allocinfo();
+        if (hints == nullptr)
+        {
+            // TODO: throw an error?
+        }
 
+        // hints: hints->fabric_attr->prov_name = provider
+        hints->mode = FI_RX_CQ_DATA;
+        hints->caps = FI_RMA | FI_WRITE | FI_REMOTE_WRITE;
+        // hints: FI_REMOTE_WRITE and FI_RMA_EVENT could be appened for a target only
+        // hints: add condition to append FI_HMEM capability if needed!
+
+        fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), 0, hints, &info);
+        fi_freeinfo(hints); // TODO: validate if this does not make everything crash
+
+        return FIInfoList{info};
+    }
+
+    FIInfoList FIInfoList::owned(::fi_info* info) noexcept
+    {
         return FIInfoList{info};
     }
 
