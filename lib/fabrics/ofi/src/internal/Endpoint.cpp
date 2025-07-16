@@ -1,9 +1,13 @@
 #include "Endpoint.hpp"
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <utility>
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
+#include "CompletionQueue.hpp"
 #include "Domain.hpp"
+#include "EventQueue.hpp"
 #include "Exception.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -30,9 +34,12 @@ namespace mxl::lib::fabrics::ofi
         close();
     }
 
-    Endpoint::Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain)
+    Endpoint::Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq,
+        std::optional<std::shared_ptr<EventQueue>> eq)
         : _raw(raw)
         , _domain(std::move(domain))
+        , _cq(std::move(cq))
+        , _eq(std::move(eq))
     {}
 
     void Endpoint::close()
@@ -63,18 +70,22 @@ namespace mxl::lib::fabrics::ofi
         return *this;
     }
 
-    void Endpoint::bind(EventQueue const& eq)
+    void Endpoint::bind(std::shared_ptr<EventQueue> eq)
     {
-        auto fid = eq.raw()->fid;
+        auto fid = eq->raw()->fid;
 
         fiCall(::fi_ep_bind, "Failed to bind event queue to endpoint", _raw, &fid, 0);
+
+        _eq = eq;
     }
 
-    void Endpoint::bind(CompletionQueue const& cq, uint64_t flags)
+    void Endpoint::bind(std::shared_ptr<CompletionQueue> cq, uint64_t flags)
     {
-        auto fid = cq.raw()->fid;
+        auto fid = cq->raw()->fid;
 
         fiCall(::fi_ep_bind, "Failed to bind completion queue to endpoint", _raw, &fid, flags);
+
+        _cq = cq;
     }
 
     void Endpoint::enable()
@@ -95,6 +106,38 @@ namespace mxl::lib::fabrics::ofi
     void Endpoint::shutdown()
     {
         fiCall(::fi_shutdown, "Failed to shutdown endpoint", _raw, 0);
+    }
+
+    std::shared_ptr<CompletionQueue> Endpoint::completionQueue() const
+    {
+        if (!_cq)
+        {
+            throw std::runtime_error("Completion queue is not bound to the endpoint"); // Is this the right throw??
+        }
+
+        return *_cq;
+    }
+
+    std::shared_ptr<EventQueue> Endpoint::eventQueue() const
+    {
+        {
+            if (!_eq)
+            {
+                throw std::runtime_error("Event queue is not bound to the endpoint"); // Is this the right throw??
+            }
+
+            return *_eq;
+        }
+    }
+
+    ::fid_ep* Endpoint::raw() noexcept
+    {
+        return _raw;
+    }
+
+    ::fid_ep const* Endpoint::raw() const noexcept
+    {
+        return _raw;
     }
 
 }

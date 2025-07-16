@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <rdma/fabric.h>
 #include <rdma/fi_endpoint.h>
 #include "CompletionQueue.hpp"
@@ -22,8 +23,8 @@ namespace mxl::lib::fabrics::ofi
 
         static std::shared_ptr<Endpoint> create(std::shared_ptr<Domain> domain);
 
-        void bind(EventQueue const& eq);
-        void bind(CompletionQueue const& cq, uint64_t flags);
+        void bind(std::shared_ptr<EventQueue> eq);
+        void bind(std::shared_ptr<CompletionQueue> cq, uint64_t flags);
 
         void enable();
 
@@ -31,12 +32,27 @@ namespace mxl::lib::fabrics::ofi
         void connect(void const* addr);
         void shutdown();
 
+        [[nodiscard]]
+        std::shared_ptr<CompletionQueue> completionQueue() const;
+
+        [[nodiscard]]
+        std::shared_ptr<EventQueue> eventQueue() const;
+
+        ::fid_ep* raw() noexcept;
+
+        [[nodiscard]]
+        ::fid_ep const* raw() const noexcept;
+
     private:
         void close();
 
-        Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain);
+        Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq = std::nullopt,
+            std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt);
 
         ::fid_ep* _raw;
         std::shared_ptr<Domain> _domain;
+
+        std::optional<std::shared_ptr<CompletionQueue>> _cq;
+        std::optional<std::shared_ptr<EventQueue>> _eq;
     };
 }

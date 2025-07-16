@@ -4,6 +4,7 @@
 #include <string>
 #include <rdma/fabric.h>
 #include <type_traits>
+#include "Provider.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -30,8 +31,6 @@ namespace mxl::lib::fabrics::ofi
         ::fi_info* raw() noexcept;
         [[nodiscard]]
         ::fi_info const* raw() const noexcept;
-
-        static FIInfo from_raw(::fi_info const* raw) noexcept;
 
     private:
         friend class FIInfoView;
@@ -126,7 +125,7 @@ namespace mxl::lib::fabrics::ofi
          * Get a list of provider configurations supported to the specified
          * node/service
          */
-        static FIInfoList get(std::string node, std::string service);
+        static FIInfoList get(std::string node, std::string service, Provider provider);
         static FIInfoList owned(::fi_info* info) noexcept;
 
         // Type aliases for const and non-const versions of the iterator template

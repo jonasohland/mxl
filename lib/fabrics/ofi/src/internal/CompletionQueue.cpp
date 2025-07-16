@@ -5,6 +5,7 @@
 #include <rdma/fi_errno.h>
 #include <sys/types.h>
 #include "internal/Logging.hpp"
+#include "Domain.hpp"
 #include "Exception.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -41,12 +42,12 @@ namespace mxl::lib::fabrics::ofi
         // expose the private constructor to std::make_shared inside this function
         struct MakeSharedEnabler : public CompletionQueue
         {
-            MakeSharedEnabler(::fid_cq* raw)
-                : CompletionQueue(raw)
+            MakeSharedEnabler(::fid_cq* raw, std::shared_ptr<Domain> domain)
+                : CompletionQueue(raw, domain)
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(cq);
+        return std::make_shared<MakeSharedEnabler>(cq, domain);
     }
 
     std::optional<std::shared_ptr<CompletionQueueDataEntry>> CompletionQueue::tryEntry()
@@ -65,8 +66,9 @@ namespace mxl::lib::fabrics::ofi
         return handleReadResult(ret, &entry);
     }
 
-    CompletionQueue::CompletionQueue(::fid_cq* raw)
+    CompletionQueue::CompletionQueue(::fid_cq* raw, std::shared_ptr<Domain> domain)
         : _raw(raw)
+        , _domain(domain)
     {}
 
     CompletionQueue::~CompletionQueue()

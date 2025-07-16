@@ -1,8 +1,11 @@
 #include "PassiveEndpoint.hpp"
 #include <memory>
+#include <optional>
+#include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_endpoint.h>
 #include "internal/Logging.hpp"
+#include "EventQueue.hpp"
 #include "Exception.hpp"
 #include "Fabric.hpp"
 
@@ -16,12 +19,12 @@ namespace mxl::lib::fabrics::ofi
 
         struct MakeSharedEnabler : public PassiveEndpoint
         {
-            MakeSharedEnabler(::fid_pep* raw, std::shared_ptr<Fabric> fabric)
-                : PassiveEndpoint(raw, std::move(fabric))
+            MakeSharedEnabler(::fid_pep* raw, std::shared_ptr<Fabric> fabric, std::optional<std::shared_ptr<EventQueue>> eq)
+                : PassiveEndpoint(raw, std::move(fabric), std::move(eq))
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(pep, fabric);
+        return std::make_shared<MakeSharedEnabler>(pep, fabric, std::nullopt);
     }
 
     PassiveEndpoint::~PassiveEndpoint()
@@ -29,9 +32,10 @@ namespace mxl::lib::fabrics::ofi
         close();
     }
 
-    PassiveEndpoint::PassiveEndpoint(::fid_pep* raw, std::shared_ptr<Fabric> fabric)
+    PassiveEndpoint::PassiveEndpoint(::fid_pep* raw, std::shared_ptr<Fabric> fabric, std::optional<std::shared_ptr<EventQueue>> eq)
         : _raw(raw)
         , _fabric(std::move(fabric))
+        , _eq(eq)
     {}
 
     void PassiveEndpoint::close()
@@ -61,10 +65,12 @@ namespace mxl::lib::fabrics::ofi
         return *this;
     }
 
-    void PassiveEndpoint::bind(EventQueue const& eq)
+    void PassiveEndpoint::bind(std::shared_ptr<EventQueue> eq)
     {
-        auto fid = eq.raw()->fid;
+        auto fid = eq->raw()->fid;
         fiCall(::fi_pep_bind, "Failed to bind event queue to passive endpoint", _raw, &fid, 0);
+
+        _eq = eq;
     }
 
     void PassiveEndpoint::listen()
@@ -81,6 +87,28 @@ namespace mxl::lib::fabrics::ofi
         }
 
         fiCall(::fi_reject, "Failed to reject connection request", _raw, *entry.getFid(), nullptr, 0);
+    }
+
+    std::shared_ptr<EventQueue> PassiveEndpoint::eventQueue() const
+    {
+        {
+            if (!_eq)
+            {
+                throw std::runtime_error("Event queue is not bound to the endpoint"); // Is this the right throw??
+            }
+
+            return *_eq;
+        }
+    }
+
+    ::fid_pep* PassiveEndpoint::raw() noexcept
+    {
+        return _raw;
+    }
+
+    ::fid_pep const* PassiveEndpoint::raw() const noexcept
+    {
+        return _raw;
     }
 
 }

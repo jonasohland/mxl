@@ -1,8 +1,11 @@
 #include "FIInfo.hpp"
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
+#include "mxl/fabrics.h"
 #include "Exception.hpp"
 #include "FIVersion.hpp"
+#include "Format.hpp"
+#include "Provider.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -60,14 +63,6 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
-    FIInfo FIInfo::from_raw(::fi_info const* raw) noexcept
-    {
-        if (!raw)
-        {
-            // TODO throw?
-        }
-    }
-
     void FIInfo::free() noexcept
     {
         if (_raw != nullptr)
@@ -116,7 +111,7 @@ namespace mxl::lib::fabrics::ofi
         return {_raw};
     }
 
-    FIInfoList FIInfoList::get(std::string node, std::string service)
+    FIInfoList FIInfoList::get(std::string node, std::string service, Provider provider)
     {
         ::fi_info *info, *hints;
 
@@ -126,9 +121,12 @@ namespace mxl::lib::fabrics::ofi
             // TODO: throw an error?
         }
 
+        auto prov = fmt::format("{}", provider);
+
         // hints: hints->fabric_attr->prov_name = provider
         hints->mode = FI_RX_CQ_DATA;
         hints->caps = FI_RMA | FI_WRITE | FI_REMOTE_WRITE;
+        hints->fabric_attr->prov_name = const_cast<char*>(prov.c_str());
         // hints: FI_REMOTE_WRITE and FI_RMA_EVENT could be appened for a target only
         // hints: add condition to append FI_HMEM capability if needed!
 

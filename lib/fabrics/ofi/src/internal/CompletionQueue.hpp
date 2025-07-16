@@ -45,10 +45,11 @@ namespace mxl::lib::fabrics::ofi
     private:
         void close();
 
-        CompletionQueue(::fid_cq* raw);
+        CompletionQueue(::fid_cq* raw, std::shared_ptr<Domain> domain);
 
         std::optional<std::shared_ptr<CompletionQueueDataEntry>> handleReadResult(ssize_t ret, ::fi_cq_data_entry* entry);
 
         ::fid_cq* _raw;
+        std::shared_ptr<Domain> _domain;
     };
 }

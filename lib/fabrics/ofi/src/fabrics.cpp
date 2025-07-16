@@ -9,7 +9,6 @@
 #include <rdma/fabric.h>
 #include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
-#include "internal/MemoryRegion.hpp"
 #include "internal/Target.hpp"
 #include "internal/TargetInfo.hpp"
 #include "mxl/platform.h"

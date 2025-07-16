@@ -32,13 +32,13 @@ namespace mxl::lib::fabrics::ofi
         static std::shared_ptr<ConnNotificationEntry> from_raw(::fi_eq_cm_entry const* raw, uint32_t eventType);
 
         [[nodiscard]]
-        std::optional<FIInfoView> getInfo();
+        std::optional<FIInfoView> getInfo() noexcept;
 
         [[nodiscard]]
-        std::optional<fid_t> getFid() const;
+        std::optional<fid_t> getFid() const noexcept;
 
         [[nodiscard]]
-        EventType getEventType() const;
+        EventType getEventType() const noexcept;
 
     private:
         ConnNotificationEntry(std::optional<::fid_t>, std::optional<FIInfoList>, EventType);

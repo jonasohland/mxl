@@ -44,10 +44,11 @@ namespace mxl::lib::fabrics::ofi
     private:
         void close();
 
-        EventQueue(::fid_eq* raw);
+        EventQueue(::fid_eq* raw, std::shared_ptr<Fabric> fabric);
 
         std::optional<std::shared_ptr<ConnNotificationEntry>> handleReadResult(ssize_t, uint32_t, ::fi_eq_cm_entry*);
 
         ::fid_eq* _raw;
+        std::shared_ptr<Fabric> _fabric;
     };
 }
