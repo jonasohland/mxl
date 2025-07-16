@@ -40,12 +40,12 @@ namespace mxl::lib::fabrics::ofi
         // expose the private constructor to std::make_shared inside this function
         struct MakeSharedEnabler : public EventQueue
         {
-            MakeSharedEnabler(::fid_eq* raw)
-                : EventQueue(raw)
+            MakeSharedEnabler(::fid_eq* raw, std::shared_ptr<Fabric> fabric)
+                : EventQueue(raw, fabric)
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(eq);
+        return std::make_shared<MakeSharedEnabler>(eq, fabric);
     }
 
     std::optional<std::shared_ptr<ConnNotificationEntry>> EventQueue::tryEntry()
@@ -68,8 +68,9 @@ namespace mxl::lib::fabrics::ofi
         return handleReadResult(ret, eventType, &entry);
     }
 
-    EventQueue::EventQueue(::fid_eq* raw)
+    EventQueue::EventQueue(::fid_eq* raw, std::shared_ptr<Fabric> fabric)
         : _raw(raw)
+        , _fabric(fabric)
     {}
 
     EventQueue::~EventQueue()

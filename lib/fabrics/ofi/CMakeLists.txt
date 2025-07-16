@@ -82,8 +82,10 @@ set(mxl_fabrics_sources
         src/internal/FIInfo.cpp
         src/internal/FILogging.cpp
         src/internal/FIVersion.cpp
+        src/internal/Initiator.cpp
         src/internal/MemoryRegion.cpp
         src/internal/PassiveEndpoint.cpp
+        src/internal/Provider.cpp
         src/internal/RMATarget.cpp
         src/internal/Target.cpp
         src/internal/TargetInfo.cpp

@@ -31,7 +31,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    std::optional<FIInfoView> ConnNotificationEntry::getInfo()
+    std::optional<FIInfoView> ConnNotificationEntry::getInfo() noexcept
     {
         if (!_info)
         {
@@ -41,12 +41,12 @@ namespace mxl::lib::fabrics::ofi
         return std::make_optional(*_info->begin());
     }
 
-    std::optional<fid_t> ConnNotificationEntry::getFid() const
+    std::optional<fid_t> ConnNotificationEntry::getFid() const noexcept
     {
         return _fid;
     }
 
-    ConnNotificationEntry::EventType ConnNotificationEntry::getEventType() const
+    ConnNotificationEntry::EventType ConnNotificationEntry::getEventType() const noexcept
     {
         return _eventType;
     }

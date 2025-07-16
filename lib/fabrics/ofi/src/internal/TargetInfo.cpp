@@ -1,27 +1,32 @@
 #include "TargetInfo.hpp"
-#include "Exception.hpp"
+#include <utility>
+#include "Address.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
 
-    std::ostream& operator<<(std::ostream& os, TargetInfo const&)
+    TargetInfo::TargetInfo()
+        : _fi_addr()
+        , _regions()
+        , _rkey(0)
+    {}
+
+    TargetInfo::TargetInfo(FabricAddress const& fi_addr, Regions const& regions, uint64_t rkey)
+        : _fi_addr(std::move(fi_addr))
+        , _regions(std::move(regions))
+        , _rkey(rkey)
+    {}
+
+    std::ostream& operator<<(std::ostream& os, TargetInfo const& targetInfo)
     {
-        os << "{}";
+        os << targetInfo._fi_addr << targetInfo._regions << targetInfo._rkey;
 
         return os;
     }
 
-    std::istream& operator>>(std::istream& is, TargetInfo&)
+    std::istream& operator>>(std::istream& is, TargetInfo& targetInfo)
     {
-        if (is.get() != '{')
-        {
-            throw Exception::make(MXL_ERR_INVALID_ARG, "invalid target info format");
-        }
-
-        if (is.get() != '}')
-        {
-            throw Exception::make(MXL_ERR_INVALID_ARG, "invalid target info format");
-        }
+        is >> targetInfo._fi_addr >> targetInfo._regions >> targetInfo._rkey;
 
         return is;
     }
