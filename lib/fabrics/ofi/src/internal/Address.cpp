@@ -1,6 +1,5 @@
 #include "Address.hpp"
 #include <cstdint>
-#include <memory>
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_errno.h>
@@ -19,7 +18,7 @@ namespace mxl::lib::fabrics::ofi
         : _inner(std::move(addr))
     {}
 
-    std::shared_ptr<FabricAddress> FabricAddress::retrieveFabricAddress(::fid_t fid)
+    FabricAddress FabricAddress::retrieveFabricAddress(::fid_t fid)
     {
         // First obtain the address length
         size_t addrlen = 0;
@@ -33,22 +32,15 @@ namespace mxl::lib::fabrics::ofi
         std::vector<uint8_t> addr(addrlen);
         fiCall(fi_getname, "Failed to retrieve endpoint's local address.", fid, addr.data(), &addrlen);
 
-        struct MakeSharedEnabler : public FabricAddress
-        {
-            MakeSharedEnabler(std::vector<uint8_t> addr)
-                : FabricAddress(std::move(addr))
-            {}
-        };
-
-        return std::make_shared<MakeSharedEnabler>(std::move(addr));
+        return FabricAddress{addr};
     }
 
-    std::shared_ptr<FabricAddress> FabricAddress::fromEndpoint(Endpoint& ep)
+    FabricAddress FabricAddress::fromEndpoint(Endpoint& ep)
     {
         return retrieveFabricAddress(&ep.raw()->fid);
     }
 
-    std::shared_ptr<FabricAddress> FabricAddress::fromEndpoint(PassiveEndpoint& pep)
+    FabricAddress FabricAddress::fromEndpoint(PassiveEndpoint& pep)
     {
         return retrieveFabricAddress(&pep.raw()->fid);
     }

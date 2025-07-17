@@ -1,7 +1,6 @@
 #pragma once
 
 #include <istream>
-#include <memory>
 #include <ostream>
 #include <vector>
 #include <rdma/fabric.h>
@@ -17,8 +16,8 @@ namespace mxl::lib::fabrics::ofi
     public:
         explicit FabricAddress();
 
-        static std::shared_ptr<FabricAddress> fromEndpoint(Endpoint&);
-        static std::shared_ptr<FabricAddress> fromEndpoint(PassiveEndpoint&);
+        static FabricAddress fromEndpoint(Endpoint&);
+        static FabricAddress fromEndpoint(PassiveEndpoint&);
 
         friend std::ostream& operator<<(std::ostream&, FabricAddress const&);
         friend std::istream& operator>>(std::istream&, FabricAddress&);
@@ -27,7 +26,7 @@ namespace mxl::lib::fabrics::ofi
 
     private:
         explicit FabricAddress(std::vector<uint8_t> addr);
-        static std::shared_ptr<FabricAddress> retrieveFabricAddress(::fid_t);
+        static FabricAddress retrieveFabricAddress(::fid_t);
 
         std::vector<uint8_t> _inner;
     };

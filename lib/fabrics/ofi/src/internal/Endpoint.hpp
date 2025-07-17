@@ -8,6 +8,7 @@
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
 #include "EventQueue.hpp"
+#include "FIInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -21,7 +22,7 @@ namespace mxl::lib::fabrics::ofi
         Endpoint(Endpoint&&) noexcept;
         Endpoint& operator=(Endpoint&&);
 
-        static std::shared_ptr<Endpoint> create(std::shared_ptr<Domain> domain);
+        static std::shared_ptr<Endpoint> create(std::shared_ptr<Domain> domain, std::optional<FIInfoView> remoteInfo = std::nullopt);
 
         void bind(std::shared_ptr<EventQueue> eq);
         void bind(std::shared_ptr<CompletionQueue> cq, uint64_t flags);

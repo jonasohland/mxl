@@ -18,7 +18,7 @@ namespace mxl::lib::fabrics::ofi
 
     TargetWrapper* FabricsInstance::createTarget()
     {
-        return &_targets.emplace_back(); // Wow c++.. This syntax is insane
+        return &_targets.emplace_back();
     }
 
     void FabricsInstance::destroyTarget(TargetWrapper* wrapper)

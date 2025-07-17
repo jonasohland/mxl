@@ -126,6 +126,8 @@ namespace mxl::lib::fabrics::ofi
          * node/service
          */
         static FIInfoList get(std::string node, std::string service, Provider provider);
+
+        // Take ownership over a fi_info raw pointer.
         static FIInfoList owned(::fi_info* info) noexcept;
 
         // Type aliases for const and non-const versions of the iterator template
