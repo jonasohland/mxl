@@ -26,7 +26,7 @@ namespace mxl::lib::fabrics::ofi
         void bind(std::shared_ptr<EventQueue> eq);
 
         void listen();
-        void reject(ConnNotificationEntry const& entry);
+        void reject(ConnNotificationEntry& entry);
 
         [[nodiscard]]
         std::shared_ptr<EventQueue> eventQueue() const;

@@ -2,52 +2,14 @@
 
 #include <cstdint>
 #include <memory>
-#include <ostream>
-#include <vector>
 #include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
 #include "Domain.hpp"
+#include "Region.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-
-    struct Region
-    {
-        friend std::ostream& operator<<(std::ostream& os, Region const& region);
-        friend std::istream& operator>>(std::istream& is, Region& region);
-
-        [[nodiscard]]
-        ::iovec to_iovec() const noexcept;
-
-        void* base;
-        size_t len;
-    };
-
-    class Regions
-    {
-    public:
-        explicit Regions() = default;
-
-        explicit Regions(std::vector<Region> regions)
-            : _inner(std::move(regions))
-        {}
-
-        friend std::ostream& operator<<(std::ostream& os, Regions const& regions);
-        friend std::istream& operator>>(std::istream& is, Regions& regions);
-
-        [[nodiscard]]
-        bool empty() const noexcept
-        {
-            return _inner.empty();
-        }
-
-        [[nodiscard]]
-        std::vector<::iovec> to_iovec() const noexcept;
-
-    private:
-        std::vector<Region> _inner;
-    };
 
     class MemoryRegion
     {
@@ -63,6 +25,7 @@ namespace mxl::lib::fabrics::ofi
         MemoryRegion& operator=(MemoryRegion&&) noexcept;
 
         ::fid_mr* raw() noexcept;
+        [[nodiscard]]
         ::fid_mr const* raw() const noexcept;
 
         [[nodiscard]]

@@ -1,10 +1,9 @@
 #include "FIInfo.hpp"
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
-#include "mxl/fabrics.h"
 #include "Exception.hpp"
 #include "FIVersion.hpp"
-#include "Format.hpp"
+#include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
 #include "Provider.hpp"
 
 namespace mxl::lib::fabrics::ofi

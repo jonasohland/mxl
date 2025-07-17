@@ -9,14 +9,18 @@
 #include "Domain.hpp"
 #include "EventQueue.hpp"
 #include "Exception.hpp"
+#include "FIInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    std::shared_ptr<Endpoint> Endpoint::create(std::shared_ptr<Domain> domain)
+    std::shared_ptr<Endpoint> Endpoint::create(std::shared_ptr<Domain> domain, std::optional<FIInfoView> remoteInfo)
     {
         ::fid_ep* raw;
 
-        fiCall(::fi_endpoint, "Failed to create endpoint", domain->raw(), domain->fabric()->info().raw(), &raw, nullptr);
+        // If we are connecting to a remote endpoint, we need to use the remote info otherwise we create the endpoint with our local info.
+        auto info = remoteInfo ? remoteInfo->raw() : domain->fabric()->info().raw();
+
+        fiCall(::fi_endpoint, "Failed to create endpoint", domain->raw(), info, &raw, nullptr);
 
         // expose the private constructor to std::make_shared inside this function
         struct MakeSharedEnabler : public Endpoint

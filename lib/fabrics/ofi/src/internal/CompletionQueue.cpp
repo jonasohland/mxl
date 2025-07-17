@@ -5,6 +5,7 @@
 #include <rdma/fi_errno.h>
 #include <sys/types.h>
 #include "internal/Logging.hpp"
+#include "CompletionQueueEntry.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
 
@@ -50,20 +51,20 @@ namespace mxl::lib::fabrics::ofi
         return std::make_shared<MakeSharedEnabler>(cq, domain);
     }
 
-    std::optional<std::shared_ptr<CompletionQueueDataEntry>> CompletionQueue::tryEntry()
+    std::optional<CompletionQueueDataEntry> CompletionQueue::tryEntry()
     {
         fi_cq_data_entry entry;
 
         ssize_t ret = fi_cq_read(_raw, &entry, 1);
-        return handleReadResult(ret, &entry);
+        return handleReadResult(ret, entry);
     }
 
-    std::optional<std::shared_ptr<CompletionQueueDataEntry>> CompletionQueue::waitForEntry(std::chrono::steady_clock::duration timeout)
+    std::optional<CompletionQueueDataEntry> CompletionQueue::waitForEntry(std::chrono::steady_clock::duration timeout)
     {
         fi_cq_data_entry entry;
 
         ssize_t ret = fi_cq_sread(_raw, &entry, 1, nullptr, std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count());
-        return handleReadResult(ret, &entry);
+        return handleReadResult(ret, entry);
     }
 
     CompletionQueue::CompletionQueue(::fid_cq* raw, std::shared_ptr<Domain> domain)
@@ -111,7 +112,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    std::optional<std::shared_ptr<CompletionQueueDataEntry>> CompletionQueue::handleReadResult(ssize_t ret, ::fi_cq_data_entry* entry)
+    std::optional<CompletionQueueDataEntry> CompletionQueue::handleReadResult(ssize_t ret, ::fi_cq_data_entry& entry)
     {
         if (ret == -FI_EAGAIN)
         {
@@ -131,6 +132,6 @@ namespace mxl::lib::fabrics::ofi
             return std::nullopt;
         }
 
-        return CompletionQueueDataEntry::from_raw(entry);
+        return CompletionQueueDataEntry{entry};
     }
 }

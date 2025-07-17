@@ -39,15 +39,15 @@ namespace mxl::lib::fabrics::ofi
         static std::shared_ptr<CompletionQueue> open(std::shared_ptr<Domain> domain,
             CompletionQueueAttr const& attr = CompletionQueueAttr::get_default());
 
-        std::optional<std::shared_ptr<CompletionQueueDataEntry>> tryEntry();
-        std::optional<std::shared_ptr<CompletionQueueDataEntry>> waitForEntry(std::chrono::steady_clock::duration timeout);
+        std::optional<CompletionQueueDataEntry> tryEntry();
+        std::optional<CompletionQueueDataEntry> waitForEntry(std::chrono::steady_clock::duration timeout);
 
     private:
         void close();
 
         CompletionQueue(::fid_cq* raw, std::shared_ptr<Domain> domain);
 
-        std::optional<std::shared_ptr<CompletionQueueDataEntry>> handleReadResult(ssize_t ret, ::fi_cq_data_entry* entry);
+        std::optional<CompletionQueueDataEntry> handleReadResult(ssize_t ret, ::fi_cq_data_entry& entry);
 
         ::fid_cq* _raw;
         std::shared_ptr<Domain> _domain;

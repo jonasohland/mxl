@@ -1,6 +1,8 @@
 #include "EventQueueEntry.hpp"
 #include <memory>
 #include <optional>
+#include "FIInfo.hpp"
+#include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -8,52 +10,77 @@ namespace mxl::lib::fabrics::ofi
     {
         struct MakeSharedEnabler : public ConnNotificationEntry
         {
-            MakeSharedEnabler(std::optional<::fid_t> fid, std::optional<FIInfoList> info, EventType eventType)
-                : ConnNotificationEntry(std::move(fid), std::move(info), eventType)
+            MakeSharedEnabler(Event ev)
+                : ConnNotificationEntry(std::move(ev))
             {}
         };
 
         switch (eventType)
         {
-            case FI_CONNREQ: {
-                return std::make_shared<MakeSharedEnabler>(
-                    std::make_optional(entry->fid), std::make_optional(FIInfoList::owned(entry->info)), from(eventType));
-            }
-            break;
-
-            case FI_CONNECTED:
-            case FI_SHUTDOWN:  {
-                return std::make_shared<MakeSharedEnabler>(std::make_optional(entry->fid), std::nullopt, from(eventType));
-            }
-            break;
-
-            default: throw std::invalid_argument("Invalid event type for ConnNotificationEntry");
+            case FI_CONNREQ:   return std::make_shared<MakeSharedEnabler>(EventConnReq{entry->fid, FIInfoList::owned(entry->info)});
+            case FI_CONNECTED: return std::make_shared<MakeSharedEnabler>(EventConnected{entry->fid});
+            case FI_SHUTDOWN:  return std::make_shared<MakeSharedEnabler>(EventShutdown{entry->fid});
+            default:           throw std::invalid_argument("Invalid event type for ConnNotificationEntry");
         }
     }
 
-    std::optional<FIInfoView> ConnNotificationEntry::getInfo() noexcept
+    bool ConnNotificationEntry::isConnReq() const noexcept
     {
-        if (!_info)
-        {
-            return std::nullopt;
-        }
-
-        return std::make_optional(*_info->begin());
+        return std::visit(overloaded{[](EventConnReq const&) { return true; },
+                              [](EventConnected const&) { return false; },
+                              [](EventShutdown const&)
+                              {
+                                  return false;
+                              }},
+            _event);
     }
 
-    std::optional<fid_t> ConnNotificationEntry::getFid() const noexcept
+    bool ConnNotificationEntry::isConnected() const noexcept
     {
-        return _fid;
+        return std::visit(overloaded{[](EventConnReq const&) { return false; },
+                              [](EventConnected const&) { return true; },
+                              [](EventShutdown const&)
+                              {
+                                  return false;
+                              }},
+            _event);
     }
 
-    ConnNotificationEntry::EventType ConnNotificationEntry::getEventType() const noexcept
+    bool ConnNotificationEntry::isShutdown() const noexcept
     {
-        return _eventType;
+        return std::visit(overloaded{[](EventConnReq const&) { return false; },
+                              [](EventConnected const&) { return false; },
+                              [](EventShutdown const&)
+                              {
+                                  return true;
+                              }},
+            _event);
     }
 
-    ConnNotificationEntry::ConnNotificationEntry(std::optional<fid_t> fid, std::optional<FIInfoList> info, EventType eventType)
-        : _fid(std::move(fid))
-        , _info(std::move(info))
-        , _eventType(EventType(eventType))
+    std::optional<FIInfoView> ConnNotificationEntry::info() noexcept
+    {
+        return std::visit(overloaded{[](EventConnReq& ev) -> std::optional<FIInfoView> { return ev.info(); },
+                              [](EventConnected&) -> std::optional<FIInfoView> { return std::nullopt; },
+                              [](EventShutdown&) -> std::optional<FIInfoView>
+                              {
+                                  return std::nullopt;
+                              }},
+            _event);
+    }
+
+    std::optional<fid_t> ConnNotificationEntry::fid() noexcept
+    {
+        return std::visit(overloaded{[](EventConnReq& ev) { return ev.fid(); },
+                              [](EventConnected& ev) { return ev.fid(); },
+                              [](EventShutdown& ev)
+                              {
+                                  return ev.fid();
+                              }},
+            _event);
+    }
+
+    ConnNotificationEntry::ConnNotificationEntry(Event ev)
+        : _event(std::move(ev))
     {}
+
 }

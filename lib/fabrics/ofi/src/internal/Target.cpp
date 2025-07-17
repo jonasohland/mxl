@@ -1,6 +1,8 @@
 #include "Target.hpp"
 #include <chrono>
 #include <memory>
+#include <optional>
+#include <variant>
 #include <fmt/format.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
@@ -12,8 +14,6 @@
 #include "Domain.hpp"
 #include "Endpoint.hpp"
 #include "EventQueue.hpp"
-#include "EventQueueEntry.hpp"
-#include "Exception.hpp"
 #include "Fabric.hpp"
 #include "FIInfo.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
@@ -21,99 +21,144 @@
 #include "PassiveEndpoint.hpp"
 #include "Provider.hpp"
 #include "RMATarget.hpp"
+#include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    TargetWrapper::TargetWrapper() = default;
-
     TargetWrapper::~TargetWrapper()
     {}
 
-    std::shared_ptr<Endpoint> connectionEventLoop(PassiveEndpoint& pep, std::shared_ptr<Domain> domain)
+    void TargetWrapper::doProgress()
     {
-        pep.listen();
-
-        // start connection event loop
-        for (;;) // we probably need to use a cancellation token here, so that it doesn't run indefinitely
-        {
-            // wait for connection request
-            auto entry = pep.eventQueue()->waitForEntry(std::chrono::milliseconds(200));
-            if (!entry.has_value())
-            {
-                continue;
-            }
-
-            if (entry.value()->getEventType() != ConnNotificationEntry::EventType::ConnReq)
-            {
-                continue;
-            }
-
-            // create the active endpoint and bind a cq and an eq
-            auto endpoint = Endpoint::create(domain);
-
-            auto cq = CompletionQueue::open(domain, CompletionQueueAttr::get_default());
-            endpoint->bind(cq, FI_REMOTE_WRITE | FI_RECV);
-
-            auto eq = EventQueue::open(domain->fabric(), EventQueueAttr::get_default());
-            endpoint->bind(eq);
-
-            // we are now ready to accept the connection
-            endpoint->accept();
-
-            // wait for a connected event
-            for (;;) // we probably need to use a cancellation token here, so that it doesn't run indefinitely
-            {
-                auto entry = eq->waitForEntry(std::chrono::milliseconds(200));
-                if (!entry.has_value())
+        _state = std::visit(
+            overloaded{[](StateFresh& state) -> State
                 {
-                    continue;
-                }
-
-                if (entry.value()->getEventType() == ConnNotificationEntry::EventType::Connected)
+                    // Nothing to do, we are waiting for a setup call
+                    return state;
+                },
+                [&](StateWaitConnReq& state) -> State
                 {
-                    return endpoint;
-                }
-            }
-        }
+                    // Check if the entry is available and is a connection request
+                    if (auto entry = state.pep->eventQueue()->tryEntry(); entry && entry->get()->isConnReq())
+                    {
+                        // When creating the endpoint here must pass the info of the remote endpoint requesting connection
+                        auto endpoint = Endpoint::create(*_domain, entry->get()->info());
+
+                        auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
+                        endpoint->bind(cq, FI_REMOTE_WRITE | FI_RECV);
+
+                        auto eq = EventQueue::open(_domain->get()->fabric(), EventQueueAttr::get_default());
+                        endpoint->bind(eq);
+
+                        // we are now ready to accept the connection
+                        endpoint->accept();
+
+                        // Return the new state as the variant type
+                        return StateWaitForConnected{endpoint};
+                    }
+
+                    return state;
+                },
+                [](StateWaitForConnected& state) -> State
+                {
+                    auto eq = state.ep->eventQueue();
+
+                    if (auto entry = eq->tryEntry(); entry && entry->get()->isConnected())
+                    {
+                        // We have a connected event, so we can transition to the connected state
+                        return StateConnected{state.ep};
+                    }
+
+                    return state;
+                },
+                [&](StateConnected& state) -> State
+                {
+                    // TODO: handle grains!
+
+                    return state;
+                }},
+            _state);
     }
 
-    std::pair<mxlStatus, std::unique_ptr<TargetInfo>> TargetWrapper::setup(mxlTargetConfig const& config)
+    void TargetWrapper::doProgressBlocking(std::chrono::steady_clock::duration timeout)
+    {
+        _state = std::visit(
+            overloaded{[](StateFresh& state) -> State
+                {
+                    // Nothing to do, we are waiting for a setup call
+                    return state;
+                },
+                [&](StateWaitConnReq& state) -> State
+                {
+                    // Check if the entry is available and is a connection request
+                    if (auto entry = state.pep->eventQueue()->waitForEntry(timeout); entry && entry->get()->isConnReq())
+                    {
+                        // TODO: move this to a separate function to avoid code duplication
+                        // create the active endpoint and bind a cq and an eq
+                        auto endpoint = Endpoint::create(*_domain);
+
+                        auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
+                        endpoint->bind(cq, FI_REMOTE_WRITE | FI_RECV);
+
+                        auto eq = EventQueue::open(_domain->get()->fabric(), EventQueueAttr::get_default());
+                        endpoint->bind(eq);
+
+                        // we are now ready to accept the connection
+                        endpoint->accept();
+
+                        // Return the new state as the variant type
+                        return StateWaitForConnected{endpoint};
+                    }
+
+                    return state;
+                },
+                [&](StateWaitForConnected& state) -> State
+                {
+                    if (auto entry = state.ep->eventQueue()->waitForEntry(timeout); entry && entry->get()->isConnected())
+                    {
+                        // We have a connected event, so we can transition to the connected state
+                        return StateConnected{state.ep};
+                    }
+
+                    return state;
+                },
+                [&](StateConnected& state) -> State
+                {
+                    // TODO: handle grains!
+
+                    return state;
+                }},
+            _state);
+    }
+
+    std::pair<mxlStatus, std::unique_ptr<TargetInfo>> TargetWrapper::setup(mxlTargetConfig const& config) noexcept
     {
         namespace ranges = std::ranges;
-
-        // we're still missing a way to use the flow uuid and recover the addresses to register (MR)
-
-        MXL_INFO("setting up target [endpoint = {}:{}, provider = {}, flow = {}]",
-            config.endpointAddress.node,
-            config.endpointAddress.service,
-            config.provider,
-            config.flowId);
+        MXL_INFO("setting up target [endpoint = {}:{}, provider = {}]", config.endpointAddress.node, config.endpointAddress.service, config.provider);
 
         auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, providerFromAPI(config.provider));
 
         auto bestFabricInfo = RMATarget::findBestFabric(fabricInfoList, config.provider);
         if (!bestFabricInfo)
         {
-            throw Exception::make(MXL_ERR_NO_FABRIC, "No suitable fabric available");
+            return {MXL_ERR_NO_FABRIC, nullptr};
         }
 
         auto fabric = Fabric::open(*bestFabricInfo);
-        auto domain = Domain::open(fabric);
+        _domain = Domain::open(fabric);
+
+        auto regions = Regions::fromAPI(config.regions);
+        _mr = MemoryRegion::reg(*_domain, *regions, FI_REMOTE_WRITE);
 
         auto pep = PassiveEndpoint::create(fabric);
 
         auto eq = EventQueue::open(fabric, EventQueueAttr::get_default());
         pep->bind(eq);
+        pep->listen();
 
-        auto ep = connectionEventLoop(*pep, domain);
+        // Transition the state machine to the waiting for a connection request state
+        _state = StateWaitConnReq{pep};
 
-        // we are now connected!!
-        MXL_INFO("We are now connected to the endpoint!");
-
-        auto fabricAddr = FabricAddress::fromEndpoint(*pep);
-        auto regions = Regions(std::vector<Region>{});
-
-        // TODO: correctly set the regions and rkey
-        return {MXL_STATUS_OK, std::make_unique<TargetInfo>(*fabricAddr, regions, 0)};
+        return {MXL_STATUS_OK, std::make_unique<TargetInfo>(FabricAddress::fromEndpoint(*pep), *regions, _mr->get()->getRemoteKey())};
     }
 }

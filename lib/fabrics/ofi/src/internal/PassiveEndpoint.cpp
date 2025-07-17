@@ -78,15 +78,16 @@ namespace mxl::lib::fabrics::ofi
         fiCall(::fi_listen, "Failed to transition the endpoint into listener mode", _raw);
     }
 
-    void PassiveEndpoint::reject(ConnNotificationEntry const& entry)
+    void PassiveEndpoint::reject(ConnNotificationEntry& entry)
     {
-        if (!entry.getFid())
+        auto fid = entry.fid();
+        if (!fid)
         {
             MXL_ERROR("Cannot reject a connection notification entry without a fid");
             return;
         }
 
-        fiCall(::fi_reject, "Failed to reject connection request", _raw, *entry.getFid(), nullptr, 0);
+        fiCall(::fi_reject, "Failed to reject connection request", _raw, *fid, nullptr, 0);
     }
 
     std::shared_ptr<EventQueue> PassiveEndpoint::eventQueue() const

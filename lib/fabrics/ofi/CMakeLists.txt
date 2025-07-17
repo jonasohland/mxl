@@ -86,6 +86,7 @@ set(mxl_fabrics_sources
         src/internal/MemoryRegion.cpp
         src/internal/PassiveEndpoint.cpp
         src/internal/Provider.cpp
+        src/internal/Region.cpp
         src/internal/RMATarget.cpp
         src/internal/Target.cpp
         src/internal/TargetInfo.cpp
