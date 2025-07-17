@@ -32,21 +32,27 @@ extern "C"
         char const* service;
     } mxlEndpointAddress;
 
+    typedef void* mxlRegions;
+
     typedef struct mxlTargetConfig_t
     {
         mxlEndpointAddress endpointAddress;
         mxlFabricsProvider provider;
-        char const* flowId;
+        mxlRegions regions;
     } mxlTargetConfig;
 
     typedef struct mxlInitiatorConfig_t
     {
         mxlEndpointAddress endpointAddress;
         mxlFabricsProvider provider;
-        char const* flowId;
+        mxlRegions regions;
     } mxlInitiatorConfig;
 
     typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
+
+    mxlStatus mxlFabricsRegionsCreate(void** ownBuffers, size_t* bufferSizes, size_t count, mxlRegions* out_regions);
+    mxlStatus mxlFabricsRegionFromFlow(mxlInstance in_instance, char const* uuid, mxlRegions* out_regions);
+    mxlStatus mxlFabricsRegionsFree(mxlRegions regions);
 
     /**
      * Create a new mxl-fabrics from an mxl instance. Targets and initiators created from this mxl-fabrics instance
