@@ -25,7 +25,6 @@ TEST_CASE("Fabrics : Test", "[fabrics]")
             .service = "1234"
         },
         .provider = MXL_SHARING_PROVIDER_AUTO,
-        .flowId = "1234"
     };
     // clang-format on
 
