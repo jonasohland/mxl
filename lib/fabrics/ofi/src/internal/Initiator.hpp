@@ -5,6 +5,7 @@
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
 #include "Endpoint.hpp"
+#include "TargetInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -14,8 +15,8 @@ namespace mxl::lib::fabrics::ofi
     public:
         // I think we should define our internal objects so that we are decoupled from the public API
         static std::pair<mxlStatus, std::unique_ptr<Initiator>> setup(mxlInitiatorConfig const& config);
-        mxlStatus addTarget(mxlTargetInfo const& targetInfo);
-        mxlStatus removeTarget(mxlTargetInfo const& targetInfo);
+        mxlStatus addTarget(TargetInfo const& targetInfo);
+        mxlStatus removeTarget(TargetInfo const& targetInfo);
 
     private:
         Initiator(std::shared_ptr<Domain> domain, std::vector<std::shared_ptr<Endpoint>> endpoints)

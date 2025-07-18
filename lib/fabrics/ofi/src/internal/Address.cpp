@@ -35,19 +35,14 @@ namespace mxl::lib::fabrics::ofi
         return FabricAddress{addr};
     }
 
-    FabricAddress FabricAddress::fromEndpoint(Endpoint& ep)
-    {
-        return retrieveFabricAddress(&ep.raw()->fid);
-    }
-
-    FabricAddress FabricAddress::fromEndpoint(PassiveEndpoint& pep)
-    {
-        return retrieveFabricAddress(&pep.raw()->fid);
-    }
-
     void* FabricAddress::raw()
     {
         return _inner.data();
+    }
+
+    void* FabricAddress::raw() const
+    {
+        return const_cast<uint8_t*>(_inner.data());
     }
 
     std::ostream& operator<<(std::ostream& os, FabricAddress const& addr)

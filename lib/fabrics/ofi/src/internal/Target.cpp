@@ -9,7 +9,6 @@
 #include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
-#include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
 #include "Endpoint.hpp"
@@ -159,6 +158,6 @@ namespace mxl::lib::fabrics::ofi
         // Transition the state machine to the waiting for a connection request state
         _state = StateWaitConnReq{pep};
 
-        return {MXL_STATUS_OK, std::make_unique<TargetInfo>(FabricAddress::fromEndpoint(*pep), *regions, _mr->get()->getRemoteKey())};
+        return {MXL_STATUS_OK, std::make_unique<TargetInfo>(pep->localAddress(), *regions, _mr->get()->getRemoteKey())};
     }
 }

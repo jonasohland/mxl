@@ -5,6 +5,7 @@
 #include <utility>
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
+#include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
 #include "EventQueue.hpp"
@@ -102,9 +103,9 @@ namespace mxl::lib::fabrics::ofi
         fiCall(::fi_accept, "Failed to accept connection", _raw, nullptr, 0);
     }
 
-    void Endpoint::connect(void const* addr)
+    void Endpoint::connect(FabricAddress const& addr)
     {
-        fiCall(::fi_connect, "Failed to connect endpoint", _raw, addr, nullptr, 0);
+        fiCall(::fi_connect, "Failed to connect endpoint", _raw, addr.raw(), nullptr, 0);
     }
 
     void Endpoint::shutdown()

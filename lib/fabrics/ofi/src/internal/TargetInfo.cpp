@@ -17,6 +17,23 @@ namespace mxl::lib::fabrics::ofi
         , _rkey(rkey)
     {}
 
+    FabricAddress const& TargetInfo::fabricAddress() const noexcept
+    {
+        return _fi_addr;
+    }
+
+    [[nodiscard]]
+    Regions const& TargetInfo::regions() const noexcept
+    {
+        return _regions;
+    }
+
+    [[nodiscard]]
+    uint64_t TargetInfo::rkey() const noexcept
+    {
+        return _rkey;
+    }
+
     std::ostream& operator<<(std::ostream& os, TargetInfo const& targetInfo)
     {
         os << targetInfo._fi_addr << targetInfo._regions << targetInfo._rkey;
