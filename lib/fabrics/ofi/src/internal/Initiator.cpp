@@ -1,8 +1,8 @@
 #include "Initiator.hpp"
 #include <memory>
-#include <vector>
 #include <rdma/fabric.h>
 #include "mxl/fabrics.h"
+#include "mxl/mxl.h"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
 #include "Endpoint.hpp"
@@ -10,13 +10,14 @@
 #include "Exception.hpp"
 #include "Fabric.hpp"
 #include "FIInfo.hpp"
+#include "MemoryRegion.hpp"
 #include "Provider.hpp"
 #include "RMATarget.hpp"
 #include "TargetInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    std::pair<mxlStatus, std::unique_ptr<Initiator>> Initiator::setup(mxlInitiatorConfig const& config)
+    mxlStatus Initiator::setup(mxlInitiatorConfig const& config)
     {
         auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, providerFromAPI(config.provider));
 
@@ -27,47 +28,47 @@ namespace mxl::lib::fabrics::ofi
         }
 
         auto fabric = Fabric::open(*bestFabricInfo);
-        auto domain = Domain::open(fabric);
+        _domain = Domain::open(fabric);
 
-        // TODO: Normally we should register our local memory regions here (buffers we will initiate transfers with).
+        auto regions = Regions::fromAPI(config.regions);
+        _mr = MemoryRegion::reg(*_domain, *regions, FI_WRITE);
 
-        struct MakeUniqueEnabler : public Initiator
-        {
-            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::vector<std::shared_ptr<Endpoint>> endpoints)
-                : Initiator(std::move(domain), std::move(endpoints))
-            {}
-        };
-
-        return {MXL_STATUS_OK, std::make_unique<MakeUniqueEnabler>(domain, std::vector<std::shared_ptr<Endpoint>>{})};
+        return MXL_STATUS_OK;
     }
 
-    mxlStatus Initiator::addTarget(TargetInfo const& targetInfo)
+    mxlStatus Initiator::addTarget(std::string identifier, TargetInfo const& targetInfo)
     {
-        auto endpoint = Endpoint::create(_domain);
+        auto endpoint = Endpoint::create(*_domain);
 
-        auto eq = EventQueue::open(_domain->fabric(), EventQueueAttr::get_default());
+        auto eq = EventQueue::open(_domain->get()->fabric(), EventQueueAttr::get_default());
         endpoint->bind(eq);
 
-        auto cq = CompletionQueue::open(_domain, CompletionQueueAttr::get_default());
+        auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
         endpoint->bind(cq, FI_WRITE);
 
-        // targetInfo.regions() // TODO: Keep those for later use when transferring data
-        // targetInfo.rkey() // TODO: Keep those for later use when transferring data
-
-        // connect to the target
         endpoint->connect(targetInfo.fabricAddress());
 
-        // We should probably store the endpoint and target info in a map so we can retrieve it later
-        _endpoints.push_back(std::move(endpoint));
+        auto target = InitiatorTargetEntry{._endpoint = std::move(endpoint), ._regions = targetInfo.regions(), ._rkey = targetInfo.rkey()};
+
+        _targets.insert({identifier, target});
 
         return MXL_STATUS_OK;
     }
 
-    mxlStatus Initiator::removeTarget(TargetInfo const& targetInfo)
+    mxlStatus Initiator::removeTarget(std::string identifier, TargetInfo const& targetInfo)
     {
-        // Find endpoint associated with the targetInfo and remove it
+        // TODO: should the identifier just be BASE64 encoding of TargetInfo ?
+        if (_targets.contains(identifier))
+        {
+            auto target = _targets.at(identifier);
 
-        MXL_FABRICS_UNUSED(targetInfo);
-        return MXL_STATUS_OK;
+            target._endpoint->shutdown();
+
+            _targets.erase(identifier);
+
+            return MXL_STATUS_OK;
+        }
+
+        return MXL_ERR_FLOW_NOT_FOUND; // TODO: replace this with a more proper error code
     }
 }

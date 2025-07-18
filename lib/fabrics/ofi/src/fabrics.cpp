@@ -9,6 +9,7 @@
 #include <rdma/fabric.h>
 #include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
+#include "internal/Initiator.hpp"
 #include "internal/Target.hpp"
 #include "internal/TargetInfo.hpp"
 #include "mxl/platform.h"
@@ -254,8 +255,35 @@ mxlStatus mxlFabricsTargetSetCompletionCallback(mxlFabricsInstance in_fabricsIns
 extern "C" MXL_EXPORT
 mxlStatus mxlFabricsCreateInitiator(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator* out_initiator)
 {
-    MXL_FABRICS_UNUSED(in_fabricsInstance);
-    MXL_FABRICS_UNUSED(out_initiator);
+    namespace ofi = mxl::lib::fabrics::ofi;
+
+    if (in_fabricsInstance == nullptr || out_initiator == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    try
+    {
+        auto instance = reinterpret_cast<ofi::FabricsInstance*>(in_fabricsInstance);
+
+        *out_initiator = reinterpret_cast<mxlFabricsInitiator>(instance->createInitiator());
+    }
+    catch (ofi::Exception& e)
+    {
+        MXL_ERROR("Failed to create initiator: {}", e.what());
+
+        return e.status();
+    }
+    catch (std::exception& e)
+    {
+        MXL_ERROR("Failed to create initiator : {}", e.what());
+        return MXL_ERR_UNKNOWN;
+    }
+    catch (...)
+    {
+        MXL_ERROR("Failed to create initiator");
+        return MXL_ERR_UNKNOWN;
+    }
 
     return MXL_STATUS_OK;
 }
@@ -272,11 +300,35 @@ mxlStatus mxlFabricsDestroyInitiator(mxlFabricsInstance in_fabricsInstance, mxlF
 extern "C" MXL_EXPORT
 mxlStatus mxlFabricsInitiatorSetup(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, mxlInitiatorConfig const* in_config)
 {
-    MXL_FABRICS_UNUSED(in_fabricsInstance);
-    MXL_FABRICS_UNUSED(in_initiator);
-    MXL_FABRICS_UNUSED(in_config);
+    namespace ofi = mxl::lib::fabrics::ofi;
 
-    return MXL_STATUS_OK;
+    if (in_fabricsInstance == nullptr || in_initiator == nullptr || in_config == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    try
+    {
+        auto initiator = reinterpret_cast<ofi::Initiator*>(in_initiator);
+
+        return initiator->setup(*in_config);
+    }
+    catch (ofi::Exception& e)
+    {
+        MXL_ERROR("Failed to set up initiator: {}", e.what());
+
+        return e.status();
+    }
+    catch (std::exception& e)
+    {
+        MXL_ERROR("Failed to set up initiator : {}", e.what());
+        return MXL_ERR_UNKNOWN;
+    }
+    catch (...)
+    {
+        MXL_ERROR("Failed to set up initiator");
+        return MXL_ERR_UNKNOWN;
+    }
 }
 
 extern "C" MXL_EXPORT

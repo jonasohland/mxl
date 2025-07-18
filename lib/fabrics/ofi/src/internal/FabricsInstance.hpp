@@ -3,6 +3,7 @@
 #include <list>
 #include <internal/Instance.hpp>
 #include <mxl/fabrics.h>
+#include "Initiator.hpp"
 #include "Target.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -20,11 +21,13 @@ namespace mxl::lib::fabrics::ofi
         FabricsInstance& operator=(FabricsInstance const&) = delete;
 
         TargetWrapper* createTarget();
+        Initiator* createInitiator();
         void destroyTarget(TargetWrapper*);
 
     private:
         mxl::lib::Instance* _mxlInstance;
         std::list<TargetWrapper> _targets;
+        std::list<Initiator> _initiators;
     };
 
 }

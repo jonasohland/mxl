@@ -61,6 +61,14 @@ RUN apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-ugly \
     gstreamer1.0-x
 
+# Install libfabric
+RUN git clone -b v2.2.0 https://github.com/ofiwg/libfabric.git \
+  && cd libfabric \
+  && ./autogen.sh \
+  && ./configure --prefix=/usr \
+  && make install -j
+  
+
 # Remove the default ubuntu user if it exists
 RUN userdel --remove ubuntu >/dev/null 2>&1 || true
 RUN groupdel ubuntu >/dev/null 2>&1 || true
