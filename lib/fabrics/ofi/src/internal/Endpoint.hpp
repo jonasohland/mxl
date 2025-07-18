@@ -5,6 +5,7 @@
 #include <optional>
 #include <rdma/fabric.h>
 #include <rdma/fi_endpoint.h>
+#include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
 #include "EventQueue.hpp"
@@ -30,8 +31,13 @@ namespace mxl::lib::fabrics::ofi
         void enable();
 
         void accept();
-        void connect(void const* addr);
+        void connect(FabricAddress const& addr);
         void shutdown();
+
+        FabricAddress localAddress()
+        {
+            return FabricAddress::fromFid(&_raw->fid);
+        }
 
         [[nodiscard]]
         std::shared_ptr<CompletionQueue> completionQueue() const;

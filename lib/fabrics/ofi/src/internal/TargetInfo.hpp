@@ -1,8 +1,9 @@
 #pragma once
 
 #include <iostream>
+#include <sys/types.h>
 #include "Address.hpp"
-#include "MemoryRegion.hpp"
+#include "Region.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -16,6 +17,15 @@ namespace mxl::lib::fabrics::ofi
 
         friend std::ostream& operator<<(std::ostream&, TargetInfo const&);
         friend std::istream& operator>>(std::istream&, TargetInfo&);
+
+        [[nodiscard]]
+        FabricAddress const& fabricAddress() const noexcept;
+
+        [[nodiscard]]
+        Regions const& regions() const noexcept;
+
+        [[nodiscard]]
+        uint64_t rkey() const noexcept;
 
     private:
         FabricAddress _fi_addr;

@@ -6,8 +6,6 @@
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
 #include <sys/types.h>
-#include "Endpoint.hpp"
-#include "PassiveEndpoint.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -16,13 +14,18 @@ namespace mxl::lib::fabrics::ofi
     public:
         explicit FabricAddress();
 
-        static FabricAddress fromEndpoint(Endpoint&);
-        static FabricAddress fromEndpoint(PassiveEndpoint&);
+        static FabricAddress fromFid(::fid_t fid)
+        {
+            return retrieveFabricAddress(fid);
+        }
 
         friend std::ostream& operator<<(std::ostream&, FabricAddress const&);
         friend std::istream& operator>>(std::istream&, FabricAddress&);
 
         void* raw();
+        
+        [[nodiscard]]
+        void* raw() const;
 
     private:
         explicit FabricAddress(std::vector<uint8_t> addr);

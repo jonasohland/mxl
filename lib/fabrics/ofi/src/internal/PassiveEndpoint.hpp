@@ -4,6 +4,7 @@
 #include <optional>
 #include <rdma/fabric.h>
 #include <rdma/fi_endpoint.h>
+#include "Address.hpp"
 #include "EventQueue.hpp"
 #include "EventQueueEntry.hpp"
 #include "Fabric.hpp"
@@ -30,6 +31,11 @@ namespace mxl::lib::fabrics::ofi
 
         [[nodiscard]]
         std::shared_ptr<EventQueue> eventQueue() const;
+
+        FabricAddress localAddress()
+        {
+            return FabricAddress::fromFid(&_raw->fid);
+        }
 
         ::fid_pep* raw() noexcept;
 

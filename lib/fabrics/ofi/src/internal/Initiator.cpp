@@ -12,6 +12,7 @@
 #include "FIInfo.hpp"
 #include "Provider.hpp"
 #include "RMATarget.hpp"
+#include "TargetInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -40,7 +41,7 @@ namespace mxl::lib::fabrics::ofi
         return {MXL_STATUS_OK, std::make_unique<MakeUniqueEnabler>(domain, std::vector<std::shared_ptr<Endpoint>>{})};
     }
 
-    mxlStatus Initiator::addTarget(mxlTargetInfo const& targetInfo)
+    mxlStatus Initiator::addTarget(TargetInfo const& targetInfo)
     {
         auto endpoint = Endpoint::create(_domain);
 
@@ -50,15 +51,19 @@ namespace mxl::lib::fabrics::ofi
         auto cq = CompletionQueue::open(_domain, CompletionQueueAttr::get_default());
         endpoint->bind(cq, FI_WRITE);
 
-        // connect to the target
-        endpoint->connect(nullptr); // TODO(set address using targetInfo)
+        // targetInfo.regions() // TODO: Keep those for later use when transferring data
+        // targetInfo.rkey() // TODO: Keep those for later use when transferring data
 
+        // connect to the target
+        endpoint->connect(targetInfo.fabricAddress());
+
+        // We should probably store the endpoint and target info in a map so we can retrieve it later
         _endpoints.push_back(std::move(endpoint));
 
         return MXL_STATUS_OK;
     }
 
-    mxlStatus Initiator::removeTarget(mxlTargetInfo const& targetInfo)
+    mxlStatus Initiator::removeTarget(TargetInfo const& targetInfo)
     {
         // Find endpoint associated with the targetInfo and remove it
 
