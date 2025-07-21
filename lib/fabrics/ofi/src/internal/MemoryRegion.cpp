@@ -17,7 +17,7 @@ namespace mxl::lib::fabrics::ofi
             throw std::invalid_argument("Cannot register an empty vector of regions");
         }
 
-        auto iovecs = regions.to_iovec();
+        auto iovecs = regions.toIovec();
 
         ::fid_mr* raw;
 

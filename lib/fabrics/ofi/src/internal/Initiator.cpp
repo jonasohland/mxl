@@ -71,4 +71,26 @@ namespace mxl::lib::fabrics::ofi
 
         return MXL_ERR_FLOW_NOT_FOUND; // TODO: replace this with a more proper error code
     }
+
+    mxlStatus Initiator::transferGrainToTarget(std::string identifier, uint64_t grainIndex, GrainInfo const* grainInfo, uint8_t const* payload)
+    {
+        if (grainInfo == nullptr || payload == nullptr)
+        {
+            return MXL_ERR_INVALID_ARG;
+        }
+
+        if (!_targets.contains(identifier))
+        {
+            return MXL_ERR_INVALID_ARG;
+        }
+
+        auto& target = _targets.at(identifier);
+
+        auto r = target._regions;
+
+        auto bufferEntryOffset = grainIndex % bufferLen;
+
+        return MXL_STATUS_OK;
+    }
+
 }
