@@ -45,6 +45,18 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         std::vector<::iovec> to_iovec() const noexcept;
 
+        [[nodiscard]]
+        Region const& at(size_t index) const noexcept
+        {
+            return _inner.at(index);
+        }
+
+        [[nodiscard]]
+        size_t size() const
+        {
+            return _inner.size();
+        }
+
     private:
         std::vector<Region> _inner;
     };

@@ -63,7 +63,7 @@ namespace mxl::lib::fabrics::ofi
         return is;
     }
 
-    std::vector<::iovec> Regions::to_iovec() const noexcept
+    std::vector<::iovec> Regions::toIovec() const noexcept
     {
         std::vector<::iovec> iovecs;
         std::ranges::transform(_inner, std::back_inserter(iovecs), [](Region const& region) { return region.to_iovec(); });

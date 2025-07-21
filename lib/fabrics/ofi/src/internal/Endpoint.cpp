@@ -5,6 +5,7 @@
 #include <utility>
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
+#include <rdma/fi_rma.h>
 #include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
@@ -143,6 +144,25 @@ namespace mxl::lib::fabrics::ofi
     ::fid_ep const* Endpoint::raw() const noexcept
     {
         return _raw;
+    }
+
+    void Endpoint::write(Region const& region, uint64_t remoteAddr, void* mrDesc, uint64_t rkey, ::fi_addr_t destAddr)
+    {
+        // TODO: catch error and convert to an internal error
+        fiCall(::fi_write, "Failed to push rma write to work queue.", _raw, region.base, region.len, mrDesc, destAddr, remoteAddr, rkey, nullptr);
+    }
+
+    void Endpoint::write(Regions const& regions, uint64_t remoteAddr, void** mrDesc, uint64_t rkey, ::fi_addr_t destAddr)
+    {
+        if (regions.empty())
+        {
+            return;
+        }
+
+        auto iov = regions.toIovec();
+
+        // TODO: catch error and convert to an internal error
+        fiCall(::fi_writev, "Failed to push rma write to work queue.", _raw, iov.data(), mrDesc, iov.size(), destAddr, remoteAddr, rkey, nullptr);
     }
 
 }
