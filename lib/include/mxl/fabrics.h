@@ -187,7 +187,7 @@ extern "C"
      */
     MXL_EXPORT
     mxlStatus mxlFabricsInitiatorAddTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator,
-        mxlTargetInfo const* in_targetInfo);
+        mxlTargetInfo const in_targetInfo);
 
     /**
      * Remove a target from the initiator.
@@ -197,7 +197,7 @@ extern "C"
      */
     MXL_EXPORT
     mxlStatus mxlFabricsInitiatorRemoveTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator,
-        mxlTargetInfo const* in_targetInfo);
+        mxlTargetInfo const in_targetInfo);
 
     /**
      * Transfer of a grain to all added targets.
@@ -210,18 +210,6 @@ extern "C"
     MXL_EXPORT
     mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, GrainInfo const* in_grainInfo,
         uint8_t const* in_payload);
-
-    /**
-     * Transfer of a grain to a specific target.
-     * \param in_fabricsInstance A valid mxl fabrics instance
-     * \param in_initiator A valid fabrics initiator
-     * \param in_grainInfo The grain information.
-     * \param in_targetInfo The target information to send the grain to.
-     * \param in_payload The payload to send.
-     */
-    MXL_EXPORT
-    mxlStatus mxlFabricsInitiatorTransferGrainToTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator,
-        GrainInfo const* in_grainInfo, mxlFabricsTarget const* in_targetInfo, uint8_t const* in_payload);
 
     // Below are helper functions
 

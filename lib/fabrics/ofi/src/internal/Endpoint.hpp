@@ -54,22 +54,12 @@ namespace mxl::lib::fabrics::ofi
         /**
          * Push a remote write work request to the endpoint.
          * \param region The local memory region to write from.
+         * \param localDesc The memory region descriptor. This is obtained by registering the memory region.
          * \param remoteAddr The remote base address to write to
-         * \param mrDesc The memory region descriptor. This is obtained by registering the memory region.
          * \param rkey The remote protection key provided by the target
          * \param destAddr The destination address of the target endpoint. This is unused when using connected endpoints.
          */
-        void write(Region const& region, uint64_t remoteAddr, void* mrDesc, uint64_t rkey, ::fi_addr_t destAddr = FI_ADDR_UNSPEC);
-
-        /**
-         * Push a remote write work request to the endpoint. This version allows to specify multiple non contiguous regions.
-         * \param region The local memory regions to write from.
-         * \param remoteAddr The remote base address to write to
-         * \param mrDesc The memory region descriptor. This is obtained by registering the memory region.
-         * \param rkey The remote protection key provided by the target
-         * \param destAddr The destination address of the target endpoint. This is unused when using connected endpoints.
-         */
-        void write(Regions const& regions, uint64_t remoteAddr, void** mrDesc, uint64_t rkey, ::fi_addr_t destAddr = FI_ADDR_UNSPEC);
+        void write(Region const& localRegion, void* localDesc, uint64_t remoteAddr, uint64_t rkey, ::fi_addr_t destAddr = FI_ADDR_UNSPEC);
 
     private:
         void close();

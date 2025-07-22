@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <utility>
 #include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
@@ -14,7 +15,7 @@ namespace mxl::lib::fabrics::ofi
     class MemoryRegion
     {
     public:
-        static std::shared_ptr<MemoryRegion> reg(std::shared_ptr<Domain> domain, Regions const& regions, uint64_t access);
+        static std::shared_ptr<MemoryRegion> reg(std::shared_ptr<Domain> domain, Region const& region, uint64_t access);
 
         ~MemoryRegion();
 
@@ -41,5 +42,29 @@ namespace mxl::lib::fabrics::ofi
 
         ::fid_mr* _raw;
         std::shared_ptr<Domain> _domain;
+    };
+
+    class RegisteredRegion
+    {
+    public:
+        RegisteredRegion(std::shared_ptr<MemoryRegion> mr, Region region)
+            : _mr(std::move(mr))
+            , _region(std::move(region))
+        {}
+
+        Region& region()
+        {
+            return _region;
+        }
+
+        void* desc()
+        {
+            return _mr->getLocalMemoryDescriptor();
+        }
+
+    private:
+        std::shared_ptr<MemoryRegion> _mr;
+
+        Region _region;
     };
 }

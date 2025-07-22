@@ -332,21 +332,33 @@ mxlStatus mxlFabricsInitiatorSetup(mxlFabricsInstance in_fabricsInstance, mxlFab
 }
 
 extern "C" MXL_EXPORT
-mxlStatus mxlFabricsInitiatorAddTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, mxlTargetInfo const* in_targetInfo)
+mxlStatus mxlFabricsInitiatorAddTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, mxlTargetInfo const in_targetInfo)
 {
-    MXL_FABRICS_UNUSED(in_fabricsInstance);
-    MXL_FABRICS_UNUSED(in_initiator);
-    MXL_FABRICS_UNUSED(in_targetInfo);
+    namespace ofi = mxl::lib::fabrics::ofi;
+
+    if (in_fabricsInstance == nullptr || in_initiator == nullptr || in_targetInfo == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    auto initiator = reinterpret_cast<ofi::Initiator*>(in_initiator);
+    auto targetInfo = ofi::TargetInfo::fromAPI(in_targetInfo);
+    initiator->addTarget(*targetInfo);
 
     return MXL_STATUS_OK;
 }
 
 extern "C" MXL_EXPORT
-mxlStatus mxlFabricsInitiatorRemoveTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, mxlTargetInfo const* in_targetInfo)
+mxlStatus mxlFabricsInitiatorRemoveTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, mxlTargetInfo const in_targetInfo)
 {
-    MXL_FABRICS_UNUSED(in_fabricsInstance);
-    MXL_FABRICS_UNUSED(in_initiator);
-    MXL_FABRICS_UNUSED(in_targetInfo);
+    namespace ofi = mxl::lib::fabrics::ofi;
+
+    if (in_fabricsInstance == nullptr || in_initiator == nullptr || in_targetInfo == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    auto initiator = reinterpret_cast<ofi::Initiator*>(in_initiator);
 
     return MXL_STATUS_OK;
 }

@@ -1,4 +1,5 @@
 #include "Initiator.hpp"
+#include <cstdint>
 #include <memory>
 #include <rdma/fabric.h>
 #include "mxl/fabrics.h"
@@ -31,12 +32,21 @@ namespace mxl::lib::fabrics::ofi
         _domain = Domain::open(fabric);
 
         auto regions = Regions::fromAPI(config.regions);
-        _mr = MemoryRegion::reg(*_domain, *regions, FI_WRITE);
+        if (!regions)
+        {
+            return MXL_ERR_UNKNOWN; // TODO: proper error
+        }
+
+        for (auto const& region : *regions)
+        {
+            auto mr = MemoryRegion::reg(*_domain, region, FI_WRITE);
+            _localRegions.emplace_back(std::move(mr), region);
+        }
 
         return MXL_STATUS_OK;
     }
 
-    mxlStatus Initiator::addTarget(std::string identifier, TargetInfo const& targetInfo)
+    mxlStatus Initiator::addTarget(TargetInfo const& targetInfo)
     {
         auto endpoint = Endpoint::create(*_domain);
 
@@ -46,23 +56,26 @@ namespace mxl::lib::fabrics::ofi
         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
         endpoint->bind(cq, FI_WRITE);
 
-        endpoint->connect(targetInfo.fabricAddress());
+        endpoint->connect(targetInfo.fabricAddress);
 
-        auto target = InitiatorTargetEntry{._endpoint = std::move(endpoint), ._regions = targetInfo.regions(), ._rkey = targetInfo.rkey()};
+        auto target = InitiatorTargetEntry{.endpoint = std::move(endpoint), .regions = targetInfo.remoteRegions};
 
-        _targets.insert({identifier, target});
+        _targets.insert({targetInfo.asIdentifier(), target});
 
         return MXL_STATUS_OK;
     }
 
-    mxlStatus Initiator::removeTarget(std::string identifier, TargetInfo const& targetInfo)
+    mxlStatus Initiator::removeTarget(TargetInfo const& targetInfo)
     {
-        // TODO: should the identifier just be BASE64 encoding of TargetInfo ?
+        MXL_FABRICS_UNUSED(targetInfo);
+
+        auto identifier = targetInfo.asIdentifier();
+
         if (_targets.contains(identifier))
         {
             auto target = _targets.at(identifier);
 
-            target._endpoint->shutdown();
+            target.endpoint->shutdown();
 
             _targets.erase(identifier);
 
@@ -72,23 +85,21 @@ namespace mxl::lib::fabrics::ofi
         return MXL_ERR_FLOW_NOT_FOUND; // TODO: replace this with a more proper error code
     }
 
-    mxlStatus Initiator::transferGrainToTarget(std::string identifier, uint64_t grainIndex, GrainInfo const* grainInfo, uint8_t const* payload)
+    mxlStatus Initiator::transferGrain(uint64_t grainIndex, GrainInfo const* grainInfo, uint8_t const* payload)
     {
         if (grainInfo == nullptr || payload == nullptr)
         {
             return MXL_ERR_INVALID_ARG;
         }
 
-        if (!_targets.contains(identifier))
+        auto localRegion = _localRegions.at(grainIndex % _localRegions.size());
+
+        for (auto [ident, target] : _targets)
         {
-            return MXL_ERR_INVALID_ARG;
+            auto remoteRegion = target.regions.at(grainIndex % target.regions.size());
+
+            target.endpoint->write(localRegion.region(), localRegion.desc(), remoteRegion.addr, remoteRegion.rkey);
         }
-
-        auto& target = _targets.at(identifier);
-
-        auto r = target._regions;
-
-        auto bufferEntryOffset = grainIndex % bufferLen;
 
         return MXL_STATUS_OK;
     }

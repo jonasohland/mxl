@@ -146,23 +146,13 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
-    void Endpoint::write(Region const& region, uint64_t remoteAddr, void* mrDesc, uint64_t rkey, ::fi_addr_t destAddr)
+    void Endpoint::write(Region const& localRegion, void* localDesc, uint64_t remoteAddr, uint64_t rkey, ::fi_addr_t destAddr)
     {
-        // TODO: catch error and convert to an internal error
-        fiCall(::fi_write, "Failed to push rma write to work queue.", _raw, region.base, region.len, mrDesc, destAddr, remoteAddr, rkey, nullptr);
-    }
-
-    void Endpoint::write(Regions const& regions, uint64_t remoteAddr, void** mrDesc, uint64_t rkey, ::fi_addr_t destAddr)
-    {
-        if (regions.empty())
-        {
-            return;
-        }
-
-        auto iov = regions.toIovec();
+        auto iovec = localRegion.to_iovec();
 
         // TODO: catch error and convert to an internal error
-        fiCall(::fi_writev, "Failed to push rma write to work queue.", _raw, iov.data(), mrDesc, iov.size(), destAddr, remoteAddr, rkey, nullptr);
+        fiCall(
+            ::fi_writev, "Failed to push rma write to work queue.", _raw, iovec.data(), iovec.size(), localDesc, destAddr, remoteAddr, rkey, nullptr);
     }
 
 }

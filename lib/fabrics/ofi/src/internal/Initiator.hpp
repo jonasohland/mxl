@@ -16,9 +16,8 @@ namespace mxl::lib::fabrics::ofi
 
     struct InitiatorTargetEntry
     {
-        std::shared_ptr<Endpoint> _endpoint;
-        Regions _regions;
-        uint64_t _rkey;
+        std::shared_ptr<Endpoint> endpoint;
+        RemoteRegions regions;
     };
 
     class Initiator
@@ -28,15 +27,14 @@ namespace mxl::lib::fabrics::ofi
 
         // TODO:: we should define our internal objects so that we are decoupled from the public API
         mxlStatus setup(mxlInitiatorConfig const& config);
-        mxlStatus addTarget(std::string identifier, TargetInfo const& targetInfo);
-        mxlStatus removeTarget(std::string identifier, TargetInfo const& targetInfo);
+        mxlStatus addTarget(TargetInfo const& targetInfo);
+        mxlStatus removeTarget(TargetInfo const& targetInfo);
 
-        mxlStatus transferGrain(uint64_t grainIndex, GrainInfo const* grainInfo, uint8_t const* payload);
-        mxlStatus transferGrainToTarget(std::string identifer, uint64_t grainIndex, GrainInfo const* grainInfo, uint8_t const* payload);
+        mxlStatus transferGrain(uint64_t grainIndex, GrainInfo const* grainInfo, uint8_t const* grain);
 
     private:
         std::optional<std::shared_ptr<Domain>> _domain = std::nullopt;
-        std::optional<std::shared_ptr<MemoryRegion>> _mr = std::nullopt;
+        std::vector<RegisteredRegion> _localRegions;
         std::map<std::string, InitiatorTargetEntry> _targets;
     };
 }
