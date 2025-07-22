@@ -1,6 +1,5 @@
 #include "FabricsInstance.hpp"
 #include <internal/Logging.hpp>
-#include "mxl/fabrics.h"
 #include "Exception.hpp"
 #include "FILogging.hpp"
 #include "Initiator.hpp"
@@ -19,12 +18,12 @@ namespace mxl::lib::fabrics::ofi
 
     TargetWrapper* FabricsInstance::createTarget()
     {
-        return &_targets.emplace_back();
+        return &_targets.emplace_back(_mxlInstance);
     }
 
     Initiator* FabricsInstance::createInitiator()
     {
-        return &_initiators.emplace_back();
+        return &_initiators.emplace_back(_mxlInstance);
     }
 
     void FabricsInstance::destroyTarget(TargetWrapper* wrapper)

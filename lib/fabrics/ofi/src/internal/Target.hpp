@@ -7,6 +7,7 @@
 #include <variant>
 #include <mxl/fabrics.h>
 #include <mxl/mxl.h>
+#include "internal/Instance.hpp"
 #include "Domain.hpp"
 #include "Endpoint.hpp"
 #include "MemoryRegion.hpp"
@@ -28,7 +29,7 @@ namespace mxl::lib::fabrics::ofi
     class TargetWrapper
     {
     public:
-        TargetWrapper() = default;
+        TargetWrapper(Instance* mxlInstance);
         ~TargetWrapper();
 
         std::pair<mxlStatus, std::unique_ptr<TargetInfo>> setup(mxlTargetConfig const& config) noexcept;
@@ -63,5 +64,6 @@ namespace mxl::lib::fabrics::ofi
         std::optional<std::shared_ptr<MemoryRegion>> _mr = std::nullopt;
 
         State _state = StateFresh{};
+        Instance* _mxlInstance;
     };
 }

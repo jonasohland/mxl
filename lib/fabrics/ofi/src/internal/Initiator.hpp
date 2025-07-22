@@ -3,6 +3,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include "internal/Instance.hpp"
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
 #include "Endpoint.hpp"
@@ -22,7 +23,7 @@ namespace mxl::lib::fabrics::ofi
     class Initiator
     {
     public:
-        Initiator() = default;
+        Initiator(Instance* _mxlInstance);
 
         // TODO:: we should define our internal objects so that we are decoupled from the public API
         mxlStatus setup(mxlInitiatorConfig const& config);
@@ -33,5 +34,7 @@ namespace mxl::lib::fabrics::ofi
         std::optional<std::shared_ptr<Domain>> _domain = std::nullopt;
         std::optional<std::shared_ptr<MemoryRegion>> _mr = std::nullopt;
         std::map<std::string, InitiatorTargetEntry> _targets;
+
+        Instance* _mxlInstance;
     };
 }

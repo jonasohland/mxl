@@ -19,11 +19,17 @@
 #include "MemoryRegion.hpp"
 #include "PassiveEndpoint.hpp"
 #include "Provider.hpp"
+#include "Region.hpp"
 #include "RMATarget.hpp"
 #include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
+    TargetWrapper::TargetWrapper(Instance* mxlInstance)
+        : _state(StateFresh{})
+        , _mxlInstance(mxlInstance)
+    {}
+
     TargetWrapper::~TargetWrapper()
     {}
 
@@ -146,8 +152,11 @@ namespace mxl::lib::fabrics::ofi
         auto fabric = Fabric::open(*bestFabricInfo);
         _domain = Domain::open(fabric);
 
-        auto regions = Regions::fromAPI(config.regions);
-        _mr = MemoryRegion::reg(*_domain, *regions, FI_REMOTE_WRITE);
+        auto deferredRegions = reinterpret_cast<DeferredRegions*>(config.regions);
+
+        auto regions = deferredRegions->unwrap(*_mxlInstance, AccessMode::READ_WRITE);
+
+        _mr = MemoryRegion::reg(*_domain, regions, FI_REMOTE_WRITE);
 
         auto pep = PassiveEndpoint::create(fabric);
 
@@ -158,6 +167,6 @@ namespace mxl::lib::fabrics::ofi
         // Transition the state machine to the waiting for a connection request state
         _state = StateWaitConnReq{pep};
 
-        return {MXL_STATUS_OK, std::make_unique<TargetInfo>(pep->localAddress(), *regions, _mr->get()->getRemoteKey())};
+        return {MXL_STATUS_OK, std::make_unique<TargetInfo>(pep->localAddress(), regions, _mr->get()->getRemoteKey())};
     }
 }

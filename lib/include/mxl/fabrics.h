@@ -48,10 +48,41 @@ extern "C"
         mxlRegions regions;
     } mxlInitiatorConfig;
 
+    typedef struct mxlBuffer_t
+    {
+        void* data;
+        size_t size;
+    } mxlBuffer;
+
     typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
 
-    mxlStatus mxlFabricsRegionsCreate(void** ownBuffers, size_t* bufferSizes, size_t count, mxlRegions* out_regions);
-    mxlStatus mxlFabricsRegionFromFlow(mxlInstance in_instance, char const* uuid, mxlRegions* out_regions);
+    /**
+     * Create a new memory region to be written to, or written from a remote node. The returned object must be freed with mxlFabricsRegionsFree.
+     * \param buffers A pointer to an array of pointers to memory regions to register. At least \param count pointers must be defined in the array
+     * \param sizes A pointer to an array of the sizes of the buffers passed in the previous argument.
+     * \param count The nummber of buffers to register.
+     * \param out_region A pointer to a memory location where the address of the returned mxlFabricsRegions object will be written.
+     * \return MXL_STATUS_OK if nothing went wrong.
+     */
+    MXL_EXPORT
+    mxlStatus mxlFabricsRegionsCreate(void** buffers, size_t* sizes, size_t count, mxlRegions* out_regions);
+
+    /**
+     * Get a list of memory regions for a flow. The returned object must be freed with mxlFabricsRegionsFree.
+     * \param in_instance A mxlInstance to which the flow is visible.
+     * \param uuid UUID of the flow.
+     * \param out_region A pointer to a memory location where the address of the returned mxlFabricsRegions object will be written.
+     * \return MXL_STATUS_OK if nothing went wrong
+     */
+    MXL_EXPORT
+    mxlStatus mxlFabricsRegionsFromFlow(mxlInstance in_instance, char const* uuid, mxlRegions* out_regions);
+
+    /**
+     * Frees a mxlFabricsRegions object previously allocated by mxlFabricsRegionsCreate or mxlFabricsRegionsFromFlow.
+     * \param The mxlRegions object that should be freed.
+     * \return MXL_STATUS_OK if nothing went wrong.
+     */
+    MXL_EXPORT
     mxlStatus mxlFabricsRegionsFree(mxlRegions regions);
 
     /**
@@ -210,18 +241,6 @@ extern "C"
     MXL_EXPORT
     mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, GrainInfo const* in_grainInfo,
         uint8_t const* in_payload);
-
-    /**
-     * Transfer of a grain to a specific target.
-     * \param in_fabricsInstance A valid mxl fabrics instance
-     * \param in_initiator A valid fabrics initiator
-     * \param in_grainInfo The grain information.
-     * \param in_targetInfo The target information to send the grain to.
-     * \param in_payload The payload to send.
-     */
-    MXL_EXPORT
-    mxlStatus mxlFabricsInitiatorTransferGrainToTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator,
-        GrainInfo const* in_grainInfo, mxlFabricsTarget const* in_targetInfo, uint8_t const* in_payload);
 
     // Below are helper functions
 

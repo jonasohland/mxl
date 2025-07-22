@@ -12,6 +12,7 @@
 #include "FIInfo.hpp"
 #include "MemoryRegion.hpp"
 #include "Provider.hpp"
+#include "Region.hpp"
 #include "RMATarget.hpp"
 #include "TargetInfo.hpp"
 
@@ -30,8 +31,10 @@ namespace mxl::lib::fabrics::ofi
         auto fabric = Fabric::open(*bestFabricInfo);
         _domain = Domain::open(fabric);
 
-        auto regions = Regions::fromAPI(config.regions);
-        _mr = MemoryRegion::reg(*_domain, *regions, FI_WRITE);
+        auto deferredRegions = reinterpret_cast<DeferredRegions*>(config.regions);
+        auto regions = deferredRegions->unwrap(*_mxlInstance, AccessMode::READ_ONLY);
+
+        _mr = MemoryRegion::reg(*_domain, regions, FI_WRITE);
 
         return MXL_STATUS_OK;
     }
