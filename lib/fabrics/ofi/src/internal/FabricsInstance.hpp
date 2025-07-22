@@ -21,8 +21,9 @@ namespace mxl::lib::fabrics::ofi
         FabricsInstance& operator=(FabricsInstance const&) = delete;
 
         TargetWrapper* createTarget();
-        Initiator* createInitiator();
         void destroyTarget(TargetWrapper*);
+        Initiator* createInitiator();
+        void destroyInitiator(Initiator*);
 
     private:
         mxl::lib::Instance* _mxlInstance;

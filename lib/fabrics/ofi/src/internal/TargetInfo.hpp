@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <iostream>
 #include <sys/types.h>
 #include "Address.hpp"
@@ -7,30 +8,58 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    // TargetInfo encompasses all the information required by an initiator to operate transfers to the given target.
-    // In the context of libfabric this means, the fi_addr, all the buffer addresses and sizes, and the remote protection key.
-    class TargetInfo
+
+    struct RemoteRegion
+    {
+        uint64_t addr;
+        uint64_t rkey;
+        // TODO: needs to be serialized/deserialized
+        friend std::ostream& operator<<(std::ostream&, RemoteRegion const&);
+        friend std::istream& operator>>(std::istream&, RemoteRegion&);
+    };
+
+    class RemoteRegions
     {
     public:
-        explicit TargetInfo();
-        explicit TargetInfo(FabricAddress const& fi_addr, Regions const& regions, uint64_t rkey);
+        RemoteRegions() = default;
 
+        [[nodiscard]]
+        RemoteRegion const& at(size_t index) const
+        {
+            return _regions.at(index);
+        }
+
+        [[nodiscard]]
+        size_t size() const noexcept
+        {
+            return _regions.size();
+        }
+
+        friend std::ostream& operator<<(std::ostream&, RemoteRegions const&);
+        friend std::istream& operator>>(std::istream&, RemoteRegions&);
+
+    private:
+        // TODO: needs to be serialized/deserialized
+        std::vector<RemoteRegion> _regions;
+    };
+
+    // TargetInfo encompasses all the information required by an initiator to operate transfers to the given target.
+    // In the context of libfabric this means, the fi_addr, all the buffer addresses and sizes, and the remote protection key.
+    struct TargetInfo
+
+    {
         friend std::ostream& operator<<(std::ostream&, TargetInfo const&);
         friend std::istream& operator>>(std::istream&, TargetInfo&);
 
-        [[nodiscard]]
-        FabricAddress const& fabricAddress() const noexcept;
+        static TargetInfo* fromAPI(mxlTargetInfo api) noexcept;
 
         [[nodiscard]]
-        Regions const& regions() const noexcept;
+        ::mxlTargetInfo toAPI() noexcept;
 
-        [[nodiscard]]
-        uint64_t rkey() const noexcept;
+        std::string asIdentifier() const noexcept;
 
-    private:
-        FabricAddress _fi_addr;
-        Regions _regions;
-        uint64_t _rkey;
+        FabricAddress fabricAddress;
+        RemoteRegions remoteRegions;
     };
 
     std::ostream& operator<<(std::ostream&, TargetInfo const&);

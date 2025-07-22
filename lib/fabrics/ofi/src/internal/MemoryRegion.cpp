@@ -10,14 +10,9 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    std::shared_ptr<MemoryRegion> MemoryRegion::reg(std::shared_ptr<Domain> domain, Regions const& regions, uint64_t access)
+    std::shared_ptr<MemoryRegion> MemoryRegion::reg(std::shared_ptr<Domain> domain, Region const& region, uint64_t access)
     {
-        if (regions.empty())
-        {
-            throw std::invalid_argument("Cannot register an empty vector of regions");
-        }
-
-        auto iovecs = regions.toIovec();
+        auto iovecs = region.to_iovec();
 
         ::fid_mr* raw;
 
