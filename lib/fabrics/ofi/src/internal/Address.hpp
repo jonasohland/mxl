@@ -9,7 +9,7 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    class FabricAddress
+    class FabricAddress final
     {
     public:
         explicit FabricAddress();
@@ -23,7 +23,7 @@ namespace mxl::lib::fabrics::ofi
         friend std::istream& operator>>(std::istream&, FabricAddress&);
 
         void* raw();
-        
+
         [[nodiscard]]
         void* raw() const;
 

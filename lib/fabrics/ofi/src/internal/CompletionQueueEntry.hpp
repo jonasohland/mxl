@@ -5,7 +5,7 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    class CompletionQueueDataEntry
+    class CompletionQueueDataEntry final
     {
     public:
         CompletionQueueDataEntry(::fi_cq_data_entry& raw)

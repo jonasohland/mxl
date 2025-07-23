@@ -11,7 +11,6 @@
 #include "EventQueue.hpp"
 #include "FIInfo.hpp"
 #include "MemoryRegion.hpp"
-#include "Region.hpp"
 #include "TargetInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi

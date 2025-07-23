@@ -5,7 +5,6 @@
 #include <memory>
 #include <optional>
 #include "mxl/fabrics.h"
-#include "mxl/flow.h"
 #include "mxl/mxl.h"
 #include "Endpoint.hpp"
 #include "MemoryRegion.hpp"
@@ -20,17 +19,21 @@ namespace mxl::lib::fabrics::ofi
         std::vector<RemoteRegion> regions;
     };
 
-    class Initiator
+    class Initiator final
     {
     public:
         Initiator() = default;
+        ~Initiator();
 
-        // TODO:: we should define our internal objects so that we are decoupled from the public API
+        static Initiator* fromAPI(mxlFabricsInitiator api);
+
+        mxlFabricsInitiator toAPI() noexcept;
+
         mxlStatus setup(mxlInitiatorConfig const& config);
         mxlStatus addTarget(TargetInfo const& targetInfo);
         mxlStatus removeTarget(TargetInfo const& targetInfo);
 
-        mxlStatus transferGrain(uint64_t grainIndex, GrainInfo const* grainInfo, uint8_t const* grain);
+        mxlStatus transferGrain(uint64_t grainIndex);
 
     private:
         std::optional<std::shared_ptr<Domain>> _domain = std::nullopt;

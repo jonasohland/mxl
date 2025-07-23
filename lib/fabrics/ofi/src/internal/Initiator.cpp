@@ -18,9 +18,53 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+
+    namespace internal
+    {
+        mxlStatus removeTargetUnchecked(std::string identifier, std::map<std::string, InitiatorTargetEntry>& targets)
+        {
+            auto target = targets.at(identifier);
+
+            target.endpoint->shutdown();
+
+            targets.erase(identifier);
+
+            return MXL_STATUS_OK;
+        }
+    }
+
+    Initiator::~Initiator()
+    {
+        for (auto [ident, target] : _targets)
+        {
+            internal::removeTargetUnchecked(ident, _targets);
+        }
+    }
+
+    Initiator* Initiator::fromAPI(mxlFabricsInitiator api)
+    {
+        if (api == nullptr)
+        {
+            throw Exception::make(MXL_ERR_INVALID_ARG, "Invalid fabrics initiator API pointer");
+        }
+
+        return reinterpret_cast<Initiator*>(api);
+    }
+
+    mxlFabricsInitiator Initiator::toAPI() noexcept
+    {
+        return reinterpret_cast<mxlFabricsInitiator>(this);
+    }
+
     mxlStatus Initiator::setup(mxlInitiatorConfig const& config)
     {
-        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, providerFromAPI(config.provider));
+        auto provider = providerFromAPI(config.provider);
+        if (!provider)
+        {
+            return MXL_ERR_INVALID_ARG;
+        }
+
+        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value());
 
         auto bestFabricInfo = RMATarget::findBestFabric(fabricInfoList, config.provider);
         if (!bestFabricInfo)
@@ -34,7 +78,7 @@ namespace mxl::lib::fabrics::ofi
         auto regions = Regions::fromAPI(config.regions);
         if (!regions)
         {
-            return MXL_ERR_UNKNOWN; // TODO: proper error
+            return MXL_ERR_UNKNOWN;
         }
 
         for (auto const& region : *regions)
@@ -48,6 +92,12 @@ namespace mxl::lib::fabrics::ofi
 
     mxlStatus Initiator::addTarget(TargetInfo const& targetInfo)
     {
+        if (_targets.contains(targetInfo.identifier()))
+        {
+            // Target already exists!
+            return MXL_ERR_INVALID_ARG;
+        }
+
         auto endpoint = Endpoint::create(*_domain);
 
         auto eq = EventQueue::open(_domain->get()->fabric(), EventQueueAttr::get_default());
@@ -67,31 +117,19 @@ namespace mxl::lib::fabrics::ofi
 
     mxlStatus Initiator::removeTarget(TargetInfo const& targetInfo)
     {
-        MXL_FABRICS_UNUSED(targetInfo);
-
         auto identifier = targetInfo.identifier();
 
         if (_targets.contains(identifier))
         {
-            auto target = _targets.at(identifier);
-
-            target.endpoint->shutdown();
-
-            _targets.erase(identifier);
-
-            return MXL_STATUS_OK;
+            return internal::removeTargetUnchecked(identifier, _targets);
         }
 
-        return MXL_ERR_FLOW_NOT_FOUND; // TODO: replace this with a more proper error code
+        // Can't remove a target that is not present!
+        return MXL_ERR_INVALID_ARG;
     }
 
-    mxlStatus Initiator::transferGrain(uint64_t grainIndex, GrainInfo const* grainInfo, uint8_t const* payload)
+    mxlStatus Initiator::transferGrain(uint64_t grainIndex)
     {
-        if (grainInfo == nullptr || payload == nullptr)
-        {
-            return MXL_ERR_INVALID_ARG;
-        }
-
         auto localRegion = _localRegions.at(grainIndex % _localRegions.size());
 
         for (auto [ident, target] : _targets)

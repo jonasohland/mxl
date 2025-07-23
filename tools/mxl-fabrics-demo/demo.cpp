@@ -192,14 +192,14 @@ static mxlStatus runSender(mxlInstance instance, mxlFabricsInstance fabricsInsta
         .regions = regions,
     };
 
-    status = mxlFabricsInitiatorSetup(fabricsInstance, initiator, &initiatorConfig);
+    status = mxlFabricsInitiatorSetup(initiator, &initiatorConfig);
     if (status != MXL_STATUS_OK)
     {
         MXL_ERROR("Failed to setup fabrics initiator with status '{}'", static_cast<int>(status));
         return status;
     }
 
-    status = mxlFabricsInitiatorAddTarget(fabricsInstance, initiator, targetInfo);
+    status = mxlFabricsInitiatorAddTarget(initiator, targetInfo);
     if (status != MXL_STATUS_OK)
     {
         MXL_ERROR("Failed to add target with status '{}'", static_cast<int>(status));
@@ -222,7 +222,7 @@ static mxlStatus runSender(mxlInstance instance, mxlFabricsInstance fabricsInsta
 
     while (g_exit_requested)
     {
-        auto ret = mxlFlowReaderGetGrain(reader, grainIndex, -1, &grainInfo, &payload); // TODO set a proper timeout...
+        auto ret = mxlFlowReaderGetGrain(reader, grainIndex, 200000000, &grainInfo, &payload); // TODO set a proper timeout...
         if (ret == MXL_ERR_OUT_OF_RANGE_TOO_LATE)
         {
             // We are too late.. time travel!
@@ -234,15 +234,21 @@ static mxlStatus runSender(mxlInstance instance, mxlFabricsInstance fabricsInsta
             // We are too early somehow.. retry the same grain later.
             continue;
         }
+        if (ret == MXL_ERR_TIMEOUT)
+        {
+            // No grains available before a timeout was triggered.. most likely a problem upstream.
+            continue;
+        }
         if (ret != MXL_STATUS_OK)
         {
-            // Something  unexpected occured, not much we can do, but  log and retry
+            // Something  unexpected occured, not much we can do, but log and retry
             MXL_ERROR("Missed grain {}, err : {}", grainIndex, (int)ret);
 
             continue;
         }
 
-        ret = mxlFabricsInitiatorTransferGrain(fabricsInstance, initiator, grainIndex, &grainInfo, payload);
+        // Okay the grain is ready, we can transfer it to the targets.
+        ret = mxlFabricsInitiatorTransferGrain(initiator, grainIndex);
         if (ret != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to transfer grain with status '{}'", static_cast<int>(ret));
@@ -342,29 +348,35 @@ static mxlStatus runReceiver(mxlInstance instance, mxlFabricsInstance fabricsIns
 
     MXL_INFO("Target info: {}", targetInfoStr);
 
-    GrainInfo grainInfo;
+    GrainInfo dummyGrainInfo;
     uint64_t grainIndex = 0;
-    uint8_t* payload;
-
-    //
+    uint8_t* dummyPayload;
     while (g_exit_requested)
     {
-        status = mxlFabricsTargetWaitForNewGrain(fabricsInstance, target, -1, nullptr, nullptr, &grainIndex);
+        status = mxlFabricsTargetWaitForNewGrain(target, &grainIndex, 200);
+        if (status == MXL_ERR_TIMEOUT)
+        {
+            // No completion before a timeout was triggered, most likely a problem upstream.
+            MXL_WARN("wait for new grain timeout, most likely there is a problem upstream.");
+            continue;
+        }
+
         if (status != MXL_STATUS_OK)
         {
-            MXL_ERROR("Failed to get grain with status '{}'", static_cast<int>(status));
+            MXL_ERROR("Failed to wait for grain with status '{}'", static_cast<int>(status));
             return status;
         }
 
-        status = mxlFlowWriterOpenGrain(writer, grainIndex, &grainInfo, &payload);
+        // Here we open so that we can commit, we are not going to modify the grain as it was already modified by the initiator.
+        status = mxlFlowWriterOpenGrain(writer, grainIndex, &dummyGrainInfo, &dummyPayload);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to open grain with status '{}'", static_cast<int>(status));
             return status;
         }
 
-        // We omit opening a grain, because the initiator writes directly to our memory region that we previously shared.
-        status = mxlFlowWriterCommitGrain(writer, &grainInfo);
+        // GrainInfo and media payload was already written by the remote endpoint, we simply commit!.
+        status = mxlFlowWriterCommitGrain(writer, &dummyGrainInfo);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to commit grain with status '{}'", static_cast<int>(status));

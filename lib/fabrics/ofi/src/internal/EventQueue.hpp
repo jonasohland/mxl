@@ -10,7 +10,7 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    struct EventQueueAttr
+    struct EventQueueAttr final
 
     {
         size_t size;

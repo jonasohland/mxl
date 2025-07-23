@@ -20,7 +20,7 @@ namespace mxl::lib::fabrics::ofi
         ConnNotificationEntry(ConnNotificationEntry&&) noexcept = default;
         ConnNotificationEntry& operator=(ConnNotificationEntry&&) = default;
 
-        class EventConnReq
+        class EventConnReq final
         {
         public:
             EventConnReq(fid_t fid, FIInfoList info)
@@ -45,7 +45,7 @@ namespace mxl::lib::fabrics::ofi
             FIInfoList _info;
         };
 
-        class EventConnected
+        class EventConnected final
         {
         public:
             EventConnected(fid_t fid)
@@ -62,7 +62,7 @@ namespace mxl::lib::fabrics::ofi
             fid_t _fid;
         };
 
-        class EventShutdown
+        class EventShutdown final
         {
         public:
             EventShutdown(fid_t fid)
