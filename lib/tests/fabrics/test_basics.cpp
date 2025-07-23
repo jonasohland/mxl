@@ -25,6 +25,7 @@ TEST_CASE("Fabrics : Test", "[fabrics]")
             .service = "1234"
         },
         .provider = MXL_SHARING_PROVIDER_AUTO,
+    .regions = nullptr,
     };
     // clang-format on
 

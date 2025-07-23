@@ -6,23 +6,28 @@
 namespace mxl::lib::fabrics::ofi
 {
     // IOVec implementations
-    ::iovec IOVec::to_iovec() const
+    ::iovec BufferSpace::to_iovec() const
     {
         return ::iovec{.iov_base = reinterpret_cast<void*>(base), .iov_len = size};
     }
 
-    std::ostream& operator<<(std::ostream& os, IOVec const& iov)
+    std::ostream& operator<<(std::ostream& os, BufferSpace const& iov)
     {
         os.write(reinterpret_cast<char const*>(iov.base), sizeof(iov.base));
         os << iov.size;
         return os;
     }
 
-    std::istream& operator>>(std::istream& is, IOVec& iov)
+    std::istream& operator>>(std::istream& is, BufferSpace& iov)
     {
         is.read(reinterpret_cast<char*>(&iov.base), sizeof(iov.base));
         is.read(reinterpret_cast<char*>(&iov.size), sizeof(iov.size));
         return is;
+    }
+
+    std::uintptr_t Region::firstBaseAddress() const noexcept
+    {
+        return _inner.front().base;
     }
 
     // Region implementations
@@ -30,7 +35,7 @@ namespace mxl::lib::fabrics::ofi
     {
         std::vector<::iovec> iovec;
 
-        std::ranges::transform(_inner, std::back_inserter(iovec), [](IOVec const& iov) { return iov.to_iovec(); });
+        std::ranges::transform(_inner, std::back_inserter(iovec), [](BufferSpace const& iov) { return iov.to_iovec(); });
         return iovec;
     }
 
@@ -47,7 +52,7 @@ namespace mxl::lib::fabrics::ofi
     {
         region._inner.clear();
 
-        IOVec iov;
+        BufferSpace iov;
         while (is >> iov)
         {
             region._inner.push_back(iov);

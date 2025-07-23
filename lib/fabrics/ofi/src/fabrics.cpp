@@ -1,4 +1,5 @@
 #include "mxl/fabrics.h"
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -359,14 +360,17 @@ mxlStatus mxlFabricsInitiatorRemoveTarget(mxlFabricsInstance in_fabricsInstance,
     }
 
     auto initiator = reinterpret_cast<ofi::Initiator*>(in_initiator);
+    auto targetInfo = ofi::TargetInfo::fromAPI(in_targetInfo);
+    initiator->removeTarget(*targetInfo);
 
     return MXL_STATUS_OK;
 }
 
 extern "C" MXL_EXPORT
-mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, GrainInfo const* in_grainInfo,
-    uint8_t const* in_payload)
+mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, uint64_t grainIndex,
+    GrainInfo const* in_grainInfo, uint8_t const* in_payload)
 {
+    MXL_FABRICS_UNUSED(grainIndex);
     MXL_FABRICS_UNUSED(in_fabricsInstance);
     MXL_FABRICS_UNUSED(in_initiator);
     MXL_FABRICS_UNUSED(in_grainInfo);

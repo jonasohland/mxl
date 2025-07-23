@@ -18,8 +18,7 @@ namespace mxl::lib::fabrics::ofi
     class Target
     {
     public:
-        virtual ~Target()
-        {}
+        virtual ~Target() = default;
 
         [[nodiscard]]
         virtual TargetInfo getInfo() const = 0;
@@ -29,7 +28,8 @@ namespace mxl::lib::fabrics::ofi
     {
     public:
         TargetWrapper() = default;
-        ~TargetWrapper();
+
+        ~TargetWrapper() = default;
 
         std::pair<mxlStatus, std::unique_ptr<TargetInfo>> setup(mxlTargetConfig const& config) noexcept;
 
@@ -60,7 +60,7 @@ namespace mxl::lib::fabrics::ofi
 
         std::unique_ptr<Target> _inner;
         std::optional<std::shared_ptr<Domain>> _domain = std::nullopt;
-        std::optional<std::shared_ptr<MemoryRegion>> _mr = std::nullopt;
+        std::vector<RegisteredRegion> _regions;
 
         State _state = StateFresh{};
     };

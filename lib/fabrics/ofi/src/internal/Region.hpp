@@ -5,12 +5,11 @@
 #include <ostream>
 #include <vector>
 #include <bits/types/struct_iovec.h>
-#include <initializer_list>
 #include "mxl/fabrics.h"
 
 namespace mxl::lib::fabrics::ofi
 {
-    struct IOVec
+    struct BufferSpace
     {
         std::uintptr_t base;
         size_t size;
@@ -18,8 +17,8 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::iovec to_iovec() const;
 
-        friend std::ostream& operator<<(std::ostream& os, IOVec const& region);
-        friend std::istream& operator>>(std::istream& is, IOVec& region);
+        friend std::ostream& operator<<(std::ostream& os, BufferSpace const& region);
+        friend std::istream& operator>>(std::istream& is, BufferSpace& region);
     };
 
     class Region
@@ -31,10 +30,13 @@ namespace mxl::lib::fabrics::ofi
         Region() = default;
 
         [[nodiscard]]
+        std::uintptr_t firstBaseAddress() const noexcept;
+
+        [[nodiscard]]
         std::vector<::iovec> to_iovec() const noexcept;
 
     private:
-        std::vector<IOVec> _inner;
+        std::vector<BufferSpace> _inner;
     };
 
     class Regions

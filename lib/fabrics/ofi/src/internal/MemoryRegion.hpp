@@ -62,6 +62,11 @@ namespace mxl::lib::fabrics::ofi
             return _mr->getLocalMemoryDescriptor();
         }
 
+        uint64_t rkey()
+        {
+            return _mr->getRemoteKey();
+        }
+
     private:
         std::shared_ptr<MemoryRegion> _mr;
 
