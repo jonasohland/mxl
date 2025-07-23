@@ -1,11 +1,16 @@
 #include "Region.hpp"
+#include <cstdint>
 #include <algorithm>
 #include <bits/types/struct_iovec.h>
+#include "internal/Flow.hpp"
 #include "mxl/fabrics.h"
+#include "mxl/mxl.h"
+#include "Exception.hpp"
+#include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    // IOVec implementations
+    // BufferSpace implementations
     ::iovec BufferSpace::to_iovec() const
     {
         return ::iovec{.iov_base = reinterpret_cast<void*>(base), .iov_len = size};
@@ -58,6 +63,35 @@ namespace mxl::lib::fabrics::ofi
             region._inner.push_back(iov);
         }
         return is;
+    }
+
+    // Regions implementations
+    Regions Regions::fromFlow(FlowData* flow)
+    {
+        static_assert(sizeof(GrainHeader) == 8192);
+
+        if (!mxlIsDiscreteDataFormat(flow->flowInfo()->common.format))
+        {
+            throw Exception::make(MXL_ERR_UNKNOWN, "Non-discrete flows not supported for now");
+        }
+
+        auto discreteFlow = static_cast<DiscreteFlowData*>(flow);
+
+        std::vector<Region> regions{};
+
+        for (std::size_t i = 0; i < discreteFlow->grainCount(); ++i)
+        {
+            auto grain = discreteFlow->grainAt(i);
+
+            auto region = Region({
+                BufferSpace{.base = reinterpret_cast<std::uintptr_t>(discreteFlow->grainInfoAt(i)), .size = sizeof(GrainHeader)         },
+                BufferSpace{.base = reinterpret_cast<std::uintptr_t>(grain) + sizeof(GrainHeader),  .size = grain->header.info.grainSize},
+            });
+
+            regions.emplace_back(std::move(region));
+        }
+
+        return Regions{regions};
     }
 
     [[nodiscard]]
@@ -114,4 +148,23 @@ namespace mxl::lib::fabrics::ofi
         return is;
     }
 
+    // DeferredRegions implementations
+
+    DeferredRegions::DeferredRegions(Regions regions) noexcept
+        : _inner(std::move(regions))
+    {}
+
+    DeferredRegions::DeferredRegions(uuids::uuid id) noexcept
+        : _inner(id)
+    {}
+
+    Regions DeferredRegions::unwrap(Instance& instance, AccessMode accessMode)
+    {
+        return std::visit(
+            overloaded{
+                [](Regions regions) -> Regions { return regions; },
+                [&](uuids::uuid const& flowId) -> Regions { return Regions::fromFlow(instance.openFlow(flowId, accessMode).get()); },
+            },
+            _inner);
+    }
 }

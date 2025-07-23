@@ -50,8 +50,10 @@ extern "C"
 
     typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
 
-    mxlStatus mxlFabricsRegionsCreate(void** ownBuffers, size_t* bufferSizes, size_t count, mxlRegions* out_regions);
-    mxlStatus mxlFabricsRegionFromFlow(mxlInstance in_instance, char const* uuid, mxlRegions* out_regions);
+    MXL_EXPORT
+    mxlStatus mxlFabricsRegionsFromFlow(mxlInstance in_instance, char const* uuid, mxlRegions* out_regions);
+
+    MXL_EXPORT
     mxlStatus mxlFabricsRegionsFree(mxlRegions regions);
 
     /**
