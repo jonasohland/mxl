@@ -13,8 +13,15 @@ namespace mxl::lib::fabrics::ofi
         fiInitLogging();
     }
 
-    FabricsInstance::~FabricsInstance()
-    {}
+    mxlFabricsInstance FabricsInstance::toAPI() noexcept
+    {
+        return reinterpret_cast<mxlFabricsInstance>(this);
+    }
+
+    FabricsInstance* FabricsInstance::fromAPI(mxlFabricsInstance instance) noexcept
+    {
+        return reinterpret_cast<FabricsInstance*>(instance);
+    }
 
     TargetWrapper* FabricsInstance::createTarget()
     {

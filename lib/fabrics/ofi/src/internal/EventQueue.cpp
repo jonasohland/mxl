@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <utility>
 #include <rdma/fi_eq.h>
 #include <rdma/fi_errno.h>
 #include "internal/Logging.hpp"
@@ -70,7 +71,7 @@ namespace mxl::lib::fabrics::ofi
 
     EventQueue::EventQueue(::fid_eq* raw, std::shared_ptr<Fabric> fabric)
         : _raw(raw)
-        , _fabric(fabric)
+        , _fabric(std::move(fabric))
     {}
 
     EventQueue::~EventQueue()

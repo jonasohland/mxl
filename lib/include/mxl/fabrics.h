@@ -1,10 +1,9 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <mxl/mxl.h>
-#include "mxl/flow.h"
 #include "mxl/platform.h"
-#include "flow.h"
 
 #define MXL_FABRICS_UNUSED(x) (void)x
 
@@ -92,7 +91,6 @@ extern "C"
 
     /**
      * Configure the target.
-     * \param in_fabricsInstance A valid mxl fabrics instance
      * \param in_target A valid fabrics target
      * \param in_config The target configuration. This will be used to create an endpoint and register a memory region. The memory region corresponds
      * to the one that will be written to by the initiator.
@@ -105,54 +103,32 @@ extern "C"
 
     /**
      * Non-blocking accessor for a flow grain at a specific index
-     * \param in_fabricsInstance A valid mxl fabrics instance
      * \param in_target A valid fabrics target
-     * \param in_index The index of the grain to obtain
-     * \param out_grain The requested GrainInfo structure.
-     * \param out_payload The requested grain payload.
+     * \param out_index The index of the grain that is ready, if any.
+     * \param out_completed Indicates if the grain was written. No distinction is made between a partial or fully written grain, they both return true.
      * \return The result code. \see mxlStatus
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsTargetGetGrain(mxlFabricsInstance in_fabricsInstance, mxlFabricsTarget in_target, uint64_t in_index, GrainInfo* out_grain,
-        uint8_t** out_payload);
+    mxlStatus mxlFabricsTargetTryNewGrain(mxlFabricsTarget in_target, uint64_t* out_index);
 
     /**
      * Blocking accessor for a flow grain at a specific index
-     * \param in_fabricsInstance A valid mxl fabrics instance
      * \param in_target A valid fabrics target
-     * \param in_index The index of the grain to obtain
+     * \param out_index The index of the grain that is ready, if any.
      * \param in_timeoutMs How long should we wait for the grain (in milliseconds)
-     * \param out_grain The requested GrainInfo structure.
-     * \param out_payload The requested grain payload.
      * \return The result code. \see mxlStatus
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsTargetGetGrainBlocking(mxlFabricsInstance in_fabricsInstance, mxlFabricsTarget in_target, uint64_t in_index,
-        uint16_t in_timeoutMs, GrainInfo* out_grain, uint8_t** out_payload);
-
-    /**
-     * Wait for a new grain to be available. This will block until a new grain is available or the timeout is reached.
-     * \param in_fabricsInstance A valid mxl fabrics instance
-     * \param in_target A valid fabrics target
-     * \param in_timeoutMs How long should we wait for the grain (in milliseconds)
-     * \param out_grain The new grain GrainInfo structure.
-     * \param out_payload The requested grain payload.
-     * \param out_grainIndex The index of the grain that was received.
-     */
-    MXL_EXPORT
-    mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsInstance in_fabricsInstance, mxlFabricsTarget in_target, uint16_t in_timeoutMs,
-        GrainInfo* out_grain, uint8_t** out_payload, uint64_t* out_grainIndex);
+    mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint64_t* out_index, uint16_t in_timeoutMs);
 
     /**
      * Set a callback function to be called everytime a new grain is available.
-     * \param in_fabricsInstance A valid mxl fabrics instance
      * \param in_target A valid fabrics target
      * \param in_callback A callback function to be called when a new grain is available.
      * \return The result code. \see mxlStatus
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsTargetSetCompletionCallback(mxlFabricsInstance in_fabricsInstance, mxlFabricsTarget in_target,
-        mxlFabricsCompletionCallback_t callbackFn);
+    mxlStatus mxlFabricsTargetSetCompletionCallback(mxlFabricsTarget in_target, mxlFabricsCompletionCallback_t callbackFn);
 
     /**
      * Create a fabrics initiator instance.
@@ -172,46 +148,38 @@ extern "C"
 
     /**
      * Configure the initiator.
-     * \param in_fabricsInstance A valid mxl fabrics instance
      * \param in_initiator A valid fabrics initiator
      * \param in_config The initiator configuration. This will be used to create an endpoint and register a memory region. The memory region
      * corresponds to the one that will be shared with targets.
      * \return The result code. \see mxlStatus
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsInitiatorSetup(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, mxlInitiatorConfig const* in_config);
+    mxlStatus mxlFabricsInitiatorSetup(mxlFabricsInitiator in_initiator, mxlInitiatorConfig const* in_config);
 
     /**
      * Add a target to the initiator. This will allow the initiator to send data to the target.
-     * \param in_fabricsInstance A valid mxl fabrics instance
      * \param in_initiator A valid fabrics initiator
      * \param in_targetInfo The target information. This should be the same as the one returned from "mxlFabricsTargetSetup".
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsInitiatorAddTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator,
-        mxlTargetInfo const in_targetInfo);
+    mxlStatus mxlFabricsInitiatorAddTarget(mxlFabricsInitiator in_initiator, mxlTargetInfo const in_targetInfo);
 
     /**
      * Remove a target from the initiator.
-     * \param in_fabricsInstance A valid mxl fabrics instance
      * \param in_initiator A valid fabrics initiator
      * \param in_targetInfo The target information. This should be the same as the one returned from "mxlFabricsTargetSetup".
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsInitiatorRemoveTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator,
-        mxlTargetInfo const in_targetInfo);
+    mxlStatus mxlFabricsInitiatorRemoveTarget(mxlFabricsInitiator in_initiator, mxlTargetInfo const in_targetInfo);
 
     /**
      * Transfer of a grain to all added targets.
-     * \param in_fabricsInstance A valid mxl fabrics instance
      * \param in_initiator A valid fabrics initiator
-     * \param in_grainInfo The grain information.
-     * \param in_payload The payload to send.
+     * \param in_grainIndex The index of the grain to transfer.
      * \return The result code. \see mxlStatus
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, uint64_t grainIndex,
-        GrainInfo const* in_grainInfo, uint8_t const* in_payload);
+    mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInitiator in_initiator, uint64_t in_grainIndex);
 
     // Below are helper functions
 

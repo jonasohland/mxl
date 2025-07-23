@@ -26,8 +26,10 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    void TargetWrapper::doProgress()
+    TargetProgressResult TargetWrapper::doProgress()
     {
+        TargetProgressResult result;
+
         _state = std::visit(
             overloaded{[](StateFresh& state) -> State
                 {
@@ -71,15 +73,24 @@ namespace mxl::lib::fabrics::ofi
                 },
                 [&](StateConnected& state) -> State
                 {
-                    // TODO: handle grains!
-
+                    if (auto entry = state.ep->completionQueue()->tryEntry(); entry)
+                    {
+                        if (auto data = entry.value().data(); data)
+                        {
+                            result.grainCompleted = data.value();
+                        }
+                    }
                     return state;
                 }},
             _state);
+
+        return result;
     }
 
-    void TargetWrapper::doProgressBlocking(std::chrono::steady_clock::duration timeout)
+    TargetProgressResult TargetWrapper::doProgressBlocking(std::chrono::steady_clock::duration timeout)
     {
+        TargetProgressResult result;
+
         _state = std::visit(
             overloaded{[](StateFresh& state) -> State
                 {
@@ -122,11 +133,34 @@ namespace mxl::lib::fabrics::ofi
                 },
                 [&](StateConnected& state) -> State
                 {
-                    // TODO: handle grains!
+                    if (auto entry = state.ep->completionQueue()->waitForEntry(timeout); entry && entry.value().isRemoteWrite())
+                    {
+                        if (auto data = entry.value().data(); data)
+                        {
+                            result.grainCompleted = data.value();
+                        }
+                    }
 
                     return state;
                 }},
             _state);
+
+        return result;
+    }
+
+    TargetWrapper* TargetWrapper::fromAPI(mxlFabricsTarget api) noexcept
+    {
+        if (api == nullptr)
+        {
+            return nullptr;
+        }
+
+        return reinterpret_cast<TargetWrapper*>(api);
+    }
+
+    mxlFabricsTarget TargetWrapper::toAPI() noexcept
+    {
+        return reinterpret_cast<mxlFabricsTarget>(this);
     }
 
     std::pair<mxlStatus, std::unique_ptr<TargetInfo>> TargetWrapper::setup(mxlTargetConfig const& config) noexcept
@@ -134,7 +168,13 @@ namespace mxl::lib::fabrics::ofi
         namespace ranges = std::ranges;
         MXL_INFO("setting up target [endpoint = {}:{}, provider = {}]", config.endpointAddress.node, config.endpointAddress.service, config.provider);
 
-        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, providerFromAPI(config.provider));
+        auto provider = providerFromAPI(config.provider);
+        if (!provider)
+        {
+            return {MXL_ERR_INVALID_ARG, nullptr};
+        }
+
+        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value());
 
         auto bestFabricInfo = RMATarget::findBestFabric(fabricInfoList, config.provider);
         if (!bestFabricInfo)
@@ -168,5 +208,15 @@ namespace mxl::lib::fabrics::ofi
         _state = StateWaitConnReq{pep};
 
         return {MXL_STATUS_OK, std::make_unique<TargetInfo>(pep->localAddress(), remoteRegions)};
+    }
+
+    TargetProgressResult TargetWrapper::tryGrain()
+    {
+        return doProgress();
+    }
+
+    TargetProgressResult TargetWrapper::waitForGrain(std::chrono::steady_clock::duration timeout)
+    {
+        return doProgressBlocking(timeout);
     }
 }

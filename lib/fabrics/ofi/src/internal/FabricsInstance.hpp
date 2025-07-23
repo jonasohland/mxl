@@ -13,12 +13,15 @@ namespace mxl::lib::fabrics::ofi
     {
     public:
         FabricsInstance(mxl::lib::Instance* instance);
-        ~FabricsInstance();
+        ~FabricsInstance() = default;
 
         FabricsInstance(FabricsInstance&&) = delete;
         FabricsInstance(FabricsInstance const&) = delete;
         FabricsInstance& operator=(FabricsInstance&&) = delete;
         FabricsInstance& operator=(FabricsInstance const&) = delete;
+
+        mxlFabricsInstance toAPI() noexcept;
+        static FabricsInstance* fromAPI(mxlFabricsInstance) noexcept;
 
         TargetWrapper* createTarget();
         void destroyTarget(TargetWrapper*);

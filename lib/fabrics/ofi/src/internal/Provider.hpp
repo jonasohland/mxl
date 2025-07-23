@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+#include <string>
 #include "mxl/fabrics.h"
 
 namespace mxl::lib::fabrics::ofi
@@ -11,5 +13,7 @@ namespace mxl::lib::fabrics::ofi
         EFA,
     };
 
-    Provider providerFromAPI(mxlFabricsProvider api);
+    mxlFabricsProvider providerToAPI(Provider provider) noexcept;
+    std::optional<Provider> providerFromAPI(mxlFabricsProvider api) noexcept;
+    std::optional<Provider> providerFromString(std::string const& s) noexcept;
 }

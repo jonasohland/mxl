@@ -1,6 +1,7 @@
 #include "CompletionQueue.hpp"
 #include <memory>
 #include <optional>
+#include <utility>
 #include <rdma/fi_eq.h>
 #include <rdma/fi_errno.h>
 #include <sys/types.h>
@@ -69,7 +70,7 @@ namespace mxl::lib::fabrics::ofi
 
     CompletionQueue::CompletionQueue(::fid_cq* raw, std::shared_ptr<Domain> domain)
         : _raw(raw)
-        , _domain(domain)
+        , _domain(std::move(domain))
     {}
 
     CompletionQueue::~CompletionQueue()

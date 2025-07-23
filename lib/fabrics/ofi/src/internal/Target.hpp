@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -24,6 +25,11 @@ namespace mxl::lib::fabrics::ofi
         virtual TargetInfo getInfo() const = 0;
     };
 
+    struct TargetProgressResult
+    {
+        std::optional<uint64_t> grainCompleted{std::nullopt};
+    };
+
     class TargetWrapper
     {
     public:
@@ -31,7 +37,13 @@ namespace mxl::lib::fabrics::ofi
 
         ~TargetWrapper() = default;
 
+        static TargetWrapper* fromAPI(mxlFabricsTarget api) noexcept;
+        mxlFabricsTarget toAPI() noexcept;
+
         std::pair<mxlStatus, std::unique_ptr<TargetInfo>> setup(mxlTargetConfig const& config) noexcept;
+
+        TargetProgressResult tryGrain();
+        TargetProgressResult waitForGrain(std::chrono::steady_clock::duration timeout);
 
     private:
         struct StateFresh
@@ -55,8 +67,8 @@ namespace mxl::lib::fabrics::ofi
 
         using State = std::variant<StateFresh, StateWaitConnReq, StateWaitForConnected, StateConnected>;
 
-        void doProgress();
-        void doProgressBlocking(std::chrono::steady_clock::duration timeout);
+        TargetProgressResult doProgress();
+        TargetProgressResult doProgressBlocking(std::chrono::steady_clock::duration timeout);
 
         std::unique_ptr<Target> _inner;
         std::optional<std::shared_ptr<Domain>> _domain = std::nullopt;
