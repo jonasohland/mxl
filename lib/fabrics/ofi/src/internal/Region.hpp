@@ -3,8 +3,12 @@
 #include <cstdint>
 #include <istream>
 #include <ostream>
+#include <variant>
 #include <vector>
+#include <uuid.h>
 #include <bits/types/struct_iovec.h>
+#include "internal/Instance.hpp"
+#include "internal/SharedMemory.hpp"
 #include "mxl/fabrics.h"
 
 namespace mxl::lib::fabrics::ofi
@@ -27,7 +31,11 @@ namespace mxl::lib::fabrics::ofi
         friend std::ostream& operator<<(std::ostream& os, Region const& region);
         friend std::istream& operator>>(std::istream& is, Region& region);
 
-        Region() = default;
+        explicit Region() = default;
+
+        explicit Region(std::vector<BufferSpace> inner)
+            : _inner(std::move(inner))
+        {}
 
         [[nodiscard]]
         std::uintptr_t firstBaseAddress() const noexcept;
@@ -42,7 +50,13 @@ namespace mxl::lib::fabrics::ofi
     class Regions
     {
     public:
-        Regions() = default;
+        explicit Regions() = default;
+
+        explicit Regions(std::vector<Region> regions)
+            : _inner(std::move(regions))
+        {}
+
+        static Regions fromFlow(FlowData* flow);
 
         [[nodiscard]]
         Region const& at(size_t index) const noexcept;
@@ -71,6 +85,18 @@ namespace mxl::lib::fabrics::ofi
 
     private:
         std::vector<Region> _inner;
+    };
+
+    class DeferredRegions
+    {
+    public:
+        explicit DeferredRegions(uuids::uuid) noexcept;
+        explicit DeferredRegions(Regions) noexcept;
+
+        Regions unwrap(Instance&, AccessMode accessMode);
+
+    private:
+        std::variant<uuids::uuid, Regions> _inner;
     };
 
 }

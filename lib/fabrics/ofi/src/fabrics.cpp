@@ -15,6 +15,86 @@
 #include "internal/TargetInfo.hpp"
 #include "mxl/platform.h"
 
+mxlStatus mxlFabricsRegionsFromFlow(mxlInstance in_instance, char const* uuid, mxlRegions* out_regions)
+{
+    MXL_FABRICS_UNUSED(in_instance);
+
+    namespace ofi = mxl::lib::fabrics::ofi;
+    namespace mxl = mxl::lib;
+
+    if (in_instance == nullptr || uuid == nullptr || out_regions == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    try
+    {
+        auto flowId = uuids::uuid::from_string(uuid);
+        if (!flowId.has_value())
+        {
+            return MXL_ERR_INVALID_ARG;
+        }
+
+        *out_regions = reinterpret_cast<mxlRegions>(new ofi::DeferredRegions{*flowId});
+
+        return MXL_STATUS_OK;
+    }
+    catch (ofi::Exception& e)
+    {
+        MXL_ERROR("Failed to create regions object: {}", e.what());
+
+        return e.status();
+    }
+    catch (std::exception& e)
+    {
+        MXL_ERROR("Failed to create Regions object: {}", e.what());
+
+        return MXL_ERR_UNKNOWN;
+    }
+    catch (...)
+    {
+        MXL_ERROR("Failed to create Regions object.");
+
+        return MXL_ERR_UNKNOWN;
+    }
+}
+
+mxlStatus mxlFabricsRegionsFree(mxlRegions in_regions)
+{
+    namespace ofi = mxl::lib::fabrics::ofi;
+
+    if (in_regions == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    try
+    {
+        auto regions = reinterpret_cast<ofi::DeferredRegions*>(in_regions);
+        delete regions;
+
+        return MXL_STATUS_OK;
+    }
+    catch (ofi::Exception& e)
+    {
+        MXL_ERROR("Failed to free regions object: {}", e.what());
+
+        return e.status();
+    }
+    catch (std::exception& e)
+    {
+        MXL_ERROR("Failed to free Regions object: {}", e.what());
+
+        return MXL_ERR_UNKNOWN;
+    }
+    catch (...)
+    {
+        MXL_ERROR("Failed to free Regions object.");
+
+        return MXL_ERR_UNKNOWN;
+    }
+}
+
 extern "C" MXL_EXPORT
 mxlStatus mxlFabricsCreateInstance(mxlInstance in_instance, mxlFabricsInstance* out_fabricsInstance)
 {

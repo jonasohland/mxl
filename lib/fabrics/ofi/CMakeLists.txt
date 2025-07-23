@@ -31,12 +31,12 @@ set_target_properties(mxl-fabrics
 
 target_link_libraries(mxl-fabrics
     PUBLIC
-        mxl
+        mxl-static
 )
 
 target_link_libraries(mxl-fabrics-static
     PUBLIC
-        mxl
+        mxl-static
 )
 
 target_include_directories(mxl-fabrics

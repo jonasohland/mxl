@@ -179,7 +179,7 @@ static mxlStatus runSender(mxlInstance instance, mxlFabricsInstance fabricsInsta
     }
 
     mxlRegions regions;
-    status = mxlFabricsRegionFromFlow(instance, config.flowID.c_str(), &regions);
+    status = mxlFabricsRegionsFromFlow(instance, config.flowID.c_str(), &regions);
     if (status != MXL_STATUS_OK)
     {
         MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
@@ -291,7 +291,7 @@ static mxlStatus runReceiver(mxlInstance instance, mxlFabricsInstance fabricsIns
     }
 
     mxlRegions regions;
-    status = mxlFabricsRegionFromFlow(instance, config.flowID.c_str(), &regions);
+    status = mxlFabricsRegionsFromFlow(instance, config.flowID.c_str(), &regions);
     if (status != MXL_STATUS_OK)
     {
         MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
