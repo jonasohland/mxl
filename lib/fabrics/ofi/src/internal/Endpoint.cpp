@@ -12,6 +12,8 @@
 #include "EventQueue.hpp"
 #include "Exception.hpp"
 #include "FIInfo.hpp"
+#include "MemoryRegion.hpp"
+#include "TargetInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -146,13 +148,22 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
-    void Endpoint::write(Region const& localRegion, void* localDesc, uint64_t remoteAddr, uint64_t rkey, ::fi_addr_t destAddr)
+    void Endpoint::write(RegisteredRegion& localRegion, RemoteRegion const& remoteRegion, ::fi_addr_t destAddr)
     {
-        auto iovec = localRegion.to_iovec();
+        auto iovec = localRegion.region().to_iovec();
+        auto desc = std::vector<void*>{localRegion.desc()};
 
         // TODO: catch error and convert to an internal error
-        fiCall(
-            ::fi_writev, "Failed to push rma write to work queue.", _raw, iovec.data(), iovec.size(), localDesc, destAddr, remoteAddr, rkey, nullptr);
+        fiCall(::fi_writev,
+            "Failed to push rma write to work queue.",
+            _raw,
+            iovec.data(),
+            desc.data(),
+            iovec.size(),
+            destAddr,
+            remoteRegion.addr,
+            remoteRegion.rkey,
+            nullptr);
     }
 
 }

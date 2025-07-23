@@ -58,9 +58,9 @@ namespace mxl::lib::fabrics::ofi
 
         endpoint->connect(targetInfo.fabricAddress);
 
-        auto target = InitiatorTargetEntry{.endpoint = std::move(endpoint), .regions = targetInfo.remoteRegions};
+        auto target = InitiatorTargetEntry{.endpoint = std::move(endpoint), .regions = targetInfo.regions};
 
-        _targets.insert({targetInfo.asIdentifier(), target});
+        _targets.insert({targetInfo.identifier(), target});
 
         return MXL_STATUS_OK;
     }
@@ -69,7 +69,7 @@ namespace mxl::lib::fabrics::ofi
     {
         MXL_FABRICS_UNUSED(targetInfo);
 
-        auto identifier = targetInfo.asIdentifier();
+        auto identifier = targetInfo.identifier();
 
         if (_targets.contains(identifier))
         {
@@ -98,10 +98,9 @@ namespace mxl::lib::fabrics::ofi
         {
             auto remoteRegion = target.regions.at(grainIndex % target.regions.size());
 
-            target.endpoint->write(localRegion.region(), localRegion.desc(), remoteRegion.addr, remoteRegion.rkey);
+            target.endpoint->write(localRegion, remoteRegion);
         }
 
         return MXL_STATUS_OK;
     }
-
 }

@@ -17,7 +17,7 @@ namespace mxl::lib::fabrics::ofi
     struct InitiatorTargetEntry
     {
         std::shared_ptr<Endpoint> endpoint;
-        RemoteRegions regions;
+        std::vector<RemoteRegion> regions;
     };
 
     class Initiator

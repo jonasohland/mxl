@@ -29,6 +29,7 @@ target_link_libraries(mxl-fabrics-tests
         mxl
         mxl-fabrics-static
         Catch2::Catch2WithMain
+        stduuid
 )
 
 target_include_directories(mxl-fabrics-tests

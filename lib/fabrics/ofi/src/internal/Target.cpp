@@ -1,5 +1,6 @@
 #include "Target.hpp"
 #include <chrono>
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <variant>
@@ -24,8 +25,6 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    TargetWrapper::~TargetWrapper()
-    {}
 
     void TargetWrapper::doProgress()
     {
@@ -146,8 +145,18 @@ namespace mxl::lib::fabrics::ofi
         auto fabric = Fabric::open(*bestFabricInfo);
         _domain = Domain::open(fabric);
 
-        auto regions = Regions::fromAPI(config.regions);
-        _mr = MemoryRegion::reg(*_domain, *regions, FI_REMOTE_WRITE);
+        auto* regions = Regions::fromAPI(config.regions);
+
+        for (auto const& region : *regions)
+        {
+            auto mr = MemoryRegion::reg(*_domain, region, FI_REMOTE_WRITE | FI_REMOTE_READ);
+            auto registeredRegion = RegisteredRegion(std::move(mr), region);
+            _regions.emplace_back(std::move(registeredRegion));
+        }
+
+        std::vector<RemoteRegion> remoteRegions;
+        std::ranges::transform(
+            _regions, std::back_inserter(remoteRegions), [](RegisteredRegion& reg) { return RemoteRegion::fromRegisteredRegion(reg); });
 
         auto pep = PassiveEndpoint::create(fabric);
 
@@ -158,6 +167,6 @@ namespace mxl::lib::fabrics::ofi
         // Transition the state machine to the waiting for a connection request state
         _state = StateWaitConnReq{pep};
 
-        return {MXL_STATUS_OK, std::make_unique<TargetInfo>(pep->localAddress(), *regions, _mr->get()->getRemoteKey())};
+        return {MXL_STATUS_OK, std::make_unique<TargetInfo>(pep->localAddress(), remoteRegions)};
     }
 }

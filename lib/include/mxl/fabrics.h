@@ -208,8 +208,8 @@ extern "C"
      * \return The result code. \see mxlStatus
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, GrainInfo const* in_grainInfo,
-        uint8_t const* in_payload);
+    mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator in_initiator, uint64_t grainIndex,
+        GrainInfo const* in_grainInfo, uint8_t const* in_payload);
 
     // Below are helper functions
 

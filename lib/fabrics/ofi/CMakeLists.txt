@@ -90,7 +90,6 @@ set(mxl_fabrics_sources
         src/internal/RMATarget.cpp
         src/internal/Target.cpp
         src/internal/TargetInfo.cpp
-
 )
 
 target_sources(mxl-fabrics PRIVATE ${mxl_fabrics_sources})

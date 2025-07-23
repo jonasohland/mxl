@@ -4,7 +4,6 @@
 #include <rdma/fi_cm.h>
 #include <rdma/fi_errno.h>
 #include "mxl/mxl.h"
-#include "Endpoint.hpp"
 #include "Exception.hpp"
 
 namespace mxl::lib::fabrics::ofi

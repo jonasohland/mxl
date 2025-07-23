@@ -10,7 +10,9 @@
 #include "Domain.hpp"
 #include "EventQueue.hpp"
 #include "FIInfo.hpp"
+#include "MemoryRegion.hpp"
 #include "Region.hpp"
+#include "TargetInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -59,7 +61,7 @@ namespace mxl::lib::fabrics::ofi
          * \param rkey The remote protection key provided by the target
          * \param destAddr The destination address of the target endpoint. This is unused when using connected endpoints.
          */
-        void write(Region const& localRegion, void* localDesc, uint64_t remoteAddr, uint64_t rkey, ::fi_addr_t destAddr = FI_ADDR_UNSPEC);
+        void write(RegisteredRegion& localRegion, RemoteRegion const& remoteRegion, ::fi_addr_t destAddr = FI_ADDR_UNSPEC);
 
     private:
         void close();
