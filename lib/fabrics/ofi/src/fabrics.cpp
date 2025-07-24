@@ -5,15 +5,18 @@
 #include <cstring>
 #include <memory>
 #include <sstream>
+#include <rfl.hpp>
 #include <internal/Instance.hpp>
 #include <internal/Logging.hpp>
 #include <mxl/mxl.h>
 #include <rdma/fabric.h>
+#include <rfl/json.hpp>
 #include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
 #include "internal/Initiator.hpp"
 #include "internal/Provider.hpp"
 #include "internal/Region.hpp"
+#include "internal/SharedMemory.hpp"
 #include "internal/Target.hpp"
 #include "internal/TargetInfo.hpp"
 #include "mxl/platform.h"
@@ -39,22 +42,28 @@ namespace
                 return MXL_ERR_INVALID_ARG;
             }
 
-            *out_regions = reinterpret_cast<mxlRegions>(new ofi::DeferredRegions{*flowId});
+            auto* instance = mxl::to_Instance(in_instance);
+            auto regions = new ofi::Regions{ofi::DeferredRegions{*flowId}.unwrap(*instance, mxl::AccessMode::READ_ONLY)};
+
+            *out_regions = regions->toAPI();
 
             return MXL_STATUS_OK;
         }
+
         catch (ofi::Exception& e)
         {
             MXL_ERROR("Failed to create regions object: {}", e.what());
 
             return e.status();
         }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to create Regions object: {}", e.what());
 
             return MXL_ERR_UNKNOWN;
         }
+
         catch (...)
         {
             MXL_ERROR("Failed to create Regions object.");
@@ -73,7 +82,7 @@ namespace
 
         try
         {
-            auto regions = reinterpret_cast<ofi::DeferredRegions*>(in_regions);
+            auto regions = ofi::Regions::fromAPI(in_regions);
             delete regions;
 
             return MXL_STATUS_OK;
@@ -620,14 +629,16 @@ namespace
 
         try
         {
-            auto targetInfo = std::make_unique<ofi::TargetInfo>();
+            auto deserializedTargetInfo = rfl::json::read<ofi::TargetInfo>(in_string);
+            if (deserializedTargetInfo)
+            {
+                auto targetInfo = std::make_unique<ofi::TargetInfo>(deserializedTargetInfo.value());
+                *out_targetInfo = targetInfo.release()->toAPI();
 
-            std::stringstream ss{in_string, std::ios_base::in};
-            ss >> *targetInfo;
+                return MXL_STATUS_OK;
+            }
 
-            *out_targetInfo = targetInfo.release()->toAPI();
-
-            return MXL_STATUS_OK;
+            MXL_ERROR("Failed to deserialize target info from string with error \"{}\"", deserializedTargetInfo.error().what());
         }
         catch (ofi::Exception& e)
         {
@@ -644,7 +655,7 @@ namespace
             return MXL_ERR_UNKNOWN;
         }
 
-        return MXL_STATUS_OK;
+        return MXL_ERR_INVALID_ARG;
     }
 
     extern "C" MXL_EXPORT
@@ -658,9 +669,8 @@ namespace
         try
         {
             std::stringstream ss;
-            ss << *ofi::TargetInfo::fromAPI(in_targetInfo);
-
-            auto targetInfoString = ss.str();
+            auto targetInfo = ofi::TargetInfo::fromAPI(in_targetInfo);
+            auto targetInfoString = rfl::json::write(targetInfo);
 
             if (out_string == nullptr)
             {
@@ -680,16 +690,19 @@ namespace
 
             return MXL_STATUS_OK;
         }
+
         catch (ofi::Exception& e)
         {
             MXL_ERROR("Failed to create instance: {}", e.what());
 
             return e.status();
         }
+
         catch (std::exception& e)
         {
             return MXL_ERR_UNKNOWN;
         }
+
         catch (...)
         {
             return MXL_ERR_UNKNOWN;

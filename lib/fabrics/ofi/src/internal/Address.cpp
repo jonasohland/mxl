@@ -4,6 +4,7 @@
 #include <rdma/fi_cm.h>
 #include <rdma/fi_errno.h>
 #include "mxl/mxl.h"
+#include "Base64.hpp"
 #include "Exception.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -44,21 +45,21 @@ namespace mxl::lib::fabrics::ofi
         return const_cast<uint8_t*>(_inner.data());
     }
 
-    std::ostream& operator<<(std::ostream& os, FabricAddress const& addr)
+    std::string FabricAddress::toBase64() const
     {
-        os.write(reinterpret_cast<char const*>(addr._inner.data()), addr._inner.size());
-        return os;
+        return base64::encode_into<std::string>(_inner.cbegin(), _inner.cend());
     }
 
-    std::istream& operator>>(std::istream& is, FabricAddress& addr)
+    FabricAddress FabricAddress::fromBase64(std::string_view data)
     {
-        addr._inner.clear();
+        return FabricAddress{base64::decode_into<std::vector<uint8_t>>(data)};
 
-        uint8_t raw;
-        while (is >> raw)
+        auto decoded = base64::decode_into<std::vector<uint8_t>>(data);
+        if (decoded.empty())
         {
-            addr._inner.push_back(raw);
+            throw std::runtime_error("Failed to decode base64 data into FabricAddress");
         }
-        return is;
+        return FabricAddress{std::move(decoded)};
     }
+
 }

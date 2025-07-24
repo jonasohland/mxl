@@ -1,6 +1,8 @@
 #include "FIInfo.hpp"
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
+#include "internal/Logging.hpp"
+#include "mxl/mxl.h"
 #include "Exception.hpp"
 #include "FIVersion.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
@@ -117,6 +119,7 @@ namespace mxl::lib::fabrics::ofi
         hints = fi_allocinfo();
         if (hints == nullptr)
         {
+            throw Exception::make(MXL_ERR_UNKNOWN, "Failed to allocate fi_info structure for hints");
             // TODO: throw an error?
         }
 
@@ -125,12 +128,16 @@ namespace mxl::lib::fabrics::ofi
         // hints: hints->fabric_attr->prov_name = provider
         hints->mode = FI_RX_CQ_DATA;
         hints->caps = FI_RMA | FI_WRITE | FI_REMOTE_WRITE;
+        hints->ep_attr->type = FI_EP_MSG;
         hints->fabric_attr->prov_name = const_cast<char*>(prov.c_str());
         // hints: FI_REMOTE_WRITE and FI_RMA_EVENT could be appened for a target only
         // hints: add condition to append FI_HMEM capability if needed!
 
         fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), 0, hints, &info);
-        fi_freeinfo(hints); // TODO: validate if this does not make everything crash
+
+        MXL_INFO("Found providers : {}", ::fi_tostr(info, FI_TYPE_INFO));
+
+        // fi_freeinfo(hints); // TODO: understand why this makes a crash.. according to the documentation hints shoud be freed after use.
 
         return FIInfoList{info};
     }

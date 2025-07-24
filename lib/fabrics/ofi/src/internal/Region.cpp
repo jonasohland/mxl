@@ -16,20 +16,6 @@ namespace mxl::lib::fabrics::ofi
         return ::iovec{.iov_base = reinterpret_cast<void*>(base), .iov_len = size};
     }
 
-    std::ostream& operator<<(std::ostream& os, BufferSpace const& iov)
-    {
-        os.write(reinterpret_cast<char const*>(iov.base), sizeof(iov.base));
-        os << iov.size;
-        return os;
-    }
-
-    std::istream& operator>>(std::istream& is, BufferSpace& iov)
-    {
-        is.read(reinterpret_cast<char*>(&iov.base), sizeof(iov.base));
-        is.read(reinterpret_cast<char*>(&iov.size), sizeof(iov.size));
-        return is;
-    }
-
     std::uintptr_t Region::firstBaseAddress() const noexcept
     {
         return _inner.front().base;
@@ -42,27 +28,6 @@ namespace mxl::lib::fabrics::ofi
 
         std::ranges::transform(_inner, std::back_inserter(iovec), [](BufferSpace const& iov) { return iov.to_iovec(); });
         return iovec;
-    }
-
-    std::ostream& operator<<(std::ostream& os, Region const& region)
-    {
-        for (auto const& region : region._inner)
-        {
-            os << region;
-        }
-        return os;
-    }
-
-    std::istream& operator>>(std::istream& is, Region& region)
-    {
-        region._inner.clear();
-
-        BufferSpace iov;
-        while (is >> iov)
-        {
-            region._inner.push_back(iov);
-        }
-        return is;
     }
 
     // Regions implementations
@@ -127,27 +92,6 @@ namespace mxl::lib::fabrics::ofi
         return reinterpret_cast<::mxlRegions>(this);
     }
 
-    std::ostream& operator<<(std::ostream& os, Regions const& regions)
-    {
-        for (auto const& region : regions._inner)
-        {
-            os << region;
-        }
-        return os;
-    }
-
-    std::istream& operator>>(std::istream& is, Regions& regions)
-    {
-        regions._inner.clear();
-
-        Region region;
-        while (is >> region)
-        {
-            regions._inner.push_back(region);
-        }
-        return is;
-    }
-
     // DeferredRegions implementations
 
     DeferredRegions::DeferredRegions(Regions regions) noexcept
@@ -163,7 +107,8 @@ namespace mxl::lib::fabrics::ofi
         return std::visit(
             overloaded{
                 [](Regions regions) -> Regions { return regions; },
-                [&](uuids::uuid const& flowId) -> Regions { return Regions::fromFlow(instance.openFlow(flowId, accessMode).get()); },
+                [&](uuids::uuid const& flowId) -> Regions
+                { return Regions::fromFlow(instance.openFlow(flowId, accessMode).get()); }, // TODO: check if we need to close the flow after this
             },
             _inner);
     }

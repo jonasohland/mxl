@@ -102,18 +102,21 @@ namespace mxl::lib::fabrics::ofi
                     // Check if the entry is available and is a connection request
                     if (auto entry = state.pep->eventQueue()->waitForEntry(timeout); entry && entry->get()->isConnReq())
                     {
+                        MXL_INFO("Connection request received, creating endpoint for remote address: {}", entry->get()->info().value()->dest_addr);
+
                         // TODO: move this to a separate function to avoid code duplication
                         // create the active endpoint and bind a cq and an eq
                         auto endpoint = Endpoint::create(*_domain);
 
                         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
-                        endpoint->bind(cq, FI_REMOTE_WRITE | FI_RECV);
+                        endpoint->bind(cq, 0);
 
                         auto eq = EventQueue::open(_domain->get()->fabric(), EventQueueAttr::get_default());
                         endpoint->bind(eq);
 
                         // we are now ready to accept the connection
                         endpoint->accept();
+                        MXL_INFO("Accepted the connection waiting for connected event notification.");
 
                         // Return the new state as the variant type
                         return StateWaitForConnected{endpoint};
@@ -125,6 +128,8 @@ namespace mxl::lib::fabrics::ofi
                 {
                     if (auto entry = state.ep->eventQueue()->waitForEntry(timeout); entry && entry->get()->isConnected())
                     {
+                        MXL_INFO("Received connected event notification, now connected.");
+
                         // We have a connected event, so we can transition to the connected state
                         return StateConnected{state.ep};
                     }
@@ -205,6 +210,7 @@ namespace mxl::lib::fabrics::ofi
         pep->listen();
 
         // Transition the state machine to the waiting for a connection request state
+        MXL_INFO("Listening for initator connection request.");
         _state = StateWaitConnReq{pep};
 
         return {MXL_STATUS_OK, std::make_unique<TargetInfo>(pep->localAddress(), remoteRegions)};

@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <memory>
 #include <rdma/fabric.h>
+#include <rfl/json/write.hpp>
+#include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
 #include "CompletionQueue.hpp"
@@ -104,9 +106,20 @@ namespace mxl::lib::fabrics::ofi
         endpoint->bind(eq);
 
         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
-        endpoint->bind(cq, FI_WRITE);
+        endpoint->bind(cq, 0);
 
+        MXL_INFO("Connecting endpoint to target with address: {}", rfl::json::write(targetInfo.fabricAddress));
         endpoint->connect(targetInfo.fabricAddress);
+
+        while (true)
+        {
+            auto entry = eq->waitForEntry(std::chrono::seconds(1));
+            if (entry && entry.value()->isConnected())
+            {
+                break;
+            }
+        }
+        MXL_INFO("Now connected!");
 
         auto target = InitiatorTargetEntry{.endpoint = std::move(endpoint), .regions = targetInfo.regions};
 

@@ -80,18 +80,14 @@ namespace mxl::lib::fabrics::ofi
 
     void Endpoint::bind(std::shared_ptr<EventQueue> eq)
     {
-        auto fid = eq->raw()->fid;
-
-        fiCall(::fi_ep_bind, "Failed to bind event queue to endpoint", _raw, &fid, 0);
+        fiCall(::fi_ep_bind, "Failed to bind event queue to endpoint", _raw, &eq->raw()->fid, 0);
 
         _eq = eq;
     }
 
     void Endpoint::bind(std::shared_ptr<CompletionQueue> cq, uint64_t flags)
     {
-        auto fid = cq->raw()->fid;
-
-        fiCall(::fi_ep_bind, "Failed to bind completion queue to endpoint", _raw, &fid, flags);
+        fiCall(::fi_ep_bind, "Failed to bind completion queue to endpoint", _raw, &cq->raw()->fid, flags);
 
         _cq = cq;
     }
@@ -103,7 +99,8 @@ namespace mxl::lib::fabrics::ofi
 
     void Endpoint::accept()
     {
-        fiCall(::fi_accept, "Failed to accept connection", _raw, nullptr, 0);
+        uint8_t dummy;
+        fiCall(::fi_accept, "Failed to accept connection", _raw, &dummy, sizeof(dummy));
     }
 
     void Endpoint::connect(FabricAddress const& addr)
