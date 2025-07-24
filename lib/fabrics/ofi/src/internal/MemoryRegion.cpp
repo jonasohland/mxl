@@ -1,6 +1,7 @@
 #include "MemoryRegion.hpp"
 #include <cstdint>
 #include <memory>
+#include <random>
 #include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
@@ -15,21 +16,20 @@ namespace mxl::lib::fabrics::ofi
         auto iovecs = region.to_iovec();
 
         ::fid_mr* raw;
+        std::random_device rd;
+        std::mt19937_64 gen(rd());
+        std::uniform_int_distribution<uint64_t> dist(0, UINT64_MAX);
 
         ::fi_mr_attr attr{};
         attr.mr_iov = iovecs.data();
         attr.iov_count = iovecs.size();
         attr.access = access;
-        attr.offset = 0;             // reserved to 0
-        attr.requested_key = 0;      // ignore if FI_MR_PROV_KEY mr mode is set
-        attr.context = nullptr;      // not used
-        attr.auth_key_size = 0;      // not used
-        attr.auth_key = nullptr;     // not used
-        attr.iface = FI_HMEM_SYSTEM; // this will change when we add HMEM support (also need to set attr.device bits)
-        attr.hmem_data = nullptr;    // not used
-        attr.page_size = 0;          // not used
-        attr.base_mr = nullptr;      // not used
-        attr.sub_mr_cnt = 0;         // not used
+        attr.offset = 0;                // reserved to 0
+        attr.requested_key = dist(gen); // creating a random key, but it will be ignored if FI_MR_PROV_KEY mr mode is set
+        attr.context = nullptr;         // not used
+        attr.page_size = 0;             // not used
+        attr.base_mr = nullptr;         // not used
+        attr.sub_mr_cnt = 0;            // not used
 
         fiCall(fi_mr_regattr,
             "Failed to register memory region",

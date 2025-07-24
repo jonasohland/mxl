@@ -1,6 +1,7 @@
 #include "PassiveEndpoint.hpp"
 #include <memory>
 #include <optional>
+#include <utility>
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_endpoint.h>
@@ -35,7 +36,7 @@ namespace mxl::lib::fabrics::ofi
     PassiveEndpoint::PassiveEndpoint(::fid_pep* raw, std::shared_ptr<Fabric> fabric, std::optional<std::shared_ptr<EventQueue>> eq)
         : _raw(raw)
         , _fabric(std::move(fabric))
-        , _eq(eq)
+        , _eq(std::move(eq))
     {}
 
     void PassiveEndpoint::close()
@@ -67,8 +68,7 @@ namespace mxl::lib::fabrics::ofi
 
     void PassiveEndpoint::bind(std::shared_ptr<EventQueue> eq)
     {
-        auto fid = eq->raw()->fid;
-        fiCall(::fi_pep_bind, "Failed to bind event queue to passive endpoint", _raw, &fid, 0);
+        fiCall(::fi_pep_bind, "Failed to bind event queue to passive endpoint", _raw, &eq->raw()->fid, 0);
 
         _eq = eq;
     }

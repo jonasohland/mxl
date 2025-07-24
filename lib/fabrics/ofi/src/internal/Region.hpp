@@ -1,8 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <istream>
-#include <ostream>
 #include <variant>
 #include <vector>
 #include <uuid.h>
@@ -20,17 +18,11 @@ namespace mxl::lib::fabrics::ofi
 
         [[nodiscard]]
         ::iovec to_iovec() const;
-
-        friend std::ostream& operator<<(std::ostream& os, BufferSpace const& region);
-        friend std::istream& operator>>(std::istream& is, BufferSpace& region);
     };
 
     class Region
     {
     public:
-        friend std::ostream& operator<<(std::ostream& os, Region const& region);
-        friend std::istream& operator>>(std::istream& is, Region& region);
-
         explicit Region() = default;
 
         explicit Region(std::vector<BufferSpace> inner)
@@ -79,9 +71,6 @@ namespace mxl::lib::fabrics::ofi
 
         static Regions* fromAPI(mxlRegions) noexcept;
         ::mxlRegions toAPI() noexcept;
-
-        friend std::ostream& operator<<(std::ostream& os, Regions const& regions);
-        friend std::istream& operator>>(std::istream& is, Regions& regions);
 
     private:
         std::vector<Region> _inner;

@@ -2,19 +2,21 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string>
+#include <uuid.h>
 #include <CLI/CLI.hpp>
 #include <mxl/fabrics.h>
 #include <mxl/flow.h>
 #include <mxl/mxl.h>
 #include <mxl/time.h>
 #include <sys/types.h>
+#include "../../lib/fabrics/ofi/src/internal/Base64.hpp"
 #include "../../lib/src/internal/FlowParser.hpp"
 #include "../../lib/src/internal/Logging.hpp"
 
 /*
     Example how to use:
 
-        1- Start a receiver: ./mlx-fabrics-sample -f bda7a5e7-32c1-483a-ae1e-055568cc4335 --node 2.2.2.2 --service 1234 --provider verbs -cf low.json
+        1- Start a target: ./mlx-fabrics-sample -f bda7a5e7-32c1-483a-ae1e-055568cc4335 --node 2.2.2.2 --service 1234 --provider verbs -c flow.json
         2- Paste the target info that gets printed in stdout to the -t argument of the sender.
         3- Start a sender: ./mlx-fabrics-sample -s -f bda7a5e7-32c1-483a-ae1e-055568cc4335 --node 1.1.1.1 --service 1234 --provider verbs -t
    <targetInfo>
@@ -39,8 +41,8 @@ void signal_handler(int)
     g_exit_requested = 1;
 }
 
-static mxlStatus runSender(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, mxlTargetInfo_t* targetInfo);
-static mxlStatus runReceiver(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, std::string const& flowConfigFile);
+static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, mxlTargetInfo_t* targetInfo);
+static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, std::string const& flowConfigFile);
 
 int main(int argc, char** argv)
 {
@@ -51,7 +53,7 @@ int main(int argc, char** argv)
 
     std::string flowConfigFile;
     auto _ = app.add_option(
-        "-c, --flow-config-file", flowConfigFile, "The json file which contains the NMOS Flow configuration. Only used when configured as a reader.");
+        "-c, --flow-config-file", flowConfigFile, "The json file which contains the NMOS Flow configuration. Only used when configured as a target.");
 
     std::string domain;
     auto domainOpt = app.add_option("-d,--domain", domain, "The MXL domain directory");
@@ -59,39 +61,36 @@ int main(int argc, char** argv)
     domainOpt->check(CLI::ExistingDirectory);
 
     std::string flowID;
-    auto flowIDOpt = app.add_option("-f, --flow-id",
-        flowID,
-        "The flow ID. When configured as a sender, this is the flow ID to read from. When configured as a receiver, this is the flow ID to write "
-        "to.");
-    flowIDOpt->required(true);
+    app.add_option("-f, --flow-id", flowID, "The flow ID. When configured as an initiator, this is the flow ID to read from.");
 
-    bool runAsSender;
-    auto runAsSenderOpt = app.add_flag("-s,--sender",
-        runAsSender,
-        "Run as a sender (flow reader + fabrics initiator). If not set, run as a receiver (fabrics target + flow writer).");
-    runAsSenderOpt->default_val(true);
+    bool runAsInitiator;
+    auto runAsInitiatorOpt = app.add_flag("-i,--initiator",
+        runAsInitiator,
+        "Run as an initiator (flow reader + fabrics initiator). If not set, run as a receiver (fabrics target + flow writer).");
+    runAsInitiatorOpt->default_val(true);
 
     std::string node;
-    app.add_option("-n,--node",
+    auto nodeOpt = app.add_option("-n,--node",
         node,
         "This corresponds to the interface identifier of the fabrics endpoint, it can also be a logical address. This can be seen as the bind "
-        "address when using sockets. "
-        "Default is localhost.");
+        "address when using sockets.");
+    nodeOpt->default_val("localhost");
 
     std::string service;
-    app.add_option("--service",
+    auto serviceOpt = app.add_option("--service",
         service,
-        "This corresponds to a service identifier for the fabrics endpoint. This can be seen as the bind port when using sockets. Default is 1234.");
+        "This corresponds to a service identifier for the fabrics endpoint. This can be seen as the bind port when using sockets.");
+    serviceOpt->default_val("1234");
 
     std::string provider;
     auto providerOpt = app.add_option("-p,--provider", provider, "The fabrics provider. One of (tcp, verbs or efa). Default is 'tcp'.");
     providerOpt->default_val("tcp");
 
     std::string targetInfo;
-    app.add_option("-t,--target-info",
+    app.add_option("--target-info",
         targetInfo,
-        "The target information. This is used when configured as a sender. This is the target information to send to. You first start the target and "
-        "it will print the targetInfo that you paste to this argument");
+        "The target information. This is used when configured as an initiator . This is the target information to send to."
+        "You first start the target and it will print the targetInfo that you paste to this argument");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -128,11 +127,14 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    if (runAsSender)
+    if (runAsInitiator)
     {
         mxlTargetInfo mxlTargetInfo;
 
-        status = mxlFabricsTargetInfoFromString(targetInfo.c_str(), &mxlTargetInfo);
+        auto decodedStr = base64::from_base64(targetInfo);
+        MXL_INFO("Target info: base64={}  decoded={}", targetInfo, decodedStr);
+
+        status = mxlFabricsTargetInfoFromString(decodedStr.c_str(), &mxlTargetInfo);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to parse target info '{}'", targetInfo);
@@ -140,13 +142,13 @@ int main(int argc, char** argv)
             goto mxl_cleanup;
         }
 
-        exit_status = runSender(instance, fabricsInstance, config, mxlTargetInfo);
+        exit_status = runInitiator(instance, fabricsInstance, config, mxlTargetInfo);
 
         mxlFabricsFreeTargetInfo(mxlTargetInfo);
     }
     else
     {
-        exit_status = runReceiver(instance, fabricsInstance, config, flowConfigFile);
+        exit_status = runTarget(instance, fabricsInstance, config, flowConfigFile);
     }
 
 mxl_cleanup:
@@ -158,7 +160,7 @@ mxl_cleanup:
     return exit_status;
 }
 
-static mxlStatus runSender(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, mxlTargetInfo_t* targetInfo)
+static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, mxlTargetInfo_t* targetInfo)
 {
     mxlFlowReader reader;
 
@@ -199,6 +201,8 @@ static mxlStatus runSender(mxlInstance instance, mxlFabricsInstance fabricsInsta
         return status;
     }
 
+    MXL_INFO("Done initiator setup");
+
     status = mxlFabricsInitiatorAddTarget(initiator, targetInfo);
     if (status != MXL_STATUS_OK)
     {
@@ -222,7 +226,7 @@ static mxlStatus runSender(mxlInstance instance, mxlFabricsInstance fabricsInsta
 
     while (g_exit_requested)
     {
-        auto ret = mxlFlowReaderGetGrain(reader, grainIndex, 200000000, &grainInfo, &payload); // TODO set a proper timeout...
+        auto ret = mxlFlowReaderGetGrain(reader, grainIndex, 200000000, &grainInfo, &payload);
         if (ret == MXL_ERR_OUT_OF_RANGE_TOO_LATE)
         {
             // We are too late.. time travel!
@@ -268,7 +272,7 @@ static mxlStatus runSender(mxlInstance instance, mxlFabricsInstance fabricsInsta
     return MXL_STATUS_OK;
 }
 
-static mxlStatus runReceiver(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, std::string const& flowConfigFile)
+static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, std::string const& flowConfigFile)
 {
     std::ifstream file(flowConfigFile, std::ios::in | std::ios::binary);
     if (!file)
@@ -279,8 +283,10 @@ static mxlStatus runReceiver(mxlInstance instance, mxlFabricsInstance fabricsIns
     std::string flowDescriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
     mxl::lib::FlowParser descriptorParser{flowDescriptor};
 
+    auto flowId = uuids::to_string(descriptorParser.getId());
+
     FlowInfo flowInfo;
-    auto status = mxlCreateFlow(instance, config.flowID.c_str(), flowDescriptor.c_str(), &flowInfo);
+    auto status = mxlCreateFlow(instance, flowDescriptor.c_str(), nullptr, &flowInfo);
     if (status != MXL_STATUS_OK)
     {
         MXL_ERROR("Failed to create flow with status '{}'", static_cast<int>(status));
@@ -289,15 +295,14 @@ static mxlStatus runReceiver(mxlInstance instance, mxlFabricsInstance fabricsIns
 
     mxlFlowWriter writer;
     // Create a flow writer for the given flow id.
-    status = mxlCreateFlowWriter(instance, config.flowID.c_str(), "", &writer);
+    status = mxlCreateFlowWriter(instance, flowId.c_str(), "", &writer);
     if (status != MXL_STATUS_OK)
     {
         MXL_ERROR("Failed to create flow writer with status '{}'", static_cast<int>(status));
-        return status;
     }
 
     mxlRegions regions;
-    status = mxlFabricsRegionsFromFlow(instance, config.flowID.c_str(), &regions);
+    status = mxlFabricsRegionsFromFlow(instance, flowId.c_str(), &regions);
     if (status != MXL_STATUS_OK)
     {
         MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
@@ -346,18 +351,19 @@ static mxlStatus runReceiver(mxlInstance instance, mxlFabricsInstance fabricsIns
         return status;
     }
 
-    MXL_INFO("Target info: {}", targetInfoStr);
+    MXL_INFO("Target info: json={}  base64={}", targetInfoStr, base64::to_base64(targetInfoStr));
 
     GrainInfo dummyGrainInfo;
     uint64_t grainIndex = 0;
     uint8_t* dummyPayload;
-    while (g_exit_requested)
+    while (!g_exit_requested)
     {
         status = mxlFabricsTargetWaitForNewGrain(target, &grainIndex, 200);
+
         if (status == MXL_ERR_TIMEOUT)
         {
             // No completion before a timeout was triggered, most likely a problem upstream.
-            MXL_WARN("wait for new grain timeout, most likely there is a problem upstream.");
+            // MXL_WARN("wait for new grain timeout, most likely there is a problem upstream.");
             continue;
         }
 

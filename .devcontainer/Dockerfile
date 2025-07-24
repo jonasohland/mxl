@@ -45,6 +45,7 @@ RUN apt-get install -y --no-install-recommends \
     "clang-tools-${CLANG_VERSION}" \
     "clang-tidy-${CLANG_VERSION}" \
     "clang-format-${CLANG_VERSION}" \
+    "llvm-${CLANG_VERSION}" \
     cmake \
     ninja-build
 
