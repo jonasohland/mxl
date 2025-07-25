@@ -10,8 +10,8 @@
 #include "Domain.hpp"
 #include "EventQueue.hpp"
 #include "FIInfo.hpp"
-#include "MemoryRegion.hpp"
-#include "TargetInfo.hpp"
+#include "LocalRegion.hpp"
+#include "RemoteRegion.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -25,7 +25,7 @@ namespace mxl::lib::fabrics::ofi
         Endpoint(Endpoint&&) noexcept;
         Endpoint& operator=(Endpoint&&);
 
-        static std::shared_ptr<Endpoint> create(std::shared_ptr<Domain> domain, std::optional<FIInfoView> remoteInfo = std::nullopt);
+        static std::shared_ptr<Endpoint> create(std::shared_ptr<Domain> domain, std::shared_ptr<FIInfo> info);
 
         void bind(std::shared_ptr<EventQueue> eq);
         void bind(std::shared_ptr<CompletionQueue> cq, uint64_t flags);
@@ -36,10 +36,8 @@ namespace mxl::lib::fabrics::ofi
         void connect(FabricAddress const& addr);
         void shutdown();
 
-        FabricAddress localAddress()
-        {
-            return FabricAddress::fromFid(&_raw->fid);
-        }
+        [[nodiscard]]
+        FabricAddress localAddress() const;
 
         [[nodiscard]]
         std::shared_ptr<CompletionQueue> completionQueue() const;
@@ -47,29 +45,30 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         std::shared_ptr<EventQueue> eventQueue() const;
 
+        /**
+         * Push a remote write work request to the endpoint.
+         * \param localGroup Source memory regions to write from
+         * \param remoteGroup Destination memory regions to write to
+         * \param destAddr The destination address of the target endpoint. This is unused when using connected endpoints.
+         * \param 64 bits of user data that will be available in the completion entry associated with this transfer.
+         */
+        void write(LocalRegionGroup& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
+            std::optional<uint64_t> immData = std::nullopt);
+
         ::fid_ep* raw() noexcept;
 
         [[nodiscard]]
         ::fid_ep const* raw() const noexcept;
 
-        /**
-         * Push a remote write work request to the endpoint.
-         * \param region The local memory region to write from.
-         * \param localDesc The memory region descriptor. This is obtained by registering the memory region.
-         * \param remoteAddr The remote base address to write to
-         * \param rkey The remote protection key provided by the target
-         * \param destAddr The destination address of the target endpoint. This is unused when using connected endpoints.
-         */
-        void write(RegisteredRegion& localRegion, RemoteRegion const& remoteRegion, ::fi_addr_t destAddr = FI_ADDR_UNSPEC);
-
     private:
         void close();
 
-        Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq = std::nullopt,
-            std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt);
+        Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::shared_ptr<FIInfo> info,
+            std::optional<std::shared_ptr<CompletionQueue>> cq = std::nullopt, std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt);
 
         ::fid_ep* _raw;
         std::shared_ptr<Domain> _domain;
+        std::shared_ptr<FIInfo> _info;
 
         std::optional<std::shared_ptr<CompletionQueue>> _cq;
         std::optional<std::shared_ptr<EventQueue>> _eq;

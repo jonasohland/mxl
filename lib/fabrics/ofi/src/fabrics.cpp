@@ -43,9 +43,12 @@ namespace
             }
 
             auto* instance = mxl::to_Instance(in_instance);
-            auto regions = new ofi::Regions{ofi::DeferredRegions{*flowId}.unwrap(*instance, mxl::AccessMode::READ_ONLY)};
+            auto regions = ofi::RegionGroups::fromFlow(instance->openFlow(flowId.value(), mxl::AccessMode::READ_ONLY).get());
 
-            *out_regions = regions->toAPI();
+            // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
+            auto regionPtr = std::make_unique<ofi::RegionGroups>(regions).release();
+
+            *out_regions = regionPtr->toAPI();
 
             return MXL_STATUS_OK;
         }
@@ -82,7 +85,7 @@ namespace
 
         try
         {
-            auto regions = ofi::Regions::fromAPI(in_regions);
+            auto regions = ofi::RegionGroups::fromAPI(in_regions);
             delete regions;
 
             return MXL_STATUS_OK;

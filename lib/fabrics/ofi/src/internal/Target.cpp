@@ -1,6 +1,5 @@
 #include "Target.hpp"
 #include <chrono>
-#include <algorithm>
 #include <memory>
 #include <optional>
 #include <variant>
@@ -20,6 +19,8 @@
 #include "MemoryRegion.hpp"
 #include "PassiveEndpoint.hpp"
 #include "Provider.hpp"
+#include "Region.hpp"
+#include "RegisteredRegion.hpp"
 #include "RMATarget.hpp"
 #include "VariantUtils.hpp"
 
@@ -41,11 +42,13 @@ namespace mxl::lib::fabrics::ofi
                     // Check if the entry is available and is a connection request
                     if (auto entry = state.pep->eventQueue()->tryEntry(); entry && entry->get()->isConnReq())
                     {
-                        // When creating the endpoint here must pass the info of the remote endpoint requesting connection
-                        auto endpoint = Endpoint::create(*_domain, entry->get()->info());
+                        auto remoteInfo = std::make_shared<FIInfo>(entry->get()->info()->owned());
+
+                        // When creating the endpoint here we must pass the info of the remote endpoint requesting connection
+                        auto endpoint = Endpoint::create(*_domain, remoteInfo);
 
                         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
-                        endpoint->bind(cq, FI_REMOTE_WRITE | FI_RECV);
+                        endpoint->bind(cq, FI_RECV);
 
                         auto eq = EventQueue::open(_domain->get()->fabric(), EventQueueAttr::get_default());
                         endpoint->bind(eq);
@@ -104,12 +107,14 @@ namespace mxl::lib::fabrics::ofi
                     {
                         MXL_INFO("Connection request received, creating endpoint for remote address: {}", entry->get()->info().value()->dest_addr);
 
+                        auto remoteInfo = std::make_shared<FIInfo>(entry.value()->info()->owned());
+
                         // TODO: move this to a separate function to avoid code duplication
-                        // create the active endpoint and bind a cq and an eq
-                        auto endpoint = Endpoint::create(*_domain);
+                        // When creating the endpoint here we must pass the info of the remote endpoint requesting connection
+                        auto endpoint = Endpoint::create(*_domain, remoteInfo);
 
                         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
-                        endpoint->bind(cq, 0);
+                        endpoint->bind(cq, FI_RECV);
 
                         auto eq = EventQueue::open(_domain->get()->fabric(), EventQueueAttr::get_default());
                         endpoint->bind(eq);
@@ -117,6 +122,7 @@ namespace mxl::lib::fabrics::ofi
                         // we are now ready to accept the connection
                         endpoint->accept();
                         MXL_INFO("Accepted the connection waiting for connected event notification.");
+                        // TODO: move this to a separate function to avoid code duplication
 
                         // Return the new state as the variant type
                         return StateWaitForConnected{endpoint};
@@ -187,21 +193,26 @@ namespace mxl::lib::fabrics::ofi
             return {MXL_ERR_NO_FABRIC, nullptr};
         }
 
-        auto fabric = Fabric::open(*bestFabricInfo);
+        auto fabricInfo = std::make_shared<FIInfo>(bestFabricInfo->owned());
+
+        auto fabric = Fabric::open(fabricInfo);
         _domain = Domain::open(fabric);
 
-        auto* regions = Regions::fromAPI(config.regions);
-
-        for (auto const& region : *regions)
+        // config.regions contains the memory layout that will be written into.
+        auto* regions = RegionGroups::fromAPI(config.regions);
+        for (auto const& group : regions->view())
         {
-            auto mr = MemoryRegion::reg(*_domain, region, FI_REMOTE_WRITE | FI_REMOTE_READ);
-            auto registeredRegion = RegisteredRegion(std::move(mr), region);
-            _regions.emplace_back(std::move(registeredRegion));
+            // For each region group we will register memory and keep a copy inside this instance as a list of registered region groups.
+            // Registered regions can be converted to remote region groups or local region groups where needed.
+            std::vector<RegisteredRegion> registeredGroup;
+            for (auto const& region : group.view())
+            {
+                auto mr = MemoryRegion::reg(*_domain, region, FI_REMOTE_WRITE);
+                auto registeredRegion = RegisteredRegion(std::move(mr), region);
+                registeredGroup.emplace_back(std::move(registeredRegion));
+            }
+            _regRegions.emplace_back(registeredGroup);
         }
-
-        std::vector<RemoteRegion> remoteRegions;
-        std::ranges::transform(
-            _regions, std::back_inserter(remoteRegions), [](RegisteredRegion& reg) { return RemoteRegion::fromRegisteredRegion(reg); });
 
         auto pep = PassiveEndpoint::create(fabric);
 
@@ -209,11 +220,21 @@ namespace mxl::lib::fabrics::ofi
         pep->bind(eq);
         pep->listen();
 
+        // TODO: delete me
+        for (auto const& group : toRemote(_regRegions))
+        {
+            for (auto const& region : group.view())
+            {
+                MXL_INFO("Remote region addr={:x} len={} rkey={:x}", region.addr, region.len, region.rkey);
+            }
+        }
+        // TODO: delete me
+
         // Transition the state machine to the waiting for a connection request state
         MXL_INFO("Listening for initator connection request.");
         _state = StateWaitConnReq{pep};
 
-        return {MXL_STATUS_OK, std::make_unique<TargetInfo>(pep->localAddress(), remoteRegions)};
+        return {MXL_STATUS_OK, std::make_unique<TargetInfo>(pep->localAddress(), toRemote(_regRegions))};
     }
 
     TargetProgressResult TargetWrapper::tryGrain()

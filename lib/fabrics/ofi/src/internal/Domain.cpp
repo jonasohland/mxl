@@ -19,7 +19,7 @@ namespace mxl::lib::fabrics::ofi
     {
         ::fid_domain* domain;
 
-        fiCall(::fi_domain2, "Failed to open domain", fabric->raw(), fabric->info().raw(), &domain, 0, nullptr);
+        fiCall(::fi_domain2, "Failed to open domain", fabric->raw(), fabric->info()->raw(), &domain, 0, nullptr);
 
         struct MakeSharedEnabler : public Domain
         {

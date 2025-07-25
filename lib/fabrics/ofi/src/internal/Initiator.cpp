@@ -1,6 +1,7 @@
 #include "Initiator.hpp"
 #include <cstdint>
 #include <memory>
+#include <uuid.h>
 #include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
 #include "internal/Logging.hpp"
@@ -23,13 +24,13 @@ namespace mxl::lib::fabrics::ofi
 
     namespace internal
     {
-        mxlStatus removeTargetUnchecked(std::string identifier, std::map<std::string, InitiatorTargetEntry>& targets)
+        mxlStatus removeTargetUnchecked(uuids::uuid const& id, std::map<uuids::uuid, InitiatorTargetEntry>& targets)
         {
-            auto target = targets.at(identifier);
+            auto target = targets.at(id);
 
             target.endpoint->shutdown();
 
-            targets.erase(identifier);
+            targets.erase(id);
 
             return MXL_STATUS_OK;
         }
@@ -74,19 +75,33 @@ namespace mxl::lib::fabrics::ofi
             throw Exception::make(MXL_ERR_NO_FABRIC, "No suitable fabric available");
         }
 
-        auto fabric = Fabric::open(*bestFabricInfo);
+        auto fabricInfo = std::make_shared<FIInfo>(bestFabricInfo->owned());
+
+        auto fabric = Fabric::open(fabricInfo);
         _domain = Domain::open(fabric);
 
-        auto regions = Regions::fromAPI(config.regions);
-        if (!regions)
+        auto regionGroups = RegionGroups::fromAPI(config.regions);
+        if (!regionGroups)
         {
             return MXL_ERR_UNKNOWN;
         }
 
-        for (auto const& region : *regions)
+        MXL_INFO("------- Local Regions ---------");
+        regionGroups->print();
+
+        for (auto const& group : regionGroups->view())
         {
-            auto mr = MemoryRegion::reg(*_domain, region, FI_WRITE);
-            _localRegions.emplace_back(std::move(mr), region);
+            std::vector<RegisteredRegion> regRegions;
+            for (auto const& region : group.view())
+            {
+                auto mr = MemoryRegion::reg(*_domain, region, FI_WRITE);
+                auto registeredRegion = RegisteredRegion(std::move(mr), region);
+                regRegions.emplace_back(std::move(registeredRegion));
+            }
+
+            RegisteredRegionGroup regGroup{std::move(regRegions)};
+            _localRegions.emplace_back(regGroup.toLocal());
+            _registeredRegions.emplace_back(std::move(regGroup));
         }
 
         return MXL_STATUS_OK;
@@ -94,19 +109,19 @@ namespace mxl::lib::fabrics::ofi
 
     mxlStatus Initiator::addTarget(TargetInfo const& targetInfo)
     {
-        if (_targets.contains(targetInfo.identifier()))
+        if (_targets.contains(targetInfo.identifier))
         {
             // Target already exists!
             return MXL_ERR_INVALID_ARG;
         }
 
-        auto endpoint = Endpoint::create(*_domain);
+        auto endpoint = Endpoint::create(*_domain, _domain->get()->fabric()->info());
 
         auto eq = EventQueue::open(_domain->get()->fabric(), EventQueueAttr::get_default());
         endpoint->bind(eq);
 
         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
-        endpoint->bind(cq, 0);
+        endpoint->bind(cq, FI_TRANSMIT);
 
         MXL_INFO("Connecting endpoint to target with address: {}", rfl::json::write(targetInfo.fabricAddress));
         endpoint->connect(targetInfo.fabricAddress);
@@ -121,16 +136,25 @@ namespace mxl::lib::fabrics::ofi
         }
         MXL_INFO("Now connected!");
 
-        auto target = InitiatorTargetEntry{.endpoint = std::move(endpoint), .regions = targetInfo.regions};
+        auto target = InitiatorTargetEntry{.endpoint = std::move(endpoint), .remoteGroups = targetInfo.remoteRegionGroups};
 
-        _targets.insert({targetInfo.identifier(), target});
+        MXL_INFO("-------- Remote Regions ------------");
+        for (auto const& group : target.remoteGroups)
+        {
+            for (auto const& region : group.view())
+            {
+                MXL_INFO("Remote region addr={:x} len={} rkey={:x}", region.addr, region.len, region.rkey);
+            }
+        }
+
+        _targets.insert({targetInfo.identifier, target});
 
         return MXL_STATUS_OK;
     }
 
     mxlStatus Initiator::removeTarget(TargetInfo const& targetInfo)
     {
-        auto identifier = targetInfo.identifier();
+        auto identifier = targetInfo.identifier;
 
         if (_targets.contains(identifier))
         {
@@ -143,13 +167,17 @@ namespace mxl::lib::fabrics::ofi
 
     mxlStatus Initiator::transferGrain(uint64_t grainIndex)
     {
-        auto localRegion = _localRegions.at(grainIndex % _localRegions.size());
+        auto localOffset = grainIndex % _registeredRegions.size();
+        MXL_INFO("TransferGrain -> localSize={}    localOffset={}", _registeredRegions.size(), localOffset);
 
         for (auto [ident, target] : _targets)
         {
-            auto remoteRegion = target.regions.at(grainIndex % target.regions.size());
+            auto remoteOffset = grainIndex % target.remoteGroups.size();
 
-            target.endpoint->write(localRegion, remoteRegion);
+            MXL_INFO("TransferGrain -> remoteSize={} remoteOffset={}", target.remoteGroups.size(), remoteOffset);
+            target.endpoint->write(_localRegions.at(localOffset), target.remoteGroups.at(remoteOffset), FI_ADDR_UNSPEC, grainIndex);
+
+            target.endpoint->completionQueue()->tryEntry();
         }
 
         return MXL_STATUS_OK;

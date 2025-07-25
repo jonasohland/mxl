@@ -3,38 +3,37 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_rma.h>
+#include "internal/Logging.hpp"
 #include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
 #include "EventQueue.hpp"
 #include "Exception.hpp"
 #include "FIInfo.hpp"
-#include "MemoryRegion.hpp"
-#include "TargetInfo.hpp"
+#include "LocalRegion.hpp"
+#include "RemoteRegion.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    std::shared_ptr<Endpoint> Endpoint::create(std::shared_ptr<Domain> domain, std::optional<FIInfoView> remoteInfo)
+    std::shared_ptr<Endpoint> Endpoint::create(std::shared_ptr<Domain> domain, std::shared_ptr<FIInfo> info)
     {
         ::fid_ep* raw;
 
-        // If we are connecting to a remote endpoint, we need to use the remote info otherwise we create the endpoint with our local info.
-        auto info = remoteInfo ? remoteInfo->raw() : domain->fabric()->info().raw();
-
-        fiCall(::fi_endpoint, "Failed to create endpoint", domain->raw(), info, &raw, nullptr);
+        fiCall(::fi_endpoint, "Failed to create endpoint", domain->raw(), info->raw(), &raw, nullptr);
 
         // expose the private constructor to std::make_shared inside this function
         struct MakeSharedEnabler : public Endpoint
         {
-            MakeSharedEnabler(::fid_ep* raw, std::shared_ptr<Domain> domain)
-                : Endpoint(raw, domain)
+            MakeSharedEnabler(::fid_ep* raw, std::shared_ptr<Domain> domain, std::shared_ptr<FIInfo> info)
+                : Endpoint(raw, domain, info)
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(raw, std::move(domain));
+        return std::make_shared<MakeSharedEnabler>(raw, std::move(domain), std::move(info));
     }
 
     Endpoint::~Endpoint()
@@ -42,10 +41,11 @@ namespace mxl::lib::fabrics::ofi
         close();
     }
 
-    Endpoint::Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq,
-        std::optional<std::shared_ptr<EventQueue>> eq)
+    Endpoint::Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::shared_ptr<FIInfo> info,
+        std::optional<std::shared_ptr<CompletionQueue>> cq, std::optional<std::shared_ptr<EventQueue>> eq)
         : _raw(raw)
         , _domain(std::move(domain))
+        , _info(std::move(info))
         , _cq(std::move(cq))
         , _eq(std::move(eq))
     {}
@@ -113,6 +113,11 @@ namespace mxl::lib::fabrics::ofi
         fiCall(::fi_shutdown, "Failed to shutdown endpoint", _raw, 0);
     }
 
+    FabricAddress Endpoint::localAddress() const
+    {
+        return FabricAddress::fromFid(&_raw->fid);
+    }
+
     std::shared_ptr<CompletionQueue> Endpoint::completionQueue() const
     {
         if (!_cq)
@@ -145,22 +150,56 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
-    void Endpoint::write(RegisteredRegion& localRegion, RemoteRegion const& remoteRegion, ::fi_addr_t destAddr)
+    void Endpoint::write(LocalRegionGroup& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr, std::optional<uint64_t> immData)
     {
-        auto iovec = localRegion.region().to_iovec();
-        auto desc = std::vector<void*>{localRegion.desc()};
+        void* buf = localGroup.iovec()[0].iov_base;
+        size_t len = localGroup.iovec()[0].iov_len;
+        uint64_t addr = remoteGroup.rmaIovs()[0].addr;
+        uint64_t rkey = remoteGroup.rmaIovs()[0].key;
 
-        // TODO: catch error and convert to an internal error
-        fiCall(::fi_writev,
-            "Failed to push rma write to work queue.",
-            _raw,
-            iovec.data(),
-            desc.data(),
-            iovec.size(),
-            destAddr,
-            remoteRegion.addr,
-            remoteRegion.rkey,
-            nullptr);
+        MXL_INFO("buf={:p} len={} addr=0x{:x}, rkey={:x}", buf, len, addr, rkey);
+
+        fiCall(::fi_write, "Failed to write", _raw, buf, len, localGroup.desc()[1], destAddr, addr, rkey, nullptr);
+
+        // uint64_t data = immData.value_or(0);
+        // uint64_t flags = immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
+
+        // for (auto const& region : localGroup.view())
+        //{
+        //     MXL_INFO("Local region addr=0x{:x} len={}", region.addr, region.len);
+        // }
+
+        // for (size_t i = 0; i < localGroup.count(); i++)
+        //{
+        //     MXL_INFO("Local region iov[{}] addr={:p} len={}", i, localGroup.iovec()[i].iov_base, localGroup.iovec()[i].iov_len);
+        // }
+
+        // for (auto const& region : remoteGroup.view())
+        //{
+        //     MXL_INFO("Remote region addr=0x{:x} len={} rkey=0x{:x}", region.addr, region.len, region.rkey);
+        // }
+
+        // for (size_t i = 0; i < remoteGroup.count(); i++)
+        //{
+        //     MXL_INFO("Remote region rma iov[{}] addr=0x{:x} len={} rkey=0x{:x}",
+        //         i,
+        //         remoteGroup.rmaIovs()[i].addr,
+        //         remoteGroup.rmaIovs()[i].len,
+        //         remoteGroup.rmaIovs()[i].key);
+        // }
+
+        //::fi_msg_rma msg = {
+        // .msg_iov = localGroup.iovec(),
+        // .desc = localGroup.desc(),
+        // .iov_count = localGroup.count(),
+        // .addr = destAddr,
+        // .rma_iov = remoteGroup.rmaIovs(),
+        // .rma_iov_count = remoteGroup.count(),
+        // .context = nullptr,
+        // .data = data,
+        // };
+
+        // fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
     }
 
 }

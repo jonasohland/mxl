@@ -8,25 +8,24 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    std::shared_ptr<Fabric> Fabric::open(FIInfoView info)
+    std::shared_ptr<Fabric> Fabric::open(std::shared_ptr<FIInfo> info)
     {
         ::fid_fabric* fid;
-        auto ownedInfo = info.owned();
 
-        fiCall(::fi_fabric2, "Failed to open fabric", ownedInfo.raw(), &fid, 0, nullptr);
+        fiCall(::fi_fabric2, "Failed to open fabric", info->raw(), &fid, 0, nullptr);
 
         // expose the private constructor to std::make_shared inside this function
         struct MakeSharedEnabler : public Fabric
         {
-            MakeSharedEnabler(::fid_fabric* raw, FIInfo info)
+            MakeSharedEnabler(::fid_fabric* raw, std::shared_ptr<FIInfo> info)
                 : Fabric(raw, info)
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(fid, info.owned());
+        return std::make_shared<MakeSharedEnabler>(fid, info);
     }
 
-    Fabric::Fabric(::fid_fabric* raw, FIInfo info)
+    Fabric::Fabric(::fid_fabric* raw, std::shared_ptr<FIInfo> info)
         : _raw(raw)
         , _info(std::move(info))
     {}
@@ -64,7 +63,7 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
-    FIInfo& Fabric::info() noexcept
+    std::shared_ptr<FIInfo> Fabric::info() noexcept
     {
         return _info;
     }

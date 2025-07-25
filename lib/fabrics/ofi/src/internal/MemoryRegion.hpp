@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <memory>
-#include <utility>
 #include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
@@ -30,10 +29,10 @@ namespace mxl::lib::fabrics::ofi
         ::fid_mr const* raw() const noexcept;
 
         [[nodiscard]]
-        void* getLocalMemoryDescriptor() const noexcept;
+        void* desc() const noexcept;
 
         [[nodiscard]]
-        uint64_t getRemoteKey() const noexcept;
+        uint64_t rkey() const noexcept;
 
     private:
         void close();
@@ -42,34 +41,5 @@ namespace mxl::lib::fabrics::ofi
 
         ::fid_mr* _raw;
         std::shared_ptr<Domain> _domain;
-    };
-
-    class RegisteredRegion
-    {
-    public:
-        RegisteredRegion(std::shared_ptr<MemoryRegion> mr, Region region)
-            : _mr(std::move(mr))
-            , _region(std::move(region))
-        {}
-
-        Region& region()
-        {
-            return _region;
-        }
-
-        void* desc()
-        {
-            return _mr->getLocalMemoryDescriptor();
-        }
-
-        uint64_t rkey()
-        {
-            return _mr->getRemoteKey();
-        }
-
-    private:
-        std::shared_ptr<MemoryRegion> _mr;
-
-        Region _region;
     };
 }

@@ -127,7 +127,8 @@ namespace mxl::lib::fabrics::ofi
 
         // hints: hints->fabric_attr->prov_name = provider
         hints->mode = FI_RX_CQ_DATA;
-        hints->caps = FI_RMA | FI_WRITE | FI_REMOTE_WRITE;
+        hints->domain_attr->mr_mode = FI_MR_LOCAL | FI_MR_ALLOCATED | FI_MR_PROV_KEY;
+        hints->caps = FI_RMA | FI_WRITE | FI_REMOTE_WRITE | FI_RMA_EVENT;
         hints->ep_attr->type = FI_EP_MSG;
         hints->fabric_attr->prov_name = const_cast<char*>(prov.c_str());
         // hints: FI_REMOTE_WRITE and FI_RMA_EVENT could be appened for a target only

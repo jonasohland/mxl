@@ -16,7 +16,7 @@ namespace mxl::lib::fabrics::ofi
     {
         ::fid_pep* pep;
 
-        fiCall(::fi_passive_ep, "Failed to create passive endpoint", fabric->raw(), fabric->info().raw(), &pep, nullptr);
+        fiCall(::fi_passive_ep, "Failed to create passive endpoint", fabric->raw(), fabric->info()->raw(), &pep, nullptr);
 
         struct MakeSharedEnabler : public PassiveEndpoint
         {

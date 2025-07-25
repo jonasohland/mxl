@@ -4,10 +4,12 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <uuid.h>
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
 #include "Endpoint.hpp"
-#include "MemoryRegion.hpp"
+#include "RegisteredRegion.hpp"
+#include "RemoteRegion.hpp"
 #include "TargetInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -16,7 +18,7 @@ namespace mxl::lib::fabrics::ofi
     struct InitiatorTargetEntry
     {
         std::shared_ptr<Endpoint> endpoint;
-        std::vector<RemoteRegion> regions;
+        std::vector<RemoteRegionGroup> remoteGroups;
     };
 
     class Initiator final
@@ -37,7 +39,8 @@ namespace mxl::lib::fabrics::ofi
 
     private:
         std::optional<std::shared_ptr<Domain>> _domain = std::nullopt;
-        std::vector<RegisteredRegion> _localRegions;
-        std::map<std::string, InitiatorTargetEntry> _targets;
+        std::vector<RegisteredRegionGroup> _registeredRegions;
+        std::vector<LocalRegionGroup> _localRegions;
+        std::map<uuids::uuid, InitiatorTargetEntry> _targets;
     };
 }

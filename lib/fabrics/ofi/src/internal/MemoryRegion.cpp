@@ -13,30 +13,32 @@ namespace mxl::lib::fabrics::ofi
 
     std::shared_ptr<MemoryRegion> MemoryRegion::reg(std::shared_ptr<Domain> domain, Region const& region, uint64_t access)
     {
-        auto iovecs = region.to_iovec();
-
         ::fid_mr* raw;
         std::random_device rd;
         std::mt19937_64 gen(rd());
         std::uniform_int_distribution<uint64_t> dist(0, UINT64_MAX);
 
-        ::fi_mr_attr attr{};
-        attr.mr_iov = iovecs.data();
-        attr.iov_count = iovecs.size();
-        attr.access = access;
-        attr.offset = 0;                // reserved to 0
-        attr.requested_key = dist(gen); // creating a random key, but it will be ignored if FI_MR_PROV_KEY mr mode is set
-        attr.context = nullptr;         // not used
-        attr.page_size = 0;             // not used
-        attr.base_mr = nullptr;         // not used
-        attr.sub_mr_cnt = 0;            // not used
+        auto const* iovec = region.as_iovec();
 
-        fiCall(fi_mr_regattr,
-            "Failed to register memory region",
-            domain->raw(),
-            &attr,
-            FI_RMA_EVENT, // flags: this will need to be modified when we will add HMEM support
-            &raw);
+        fiCall(fi_mr_reg, "Failed to register memory", domain->raw(), iovec->iov_base, iovec->iov_len, access, 0, dist(gen), 0, &raw, nullptr);
+
+        //::fi_mr_attr attr{};
+        // attr.mr_iov = region.as_iovec();
+        // attr.iov_count = 1;
+        // attr.access = access;
+        // attr.offset = 0;                // reserved to 0
+        // attr.requested_key = dist(gen); // creating a random key, but it can be ignored if FI_MR_PROV_KEY mr mode is set
+        // attr.context = nullptr;         // not used
+        // attr.page_size = 0;             // not used
+        // attr.base_mr = nullptr;         // not used
+        // attr.sub_mr_cnt = 0;            // not used
+
+        // fiCall(fi_mr_regattr,
+        //     "Failed to register memory region",
+        //     domain->raw(),
+        //     &attr,
+        //     FI_RMA_EVENT, // flags: this will need to be modified when we will add HMEM support
+        //     &raw);
 
         struct MakeSharedEnabler : public MemoryRegion
         {
@@ -72,12 +74,12 @@ namespace mxl::lib::fabrics::ofi
         return *this;
     }
 
-    void* MemoryRegion::getLocalMemoryDescriptor() const noexcept
+    void* MemoryRegion::desc() const noexcept
     {
         return fi_mr_desc(_raw);
     }
 
-    uint64_t MemoryRegion::getRemoteKey() const noexcept
+    uint64_t MemoryRegion::rkey() const noexcept
     {
         return fi_mr_key(_raw);
     }
