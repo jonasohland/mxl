@@ -10,8 +10,8 @@
 #include <mxl/mxl.h>
 #include "Domain.hpp"
 #include "Endpoint.hpp"
-#include "MemoryRegion.hpp"
 #include "PassiveEndpoint.hpp"
+#include "RegisteredRegion.hpp"
 #include "TargetInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -72,7 +72,7 @@ namespace mxl::lib::fabrics::ofi
 
         std::unique_ptr<Target> _inner;
         std::optional<std::shared_ptr<Domain>> _domain = std::nullopt;
-        std::vector<RegisteredRegion> _regions;
+        std::vector<RegisteredRegionGroup> _regRegions;
 
         State _state = StateFresh{};
     };

@@ -127,8 +127,7 @@ namespace mxl::lib::fabrics::ofi
             ::fi_cq_err_entry err_entry;
             fi_cq_readerr(_raw, &err_entry, 0);
 
-            MXL_ERROR("Failed to read an entry from the completion queue with an error: \"{}\"",
-                fi_cq_strerror(_raw, err_entry.prov_errno, err_entry.err_data, nullptr, 0));
+            MXL_ERROR("A completion erro entry was returned : \"{}\"", fi_cq_strerror(_raw, err_entry.prov_errno, err_entry.err_data, nullptr, 0));
 
             return std::nullopt;
         }

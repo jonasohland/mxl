@@ -1,91 +1,85 @@
 #pragma once
 
 #include <cstdint>
-#include <variant>
 #include <vector>
 #include <uuid.h>
 #include <bits/types/struct_iovec.h>
-#include "internal/Instance.hpp"
-#include "internal/SharedMemory.hpp"
+#include "internal/FlowData.hpp"
 #include "mxl/fabrics.h"
 
 namespace mxl::lib::fabrics::ofi
 {
-    struct BufferSpace
+    class Region
     {
+    public:
+        explicit Region(std::uintptr_t base, size_t size)
+            : base(base)
+            , size(size)
+            , _iovec(iovecFromRegion(base, size))
+        {}
+
+        virtual ~Region() = default;
+
         std::uintptr_t base;
         size_t size;
 
         [[nodiscard]]
-        ::iovec to_iovec() const;
+        ::iovec const* as_iovec() const noexcept;
+
+        [[nodiscard]]
+        ::iovec to_iovec() const noexcept;
+
+    private:
+        static ::iovec iovecFromRegion(std::uintptr_t, size_t) noexcept;
+
+        ::iovec _iovec;
     };
 
-    class Region
+    class RegionGroup
+
     {
     public:
-        explicit Region() = default;
+        explicit RegionGroup() = default;
 
-        explicit Region(std::vector<BufferSpace> inner)
+        explicit RegionGroup(std::vector<Region> inner)
+            : _inner(std::move(inner))
+            , _iovecs(iovecsFromGroup(_inner))
+        {}
+
+        [[nodiscard]]
+        std::vector<Region> const& view() const noexcept;
+
+        [[nodiscard]]
+        ::iovec const* as_iovec() const noexcept;
+
+    private:
+        static std::vector<::iovec> iovecsFromGroup(std::vector<Region> const& group) noexcept;
+
+        std::vector<Region> _inner;
+
+        std::vector<::iovec> _iovecs;
+    };
+
+    class RegionGroups
+    {
+    public:
+        static RegionGroups fromFlow(FlowData* flow);
+
+        static RegionGroups* fromAPI(mxlRegions) noexcept;
+        [[nodiscard]]
+        mxlRegions toAPI() noexcept;
+
+        [[nodiscard]]
+        std::vector<RegionGroup> const& view() const noexcept;
+
+        void print() const noexcept;
+
+    private:
+        explicit RegionGroups(std::vector<RegionGroup> inner)
             : _inner(std::move(inner))
         {}
 
-        [[nodiscard]]
-        std::uintptr_t firstBaseAddress() const noexcept;
-
-        [[nodiscard]]
-        std::vector<::iovec> to_iovec() const noexcept;
-
-    private:
-        std::vector<BufferSpace> _inner;
-    };
-
-    class Regions
-    {
-    public:
-        explicit Regions() = default;
-
-        explicit Regions(std::vector<Region> regions)
-            : _inner(std::move(regions))
-        {}
-
-        static Regions fromFlow(FlowData* flow);
-
-        [[nodiscard]]
-        Region const& at(size_t index) const noexcept;
-
-        auto begin() noexcept
-        {
-            return _inner.begin();
-        }
-
-        auto end() noexcept
-        {
-            return _inner.end();
-        }
-
-        [[nodiscard]]
-        size_t size() const;
-
-        [[nodiscard]]
-        bool empty() const noexcept;
-
-        static Regions* fromAPI(mxlRegions) noexcept;
-        ::mxlRegions toAPI() noexcept;
-
-    private:
-        std::vector<Region> _inner;
-    };
-
-    class DeferredRegions
-    {
-    public:
-        explicit DeferredRegions(uuids::uuid) noexcept;
-        explicit DeferredRegions(Regions) noexcept;
-
-        Regions unwrap(Instance&, AccessMode accessMode);
-
-    private:
-        std::variant<uuids::uuid, Regions> _inner;
+        std::vector<RegionGroup> _inner;
     };
 
 }

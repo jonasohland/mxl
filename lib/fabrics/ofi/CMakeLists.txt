@@ -88,10 +88,13 @@ set(mxl_fabrics_sources
         src/internal/FILogging.cpp
         src/internal/FIVersion.cpp
         src/internal/Initiator.cpp
+        src/internal/LocalRegion.cpp
         src/internal/MemoryRegion.cpp
         src/internal/PassiveEndpoint.cpp
         src/internal/Provider.cpp
         src/internal/Region.cpp
+        src/internal/RegisteredRegion.cpp
+        src/internal/RemoteRegion.cpp
         src/internal/RMATarget.cpp
         src/internal/Target.cpp
         src/internal/TargetInfo.cpp

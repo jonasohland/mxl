@@ -132,8 +132,6 @@ int main(int argc, char** argv)
         mxlTargetInfo mxlTargetInfo;
 
         auto decodedStr = base64::from_base64(targetInfo);
-        MXL_INFO("Target info: base64={}  decoded={}", targetInfo, decodedStr);
-
         status = mxlFabricsTargetInfoFromString(decodedStr.c_str(), &mxlTargetInfo);
         if (status != MXL_STATUS_OK)
         {
@@ -210,6 +208,8 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
         return status;
     }
 
+    MXL_INFO("Done adding target");
+
     // Extract the FlowInfo structure.
     FlowInfo flow_info;
     status = mxlFlowReaderGetInfo(reader, &flow_info);
@@ -224,7 +224,7 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
 
     uint64_t grainIndex = flow_info.discrete.headIndex + 1;
 
-    while (g_exit_requested)
+    while (!g_exit_requested)
     {
         auto ret = mxlFlowReaderGetGrain(reader, grainIndex, 200000000, &grainInfo, &payload);
         if (ret == MXL_ERR_OUT_OF_RANGE_TOO_LATE)
@@ -251,6 +251,8 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
             continue;
         }
 
+        MXL_INFO("About to transfer grain with index {}", grainIndex);
+
         // Okay the grain is ready, we can transfer it to the targets.
         ret = mxlFabricsInitiatorTransferGrain(initiator, grainIndex);
         if (ret != MXL_STATUS_OK)
@@ -258,6 +260,8 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
             MXL_ERROR("Failed to transfer grain with status '{}'", static_cast<int>(ret));
             return status;
         }
+
+        MXL_INFO("Grain with index {} was  sent to transfer queue", grainIndex);
 
         if (grainInfo.commitedSize != grainInfo.grainSize)
         {
@@ -351,7 +355,7 @@ static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInsta
         return status;
     }
 
-    MXL_INFO("Target info: json={}  base64={}", targetInfoStr, base64::to_base64(targetInfoStr));
+    MXL_INFO("Target info:  {}", base64::to_base64(targetInfoStr));
 
     GrainInfo dummyGrainInfo;
     uint64_t grainIndex = 0;
@@ -372,6 +376,8 @@ static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInsta
             MXL_ERROR("Failed to wait for grain with status '{}'", static_cast<int>(status));
             return status;
         }
+
+        MXL_INFO("Grain with index {} was written, we will now commit it.", grainIndex);
 
         // Here we open so that we can commit, we are not going to modify the grain as it was already modified by the initiator.
         status = mxlFlowWriterOpenGrain(writer, grainIndex, &dummyGrainInfo, &dummyPayload);

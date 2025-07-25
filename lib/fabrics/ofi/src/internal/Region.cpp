@@ -2,38 +2,55 @@
 #include <cstdint>
 #include <algorithm>
 #include <bits/types/struct_iovec.h>
+#include "internal/DiscreteFlowData.hpp"
 #include "internal/Flow.hpp"
-#include "mxl/fabrics.h"
+#include "internal/Logging.hpp"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
-#include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    // BufferSpace implementations
-    ::iovec BufferSpace::to_iovec() const
+
+    ::iovec const* Region::as_iovec() const noexcept
+    {
+        return &_iovec;
+    }
+
+    ::iovec Region::to_iovec() const noexcept
+    {
+        return _iovec;
+    }
+
+    // Region implementations
+    ::iovec Region::iovecFromRegion(std::uintptr_t base, size_t size) noexcept
     {
         return ::iovec{.iov_base = reinterpret_cast<void*>(base), .iov_len = size};
     }
 
-    std::uintptr_t Region::firstBaseAddress() const noexcept
-    {
-        return _inner.front().base;
-    }
-
     // Region implementations
-    std::vector<::iovec> Region::to_iovec() const noexcept
-    {
-        std::vector<::iovec> iovec;
 
-        std::ranges::transform(_inner, std::back_inserter(iovec), [](BufferSpace const& iov) { return iov.to_iovec(); });
-        return iovec;
+    std::vector<Region> const& RegionGroup::view() const noexcept
+    {
+        return _inner;
     }
 
-    // Regions implementations
-    Regions Regions::fromFlow(FlowData* flow)
+    ::iovec const* RegionGroup::as_iovec() const noexcept
     {
-        static_assert(sizeof(GrainHeader) == 8192);
+        return _iovecs.data();
+    }
+
+    std::vector<::iovec> RegionGroup::iovecsFromGroup(std::vector<Region> const& group) noexcept
+    {
+        std::vector<::iovec> iovecs;
+        std::ranges::transform(group, std::back_inserter(iovecs), [](Region const& reg) { return reg.to_iovec(); });
+        return iovecs;
+    }
+
+    RegionGroups RegionGroups::fromFlow(FlowData* flow)
+    {
+        static_assert(sizeof(GrainHeader) == 8192,
+            "GrainHeader type size changed! The Fabrics API makes assumptions on the memory layout of a flow, please review the code below if the "
+            "change is intended!");
 
         if (!mxlIsDiscreteDataFormat(flow->flowInfo()->common.format))
         {
@@ -42,74 +59,52 @@ namespace mxl::lib::fabrics::ofi
 
         auto discreteFlow = static_cast<DiscreteFlowData*>(flow);
 
-        std::vector<Region> regions{};
+        std::vector<RegionGroup> regionGroups;
 
         for (std::size_t i = 0; i < discreteFlow->grainCount(); ++i)
         {
             auto grain = discreteFlow->grainAt(i);
 
-            auto region = Region({
-                BufferSpace{.base = reinterpret_cast<std::uintptr_t>(discreteFlow->grainInfoAt(i)), .size = sizeof(GrainHeader)         },
-                BufferSpace{.base = reinterpret_cast<std::uintptr_t>(grain) + sizeof(GrainHeader),  .size = grain->header.info.grainSize},
+            auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow->grainInfoAt(i));
+            auto grainInfoSize = sizeof(GrainHeader);
+            auto grainPayloadBaseAddr = reinterpret_cast<std::uintptr_t>(grainInfoBaseAddr) + sizeof(GrainHeader);
+            auto grainPayloadSize = grain->header.info.grainSize;
+
+            auto regionGroup = RegionGroup({
+                Region{grainInfoBaseAddr,    grainInfoSize   },
+                Region{grainPayloadBaseAddr, grainPayloadSize},
             });
 
-            regions.emplace_back(std::move(region));
+            regionGroups.emplace_back(std::move(regionGroup));
         }
 
-        return Regions{regions};
+        return RegionGroups{std::move(regionGroups)};
     }
 
-    [[nodiscard]]
-    Region const& Regions::at(size_t index) const noexcept
+    RegionGroups* RegionGroups::fromAPI(mxlRegions regions) noexcept
     {
-        return _inner.at(index);
+        return reinterpret_cast<RegionGroups*>(regions);
     }
 
-    [[nodiscard]]
-    size_t Regions::size() const
+    mxlRegions RegionGroups::toAPI() noexcept
     {
-        return _inner.size();
+        return reinterpret_cast<mxlRegions>(this);
     }
 
-    // Regions implementations
-    bool Regions::empty() const noexcept
+    std::vector<RegionGroup> const& RegionGroups::view() const noexcept
     {
-        return _inner.empty();
+        return _inner;
     }
 
-    Regions* Regions::fromAPI(mxlRegions api) noexcept
+    void RegionGroups::print() const noexcept
     {
-        if (!api)
+        for (auto const& group : _inner)
         {
-            return nullptr;
+            for (auto const& region : group.view())
+            {
+                MXL_INFO("Region addr={:x} len={}", region.base, region.size);
+            }
         }
-
-        return reinterpret_cast<Regions*>(api);
     }
 
-    ::mxlRegions Regions::toAPI() noexcept
-    {
-        return reinterpret_cast<::mxlRegions>(this);
-    }
-
-    // DeferredRegions implementations
-
-    DeferredRegions::DeferredRegions(Regions regions) noexcept
-        : _inner(std::move(regions))
-    {}
-
-    DeferredRegions::DeferredRegions(uuids::uuid id) noexcept
-        : _inner(id)
-    {}
-
-    Regions DeferredRegions::unwrap(Instance& instance, AccessMode accessMode)
-    {
-        return std::visit(
-            overloaded{
-                [](Regions regions) -> Regions { return regions; },
-                [&](uuids::uuid const& flowId) -> Regions
-                { return Regions::fromFlow(instance.openFlow(flowId, accessMode).get()); }, // TODO: check if we need to close the flow after this
-            },
-            _inner);
-    }
 }
