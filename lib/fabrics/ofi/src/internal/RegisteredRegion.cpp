@@ -1,5 +1,4 @@
 #include "RegisteredRegion.hpp"
-#include <cstdint>
 #include "LocalRegion.hpp"
 #include "RemoteRegion.hpp"
 
@@ -16,18 +15,6 @@ namespace mxl::lib::fabrics::ofi
     LocalRegion RegisteredRegion::toLocal() const noexcept
     {
         return LocalRegion{.addr = region.base, .len = region.size, .desc = mr->desc()};
-    }
-
-    uint64_t RegisteredRegion::getBaseAddress(std::uintptr_t raw) const noexcept
-    {
-        if (mr->_domain->usingVirtualAddresses())
-        {
-            return raw;
-        }
-        else
-        {
-            return 0;
-        }
     }
 
     RemoteRegionGroup RegisteredRegionGroup::toRemote() const noexcept

@@ -24,8 +24,6 @@ namespace mxl::lib::fabrics::ofi
         LocalRegion toLocal() const noexcept;
 
     private:
-        uint64_t getBaseAddress(std::uintptr_t raw) const noexcept;
-
         std::shared_ptr<MemoryRegion> mr;
         Region region;
     };

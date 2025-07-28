@@ -60,7 +60,9 @@ RUN apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-ugly \
-    gstreamer1.0-x
+    gstreamer1.0-x \
+    librdmacm-dev \
+    perftest
 
 # Install libfabric
 RUN git clone -b v2.2.0 https://github.com/ofiwg/libfabric.git \
