@@ -167,17 +167,17 @@ namespace mxl::lib::fabrics::ofi
 
     mxlStatus Initiator::transferGrain(uint64_t grainIndex)
     {
-        auto localOffset = grainIndex % _registeredRegions.size();
-        MXL_INFO("TransferGrain -> localSize={}    localOffset={}", _registeredRegions.size(), localOffset);
+        auto localOffset = grainIndex % _localRegions.size();
 
         for (auto [ident, target] : _targets)
         {
+            while (target.endpoint->eventQueue()->tryEntry() != std::nullopt)
+            {
+            };
+
             auto remoteOffset = grainIndex % target.remoteGroups.size();
 
-            MXL_INFO("TransferGrain -> remoteSize={} remoteOffset={}", target.remoteGroups.size(), remoteOffset);
             target.endpoint->write(_localRegions.at(localOffset), target.remoteGroups.at(remoteOffset), FI_ADDR_UNSPEC, grainIndex);
-
-            target.endpoint->completionQueue()->tryEntry();
         }
 
         return MXL_STATUS_OK;

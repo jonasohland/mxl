@@ -14,7 +14,9 @@
 #include <mxl/mxl.h>
 #include <mxl/time.h>
 #include <sys/stat.h>
+#include "DiscreteFlowData.hpp"
 #include "Flow.hpp"
+#include "FlowData.hpp"
 #include "FlowManager.hpp"
 #include "Logging.hpp"
 #include "PathUtils.hpp"
@@ -147,6 +149,11 @@ namespace mxl::lib
         }
 
         return MXL_ERR_UNKNOWN;
+    }
+
+    DiscreteFlowData* PosixDiscreteFlowReader::flowData() const noexcept
+    {
+        return _flowData.get();
     }
 
 } // namespace mxl::lib

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include "mxl/flow.h"
 #include "Flow.hpp"
 #include "SharedMemory.hpp"
 
@@ -25,6 +26,10 @@ namespace mxl::lib
 
         constexpr FlowInfo* flowInfo() noexcept;
         constexpr FlowInfo const* flowInfo() const noexcept;
+
+        [[nodiscard]]
+        mxlFlowData toAPI() const noexcept;
+        static FlowData* fromAPI(mxlFlowData) noexcept;
 
         virtual ~FlowData();
 

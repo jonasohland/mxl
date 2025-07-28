@@ -50,6 +50,9 @@ namespace mxl::lib
         ///
         virtual void flowRead() override;
 
+        [[nodiscard]]
+        DiscreteFlowData* flowData() const noexcept override;
+
     private:
         /// The FlowData for the currently opened flow. null if no flow is opened.
         std::unique_ptr<DiscreteFlowData> _flowData;

@@ -108,6 +108,8 @@ namespace mxl::lib::fabrics::ofi
     {
         if (_raw)
         {
+            MXL_INFO("Closing completion queue");
+
             fiCall(::fi_close, "Failed to close completion queue", &_raw->fid);
             _raw = nullptr;
         }
@@ -117,12 +119,16 @@ namespace mxl::lib::fabrics::ofi
     {
         if (ret == -FI_EAGAIN)
         {
+            MXL_INFO("completion polling returned FI_EAGAIN");
+
             // No entry available
             return std::nullopt;
         }
 
         if (ret == -FI_EAVAIL)
         {
+            MXL_INFO("completion polling returned an error");
+
             // An entry is available but in the error queue
             ::fi_cq_err_entry err_entry;
             fi_cq_readerr(_raw, &err_entry, 0);

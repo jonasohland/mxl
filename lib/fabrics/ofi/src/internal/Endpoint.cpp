@@ -8,6 +8,7 @@
 #include <rdma/fi_cm.h>
 #include <rdma/fi_rma.h>
 #include "internal/Logging.hpp"
+#include "mxl/flow.h"
 #include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
@@ -152,54 +153,24 @@ namespace mxl::lib::fabrics::ofi
 
     void Endpoint::write(LocalRegionGroup& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr, std::optional<uint64_t> immData)
     {
-        void* buf = localGroup.iovec()[0].iov_base;
-        size_t len = localGroup.iovec()[0].iov_len;
-        uint64_t addr = remoteGroup.rmaIovs()[0].addr;
-        uint64_t rkey = remoteGroup.rmaIovs()[0].key;
+        uint64_t data = immData.value_or(0);
+        uint64_t flags = immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
 
-        MXL_INFO("buf={:p} len={} addr=0x{:x}, rkey={:x}", buf, len, addr, rkey);
+        // auto* grainInfo = reinterpret_cast<GrainInfo*>(localGroup.iovec()[0].iov_base);
+        // MXL_INFO("Actual grainInfo commitedSize={} grainSize={} ", grainInfo->commitedSize, grainInfo->grainSize);
 
-        fiCall(::fi_write, "Failed to write", _raw, buf, len, localGroup.desc()[1], destAddr, addr, rkey, nullptr);
+        ::fi_msg_rma msg = {
+            .msg_iov = localGroup.iovec(),
+            .desc = localGroup.desc(),
+            .iov_count = localGroup.count(),
+            .addr = destAddr,
+            .rma_iov = remoteGroup.rmaIovs(),
+            .rma_iov_count = remoteGroup.count(),
+            .context = nullptr,
+            .data = data,
+        };
 
-        // uint64_t data = immData.value_or(0);
-        // uint64_t flags = immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
-
-        // for (auto const& region : localGroup.view())
-        //{
-        //     MXL_INFO("Local region addr=0x{:x} len={}", region.addr, region.len);
-        // }
-
-        // for (size_t i = 0; i < localGroup.count(); i++)
-        //{
-        //     MXL_INFO("Local region iov[{}] addr={:p} len={}", i, localGroup.iovec()[i].iov_base, localGroup.iovec()[i].iov_len);
-        // }
-
-        // for (auto const& region : remoteGroup.view())
-        //{
-        //     MXL_INFO("Remote region addr=0x{:x} len={} rkey=0x{:x}", region.addr, region.len, region.rkey);
-        // }
-
-        // for (size_t i = 0; i < remoteGroup.count(); i++)
-        //{
-        //     MXL_INFO("Remote region rma iov[{}] addr=0x{:x} len={} rkey=0x{:x}",
-        //         i,
-        //         remoteGroup.rmaIovs()[i].addr,
-        //         remoteGroup.rmaIovs()[i].len,
-        //         remoteGroup.rmaIovs()[i].key);
-        // }
-
-        //::fi_msg_rma msg = {
-        // .msg_iov = localGroup.iovec(),
-        // .desc = localGroup.desc(),
-        // .iov_count = localGroup.count(),
-        // .addr = destAddr,
-        // .rma_iov = remoteGroup.rmaIovs(),
-        // .rma_iov_count = remoteGroup.count(),
-        // .context = nullptr,
-        // .data = data,
-        // };
-
-        // fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
+        fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
     }
 
 }

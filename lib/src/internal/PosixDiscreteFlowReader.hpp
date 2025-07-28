@@ -58,6 +58,9 @@ namespace mxl::lib
         ///
         virtual mxlStatus getGrain(std::uint64_t in_index, GrainInfo* out_grainInfo, std::uint8_t** out_payload) override;
 
+        [[nodiscard]]
+        DiscreteFlowData* flowData() const noexcept override;
+
     private:
         std::unique_ptr<DiscreteFlowData> _flowData;
         int _accessFileFd;

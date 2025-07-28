@@ -35,6 +35,8 @@ namespace mxl::lib::fabrics::ofi
         uint64_t rkey() const noexcept;
 
     private:
+        friend class RegisteredRegion;
+
         void close();
 
         MemoryRegion(::fid_mr* raw, std::shared_ptr<Domain> domain);

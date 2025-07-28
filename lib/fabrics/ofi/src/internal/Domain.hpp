@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
 #include "Fabric.hpp"
 
@@ -28,6 +29,9 @@ namespace mxl::lib::fabrics::ofi
         {
             return _fabric;
         }
+
+        [[nodiscard]]
+        bool usingVirtualAddresses() const noexcept;
 
     private:
         void close();

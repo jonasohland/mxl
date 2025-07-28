@@ -65,9 +65,9 @@ namespace mxl::lib::fabrics::ofi
         {
             auto grain = discreteFlow->grainAt(i);
 
-            auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow->grainInfoAt(i));
+            auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow->grainAt(i));
             auto grainInfoSize = sizeof(GrainHeader);
-            auto grainPayloadBaseAddr = reinterpret_cast<std::uintptr_t>(grainInfoBaseAddr) + sizeof(GrainHeader);
+            auto grainPayloadBaseAddr = grainInfoBaseAddr + sizeof(GrainHeader);
             auto grainPayloadSize = grain->header.info.grainSize;
 
             auto regionGroup = RegionGroup({

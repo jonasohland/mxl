@@ -5,6 +5,7 @@
 #include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
+#include "internal/Logging.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
 
@@ -19,6 +20,7 @@ namespace mxl::lib::fabrics::ofi
         std::uniform_int_distribution<uint64_t> dist(0, UINT64_MAX);
 
         auto const* iovec = region.as_iovec();
+        MXL_INFO("Registering memory region with address 0x{:p} and size {}", iovec->iov_base, iovec->iov_len);
 
         fiCall(fi_mr_reg, "Failed to register memory", domain->raw(), iovec->iov_base, iovec->iov_len, access, 0, dist(gen), 0, &raw, nullptr);
 
@@ -93,8 +95,11 @@ namespace mxl::lib::fabrics::ofi
     {
         if (_raw)
         {
+            MXL_INFO("Closing memory region with rkey={:x}", rkey());
+
             fiCall(::fi_close, "Failed to close memory region", &_raw->fid);
             _raw = nullptr;
         }
     }
+
 }
