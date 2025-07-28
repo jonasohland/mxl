@@ -24,6 +24,8 @@ namespace mxl::lib::fabrics::ofi
         LocalRegion toLocal() const noexcept;
 
     private:
+        uint64_t getBaseAddress(std::uintptr_t raw) const noexcept;
+
         std::shared_ptr<MemoryRegion> mr;
         Region region;
     };
@@ -46,18 +48,6 @@ namespace mxl::lib::fabrics::ofi
     };
 
     std::vector<RemoteRegionGroup> toRemote(std::vector<RegisteredRegionGroup> const& groups) noexcept;
-
-    // {
-    //     std::vector<RemoteRegionGroup> remoteGroups;
-    //     std::ranges::transform(groups, std::back_inserter(remoteGroups), [](RegisteredRegionGroup const& reg) { return reg.toRemote(); });
-    //     return remoteGroups;
-    // }
-
     std::vector<LocalRegionGroup> toLocal(std::vector<RegisteredRegionGroup> const& groups) noexcept;
-    //{
-    //    std::vector<LocalRegionGroup> localGroups;
-    //    std::ranges::transform(groups, std::back_inserter(localGroups), [](RegisteredRegionGroup const& reg) { return reg.toLocal(); });
-    //    return localGroups;
-    //}
 
 }

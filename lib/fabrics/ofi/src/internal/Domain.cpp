@@ -69,4 +69,9 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
+    bool Domain::usingVirtualAddresses() const noexcept
+    {
+        return _fabric->info()->raw()->domain_attr->mr_mode && FI_MR_VIRT_ADDR != 0;
+    }
+
 }

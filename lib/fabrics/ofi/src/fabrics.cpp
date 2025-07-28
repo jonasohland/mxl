@@ -13,12 +13,13 @@
 #include <rfl/json.hpp>
 #include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
+#include "internal/FlowData.hpp"
 #include "internal/Initiator.hpp"
 #include "internal/Provider.hpp"
 #include "internal/Region.hpp"
-#include "internal/SharedMemory.hpp"
 #include "internal/Target.hpp"
 #include "internal/TargetInfo.hpp"
+#include "mxl/flow.h"
 #include "mxl/platform.h"
 
 namespace
@@ -27,23 +28,16 @@ namespace
     namespace mxl = mxl::lib;
 
     extern "C" MXL_EXPORT
-    mxlStatus mxlFabricsRegionsFromFlow(mxlInstance in_instance, char const* uuid, mxlRegions* out_regions)
+    mxlStatus mxlFabricsRegionsFromFlow(mxlFlowData const in_flowData, mxlRegions* out_regions)
     {
-        if (in_instance == nullptr || uuid == nullptr || out_regions == nullptr)
+        if (in_flowData == nullptr || out_regions == nullptr)
         {
             return MXL_ERR_INVALID_ARG;
         }
 
         try
         {
-            auto flowId = uuids::uuid::from_string(uuid);
-            if (!flowId.has_value())
-            {
-                return MXL_ERR_INVALID_ARG;
-            }
-
-            auto* instance = mxl::to_Instance(in_instance);
-            auto regions = ofi::RegionGroups::fromFlow(instance->openFlow(flowId.value(), mxl::AccessMode::READ_ONLY).get());
+            auto regions = ofi::RegionGroups::fromFlow(mxl::FlowData::fromAPI(in_flowData));
 
             // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
             auto regionPtr = std::make_unique<ofi::RegionGroups>(regions).release();

@@ -48,10 +48,10 @@ namespace mxl::lib::fabrics::ofi
                         auto endpoint = Endpoint::create(*_domain, remoteInfo);
 
                         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
-                        endpoint->bind(cq, FI_RECV);
+                        endpoint->bind(std::move(cq), FI_REMOTE_WRITE | FI_RECV);
 
                         auto eq = EventQueue::open(_domain->get()->fabric(), EventQueueAttr::get_default());
-                        endpoint->bind(eq);
+                        endpoint->bind(std::move(eq));
 
                         // we are now ready to accept the connection
                         endpoint->accept();
@@ -144,7 +144,7 @@ namespace mxl::lib::fabrics::ofi
                 },
                 [&](StateConnected& state) -> State
                 {
-                    if (auto entry = state.ep->completionQueue()->waitForEntry(timeout); entry && entry.value().isRemoteWrite())
+                    if (auto entry = state.ep->completionQueue()->waitForEntry(timeout); entry)
                     {
                         if (auto data = entry.value().data(); data)
                         {
@@ -200,6 +200,8 @@ namespace mxl::lib::fabrics::ofi
 
         // config.regions contains the memory layout that will be written into.
         auto* regions = RegionGroups::fromAPI(config.regions);
+
+        // auto group = regions->view().front();
         for (auto const& group : regions->view())
         {
             // For each region group we will register memory and keep a copy inside this instance as a list of registered region groups.

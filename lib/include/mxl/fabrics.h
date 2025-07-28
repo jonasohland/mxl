@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <mxl/mxl.h>
+#include "mxl/flow.h"
 #include "mxl/platform.h"
 
 #define MXL_FABRICS_UNUSED(x) (void)x
@@ -50,7 +51,7 @@ extern "C"
     typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
 
     MXL_EXPORT
-    mxlStatus mxlFabricsRegionsFromFlow(mxlInstance in_instance, char const* uuid, mxlRegions* out_regions);
+    mxlStatus mxlFabricsRegionsFromFlow(mxlFlowData const in_flowData, mxlRegions* out_regions);
 
     MXL_EXPORT
     mxlStatus mxlFabricsRegionsFree(mxlRegions regions);
