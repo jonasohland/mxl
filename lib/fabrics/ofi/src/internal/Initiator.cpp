@@ -1,9 +1,15 @@
 #include "Initiator.hpp"
+#include <chrono>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <memory>
+#include <fcntl.h>
+#include <unistd.h>
 #include <uuid.h>
 #include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
+#include <sys/mman.h>
 #include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
@@ -67,7 +73,7 @@ namespace mxl::lib::fabrics::ofi
             return MXL_ERR_INVALID_ARG;
         }
 
-        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value());
+        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE);
 
         auto bestFabricInfo = RMATarget::findBestFabric(fabricInfoList, config.provider);
         if (!bestFabricInfo)
@@ -86,17 +92,12 @@ namespace mxl::lib::fabrics::ofi
             return MXL_ERR_UNKNOWN;
         }
 
-        MXL_INFO("------- Local Regions ---------");
-        regionGroups->print();
-
         for (auto const& group : regionGroups->view())
         {
             std::vector<RegisteredRegion> regRegions;
             for (auto const& region : group.view())
             {
-                auto mr = MemoryRegion::reg(*_domain, region, FI_WRITE);
-                auto registeredRegion = RegisteredRegion(std::move(mr), region);
-                regRegions.emplace_back(std::move(registeredRegion));
+                regRegions.emplace_back(MemoryRegion::reg(*_domain, region, FI_WRITE), region);
             }
 
             RegisteredRegionGroup regGroup{std::move(regRegions)};
@@ -123,12 +124,13 @@ namespace mxl::lib::fabrics::ofi
         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
         endpoint->bind(cq, FI_TRANSMIT);
 
-        MXL_INFO("Connecting endpoint to target with address: {}", rfl::json::write(targetInfo.fabricAddress));
+        MXL_INFO("Connecting endpoint to target with encoded address: {}", rfl::json::write(targetInfo.fabricAddress));
         endpoint->connect(targetInfo.fabricAddress);
 
-        while (true)
+        // TODO: use a cancellation token to exit this loop
+        for (;;)
         {
-            auto entry = eq->waitForEntry(std::chrono::seconds(1));
+            auto entry = eq->waitForEntry(std::chrono::milliseconds(200));
             if (entry && entry.value()->isConnected())
             {
                 break;
@@ -136,18 +138,9 @@ namespace mxl::lib::fabrics::ofi
         }
         MXL_INFO("Now connected!");
 
-        auto target = InitiatorTargetEntry{.endpoint = std::move(endpoint), .remoteGroups = targetInfo.remoteRegionGroups};
-
-        MXL_INFO("-------- Remote Regions ------------");
-        for (auto const& group : target.remoteGroups)
-        {
-            for (auto const& region : group.view())
-            {
-                MXL_INFO("Remote region addr={:x} len={} rkey={:x}", region.addr, region.len, region.rkey);
-            }
-        }
-
-        _targets.insert({targetInfo.identifier, target});
+        _targets.insert({
+            targetInfo.identifier, InitiatorTargetEntry{.endpoint = std::move(endpoint), .remoteGroups = targetInfo.remoteRegionGroups}
+        });
 
         return MXL_STATUS_OK;
     }
@@ -171,9 +164,8 @@ namespace mxl::lib::fabrics::ofi
 
         for (auto [ident, target] : _targets)
         {
-            while (target.endpoint->eventQueue()->tryEntry() != std::nullopt)
-            {
-            };
+            // try to empty the completion queue
+            flushCq(target);
 
             auto remoteOffset = grainIndex % target.remoteGroups.size();
 
@@ -181,5 +173,22 @@ namespace mxl::lib::fabrics::ofi
         }
 
         return MXL_STATUS_OK;
+    }
+
+    void Initiator::flushCq(InitiatorTargetEntry const& target) const noexcept
+    {
+        for (;;)
+        {
+            auto entry = target.endpoint->completionQueue()->tryEntry();
+            if (!entry)
+            {
+                break;
+            }
+
+            if (auto error = entry->tryErr())
+            {
+                MXL_ERROR("Completion error entry available: {}", error->toString(target.endpoint->completionQueue()->raw()));
+            }
+        }
     }
 }

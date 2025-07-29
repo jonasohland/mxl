@@ -1,13 +1,16 @@
 #include "MemoryRegion.hpp"
 #include <cstdint>
+#include <cstdio>
 #include <memory>
 #include <random>
 #include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
+#include <sys/mman.h>
 #include "internal/Logging.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
+#include "Region.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -19,28 +22,29 @@ namespace mxl::lib::fabrics::ofi
         std::mt19937_64 gen(rd());
         std::uniform_int_distribution<uint64_t> dist(0, UINT64_MAX);
 
-        auto const* iovec = region.as_iovec();
-        MXL_INFO("Registering memory region with address 0x{:p} and size {}", iovec->iov_base, iovec->iov_len);
+        MXL_DEBUG("Registering memory region with address 0x{:p} and size {}", region.base, region.size);
 
-        fiCall(fi_mr_reg, "Failed to register memory", domain->raw(), iovec->iov_base, iovec->iov_len, access, 0, dist(gen), 0, &raw, nullptr);
+        ::fi_mr_attr attr{};
+        attr.mr_iov = region.as_iovec();
+        attr.iov_count = 1;
+        attr.access = access;
+        attr.offset = 0;                // reserved to 0
+        attr.requested_key = dist(gen); // creating a random key, but it can be ignored if FI_MR_PROV_KEY mr mode is set
+        attr.context = nullptr;         // not used
+        attr.auth_key_size = 0;
+        attr.auth_key = nullptr;
+        attr.iface = FI_HMEM_SYSTEM;
+        attr.hmem_data = nullptr;
+        attr.page_size = 4096;  // not used'
+        attr.base_mr = nullptr; // not used
+        attr.sub_mr_cnt = 0;    // not used
 
-        //::fi_mr_attr attr{};
-        // attr.mr_iov = region.as_iovec();
-        // attr.iov_count = 1;
-        // attr.access = access;
-        // attr.offset = 0;                // reserved to 0
-        // attr.requested_key = dist(gen); // creating a random key, but it can be ignored if FI_MR_PROV_KEY mr mode is set
-        // attr.context = nullptr;         // not used
-        // attr.page_size = 0;             // not used
-        // attr.base_mr = nullptr;         // not used
-        // attr.sub_mr_cnt = 0;            // not used
-
-        // fiCall(fi_mr_regattr,
-        //     "Failed to register memory region",
-        //     domain->raw(),
-        //     &attr,
-        //     FI_RMA_EVENT, // flags: this will need to be modified when we will add HMEM support
-        //     &raw);
+        fiCall(fi_mr_regattr,
+            "Failed to register memory region",
+            domain->raw(),
+            &attr,
+            0, // flags: this will need to be modified when we will add HMEM support
+            &raw);
 
         struct MakeSharedEnabler : public MemoryRegion
         {
@@ -96,7 +100,6 @@ namespace mxl::lib::fabrics::ofi
         if (_raw)
         {
             MXL_INFO("Closing memory region with rkey={:x}", rkey());
-
             fiCall(::fi_close, "Failed to close memory region", &_raw->fid);
             _raw = nullptr;
         }

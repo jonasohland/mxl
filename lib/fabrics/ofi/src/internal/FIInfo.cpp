@@ -1,4 +1,5 @@
 #include "FIInfo.hpp"
+#include <cstdint>
 #include <cstring>
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
@@ -113,7 +114,7 @@ namespace mxl::lib::fabrics::ofi
         return {_raw};
     }
 
-    FIInfoList FIInfoList::get(std::string node, std::string service, Provider provider)
+    FIInfoList FIInfoList::get(std::string node, std::string service, Provider provider, uint64_t caps)
     {
         ::fi_info *info, *hints;
 
@@ -126,15 +127,15 @@ namespace mxl::lib::fabrics::ofi
 
         auto prov = fmt::format("{}", provider);
 
-        hints->mode = FI_RX_CQ_DATA;
-        hints->caps = FI_RMA | FI_WRITE | FI_REMOTE_WRITE;
+        hints->domain_attr->mr_mode = FI_MR_LOCAL | FI_MR_VIRT_ADDR | FI_MR_ALLOCATED | FI_MR_PROV_KEY;
+
+        hints->mode |= FI_RX_CQ_DATA;
+        hints->caps = caps;
         hints->ep_attr->type = FI_EP_MSG;
         hints->fabric_attr->prov_name = strdup(prov.c_str());
         // hints: add condition to append FI_HMEM capability if needed!
 
         fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), 0, hints, &info);
-
-        MXL_INFO("Found providers : {}", ::fi_tostr(info, FI_TYPE_INFO));
 
         // fi_freeinfo(hints); // TODO: understand why this makes a crash.. according to the documentation hints shoud be freed after use.
 

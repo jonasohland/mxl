@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <rdma/fabric.h>
 #include <type_traits>
@@ -125,7 +126,7 @@ namespace mxl::lib::fabrics::ofi
          * Get a list of provider configurations supported to the specified
          * node/service
          */
-        static FIInfoList get(std::string node, std::string service, Provider provider);
+        static FIInfoList get(std::string node, std::string service, Provider provider, uint64_t caps);
 
         // Take ownership over a fi_info raw pointer.
         static FIInfoList owned(::fi_info* info) noexcept;

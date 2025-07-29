@@ -7,8 +7,6 @@
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_rma.h>
-#include "internal/Logging.hpp"
-#include "mxl/flow.h"
 #include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
@@ -155,9 +153,6 @@ namespace mxl::lib::fabrics::ofi
     {
         uint64_t data = immData.value_or(0);
         uint64_t flags = immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
-
-        // auto* grainInfo = reinterpret_cast<GrainInfo*>(localGroup.iovec()[0].iov_base);
-        // MXL_INFO("Actual grainInfo commitedSize={} grainSize={} ", grainInfo->commitedSize, grainInfo->grainSize);
 
         ::fi_msg_rma msg = {
             .msg_iov = localGroup.iovec(),
