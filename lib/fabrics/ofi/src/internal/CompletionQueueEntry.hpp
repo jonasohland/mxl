@@ -1,6 +1,8 @@
 #pragma once
 
 #include <optional>
+#include <string>
+#include <variant>
 #include <rdma/fi_eq.h>
 
 namespace mxl::lib::fabrics::ofi
@@ -8,7 +10,7 @@ namespace mxl::lib::fabrics::ofi
     class CompletionQueueDataEntry final
     {
     public:
-        CompletionQueueDataEntry(::fi_cq_data_entry& raw)
+        explicit CompletionQueueDataEntry(::fi_cq_data_entry& raw)
             : _raw(raw)
         {}
 
@@ -21,5 +23,44 @@ namespace mxl::lib::fabrics::ofi
 
     private:
         ::fi_cq_data_entry _raw;
+    };
+
+    class CompletionQueueErrorEntry final
+    {
+    public:
+        explicit CompletionQueueErrorEntry(::fi_cq_err_entry& raw)
+            : _raw(raw)
+        {}
+
+        [[nodiscard]]
+        std::string toString(::fid_cq* cq) const;
+
+    private:
+        ::fi_cq_err_entry _raw;
+    };
+
+    class CompletionEntry
+    {
+    public:
+        explicit CompletionEntry(CompletionQueueDataEntry entry);
+        explicit CompletionEntry(CompletionQueueErrorEntry entry);
+
+        CompletionQueueDataEntry data();
+        CompletionQueueErrorEntry err();
+
+        [[nodiscard]]
+        std::optional<CompletionQueueDataEntry> tryData() const noexcept;
+        [[nodiscard]]
+        std::optional<CompletionQueueErrorEntry> tryErr() const noexcept;
+
+        [[nodiscard]]
+        bool isDataEntry() const noexcept;
+        [[nodiscard]]
+        bool isErrEntry() const noexcept;
+
+    private:
+        using CompletionEntryInner = std::variant<CompletionQueueDataEntry, CompletionQueueErrorEntry>;
+
+        CompletionEntryInner _inner;
     };
 }

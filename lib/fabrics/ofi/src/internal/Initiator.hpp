@@ -38,6 +38,8 @@ namespace mxl::lib::fabrics::ofi
         mxlStatus transferGrain(uint64_t grainIndex);
 
     private:
+        void flushCq(InitiatorTargetEntry const& target) const noexcept;
+
         std::optional<std::shared_ptr<Domain>> _domain = std::nullopt;
         std::vector<RegisteredRegionGroup> _registeredRegions;
         std::vector<LocalRegionGroup> _localRegions;

@@ -52,15 +52,16 @@ namespace mxl::lib::fabrics::ofi
         return std::make_shared<MakeSharedEnabler>(cq, domain);
     }
 
-    std::optional<CompletionQueueDataEntry> CompletionQueue::tryEntry()
+    std::optional<CompletionEntry> CompletionQueue::tryEntry()
     {
         fi_cq_data_entry entry;
 
         ssize_t ret = fi_cq_read(_raw, &entry, 1);
+
         return handleReadResult(ret, entry);
     }
 
-    std::optional<CompletionQueueDataEntry> CompletionQueue::waitForEntry(std::chrono::steady_clock::duration timeout)
+    std::optional<CompletionEntry> CompletionQueue::waitForEntry(std::chrono::steady_clock::duration timeout)
     {
         fi_cq_data_entry entry;
 
@@ -115,29 +116,23 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    std::optional<CompletionQueueDataEntry> CompletionQueue::handleReadResult(ssize_t ret, ::fi_cq_data_entry& entry)
+    std::optional<CompletionEntry> CompletionQueue::handleReadResult(ssize_t ret, ::fi_cq_data_entry& entry)
     {
         if (ret == -FI_EAGAIN)
         {
-            MXL_INFO("completion polling returned FI_EAGAIN");
-
             // No entry available
             return std::nullopt;
         }
 
         if (ret == -FI_EAVAIL)
         {
-            MXL_INFO("completion polling returned an error");
-
             // An entry is available but in the error queue
             ::fi_cq_err_entry err_entry;
             fi_cq_readerr(_raw, &err_entry, 0);
 
-            MXL_ERROR("A completion erro entry was returned : \"{}\"", fi_cq_strerror(_raw, err_entry.prov_errno, err_entry.err_data, nullptr, 0));
-
-            return std::nullopt;
+            return CompletionEntry{CompletionQueueErrorEntry{err_entry}};
         }
 
-        return CompletionQueueDataEntry{entry};
+        return CompletionEntry{CompletionQueueDataEntry{entry}};
     }
 }

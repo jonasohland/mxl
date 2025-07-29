@@ -78,9 +78,9 @@ namespace mxl::lib::fabrics::ofi
                 {
                     if (auto entry = state.ep->completionQueue()->tryEntry(); entry)
                     {
-                        if (auto data = entry.value().data(); data)
+                        if (auto dataEntry = entry.value().tryData(); dataEntry)
                         {
-                            result.grainCompleted = data.value();
+                            result.grainCompleted = dataEntry.value().data();
                         }
                     }
                     return state;
@@ -108,9 +108,6 @@ namespace mxl::lib::fabrics::ofi
                         MXL_INFO("Connection request received, creating endpoint for remote address: {}", entry->get()->info().value()->dest_addr);
 
                         auto remoteInfo = std::make_shared<FIInfo>(entry.value()->info()->owned());
-
-                        // TODO: move this to a separate function to avoid code duplication
-                        // When creating the endpoint here we must pass the info of the remote endpoint requesting connection
                         auto endpoint = Endpoint::create(*_domain, remoteInfo);
 
                         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
@@ -122,7 +119,6 @@ namespace mxl::lib::fabrics::ofi
                         // we are now ready to accept the connection
                         endpoint->accept();
                         MXL_INFO("Accepted the connection waiting for connected event notification.");
-                        // TODO: move this to a separate function to avoid code duplication
 
                         // Return the new state as the variant type
                         return StateWaitForConnected{endpoint};
@@ -134,7 +130,7 @@ namespace mxl::lib::fabrics::ofi
                 {
                     if (auto entry = state.ep->eventQueue()->waitForEntry(timeout); entry && entry->get()->isConnected())
                     {
-                        MXL_INFO("Received connected event notification, now connected.");
+                        MXL_DEBUG("Received connected event notification, now connected.");
 
                         // We have a connected event, so we can transition to the connected state
                         return StateConnected{state.ep};
@@ -146,9 +142,9 @@ namespace mxl::lib::fabrics::ofi
                 {
                     if (auto entry = state.ep->completionQueue()->waitForEntry(timeout); entry)
                     {
-                        if (auto data = entry.value().data(); data)
+                        if (auto dataEntry = entry.value().tryData(); dataEntry)
                         {
-                            result.grainCompleted = data.value();
+                            result.grainCompleted = dataEntry.value().data();
                         }
                     }
 
@@ -177,7 +173,8 @@ namespace mxl::lib::fabrics::ofi
     std::pair<mxlStatus, std::unique_ptr<TargetInfo>> TargetWrapper::setup(mxlTargetConfig const& config) noexcept
     {
         namespace ranges = std::ranges;
-        MXL_INFO("setting up target [endpoint = {}:{}, provider = {}]", config.endpointAddress.node, config.endpointAddress.service, config.provider);
+        MXL_DEBUG(
+            "setting up target [endpoint = {}:{}, provider = {}]", config.endpointAddress.node, config.endpointAddress.service, config.provider);
 
         auto provider = providerFromAPI(config.provider);
         if (!provider)
@@ -185,7 +182,8 @@ namespace mxl::lib::fabrics::ofi
             return {MXL_ERR_INVALID_ARG, nullptr};
         }
 
-        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value());
+        auto fabricInfoList = FIInfoList::get(
+            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_REMOTE_WRITE);
 
         auto bestFabricInfo = RMATarget::findBestFabric(fabricInfoList, config.provider);
         if (!bestFabricInfo)
@@ -195,23 +193,24 @@ namespace mxl::lib::fabrics::ofi
 
         auto fabricInfo = std::make_shared<FIInfo>(bestFabricInfo->owned());
 
+        MXL_DEBUG("Selected provider: {}", ::fi_tostr(fabricInfo->raw(), FI_TYPE_INFO));
+
         auto fabric = Fabric::open(fabricInfo);
+
         _domain = Domain::open(fabric);
 
         // config.regions contains the memory layout that will be written into.
-        auto* regions = RegionGroups::fromAPI(config.regions);
+        auto* localRegionGroups = RegionGroups::fromAPI(config.regions);
 
         // auto group = regions->view().front();
-        for (auto const& group : regions->view())
+        for (auto const& group : localRegionGroups->view())
         {
             // For each region group we will register memory and keep a copy inside this instance as a list of registered region groups.
             // Registered regions can be converted to remote region groups or local region groups where needed.
             std::vector<RegisteredRegion> registeredGroup;
             for (auto const& region : group.view())
             {
-                auto mr = MemoryRegion::reg(*_domain, region, FI_REMOTE_WRITE);
-                auto registeredRegion = RegisteredRegion(std::move(mr), region);
-                registeredGroup.emplace_back(std::move(registeredRegion));
+                registeredGroup.emplace_back(MemoryRegion::reg(*_domain, region, FI_REMOTE_WRITE), region);
             }
             _regRegions.emplace_back(registeredGroup);
         }
@@ -221,16 +220,6 @@ namespace mxl::lib::fabrics::ofi
         auto eq = EventQueue::open(fabric, EventQueueAttr::get_default());
         pep->bind(eq);
         pep->listen();
-
-        // TODO: delete me
-        for (auto const& group : toRemote(_regRegions))
-        {
-            for (auto const& region : group.view())
-            {
-                MXL_INFO("Remote region addr={:x} len={} rkey={:x}", region.addr, region.len, region.rkey);
-            }
-        }
-        // TODO: delete me
 
         // Transition the state machine to the waiting for a connection request state
         MXL_INFO("Listening for initator connection request.");
