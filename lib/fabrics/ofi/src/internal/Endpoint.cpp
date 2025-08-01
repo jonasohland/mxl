@@ -123,7 +123,7 @@ namespace mxl::lib::fabrics::ofi
     {
         if (!_cq)
         {
-            throw std::runtime_error("no Completion queue bound to the endpoint"); // Is this the right throw??
+            throw std::runtime_error("no Completion queue is bound to the endpoint"); // Is this the right throw??
         }
 
         return *_cq;
@@ -169,16 +169,12 @@ namespace mxl::lib::fabrics::ofi
         };
 
         fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
-
-        MXL_INFO("POSTED WRITEMSG");
     }
 
     void Endpoint::recv(LocalRegion& region)
     {
         auto iovec = region.toIov();
         fiCall(::fi_recv, "Failed to push recv to work queue", _raw, iovec.iov_base, iovec.iov_len, nullptr, FI_ADDR_UNSPEC, nullptr);
-
-        MXL_INFO("POST RECV");
     }
 
 }

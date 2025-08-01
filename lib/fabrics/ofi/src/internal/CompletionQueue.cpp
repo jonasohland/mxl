@@ -56,8 +56,6 @@ namespace mxl::lib::fabrics::ofi
     {
         fi_cq_data_entry entry;
 
-        MXL_INFO("tryEntry!");
-
         ssize_t ret = fi_cq_read(_raw, &entry, 1);
 
         return handleReadResult(ret, entry);
@@ -66,8 +64,6 @@ namespace mxl::lib::fabrics::ofi
     std::optional<CompletionEntry> CompletionQueue::waitForEntry(std::chrono::steady_clock::duration timeout)
     {
         fi_cq_data_entry entry;
-
-        MXL_INFO("waitForEntry!");
 
         ssize_t ret = fi_cq_sread(_raw, &entry, 1, nullptr, std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count());
         return handleReadResult(ret, entry);
@@ -134,12 +130,8 @@ namespace mxl::lib::fabrics::ofi
             ::fi_cq_err_entry err_entry;
             fi_cq_readerr(_raw, &err_entry, 0);
 
-            MXL_INFO("Got an error entry");
-
             return CompletionEntry{CompletionQueueErrorEntry{err_entry}};
         }
-
-        MXL_INFO("Got a data entry");
 
         return CompletionEntry{CompletionQueueDataEntry{entry}};
     }

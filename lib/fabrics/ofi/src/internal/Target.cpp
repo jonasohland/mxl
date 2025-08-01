@@ -158,6 +158,10 @@ namespace mxl::lib::fabrics::ofi
 
                             state.ep->recv(_immDataRegion);
                         }
+                        else
+                        {
+                            MXL_ERROR("CQ Error={}", entry->err().toString(state.ep->completionQueue()->raw()));
+                        }
                     }
 
                     return state;
@@ -213,15 +217,6 @@ namespace mxl::lib::fabrics::ofi
         {
             _immDataRegion = LocalRegion{.addr = reinterpret_cast<std::uintptr_t>(_immData), .len = sizeof(_immData), .desc = nullptr};
         }
-
-        // auto* buf = malloc(64 * 1024);
-        // auto region = Region{reinterpret_cast<std::uintptr_t>(buf), 64 * 1024};
-        // auto mr = MemoryRegion::reg(*_domain, region, FI_REMOTE_WRITE);
-        // std::vector<RegisteredRegion> regRegions{
-        //     RegisteredRegion{mr, region}
-        // };
-        // auto regRegionGroup = RegisteredRegionGroup{std::move(regRegions)};
-        // _regRegions.emplace_back(std::move(regRegionGroup));
 
         // config.regions contains the memory layout that will be written into.
         auto* localRegionGroups = RegionGroups::fromAPI(config.regions);

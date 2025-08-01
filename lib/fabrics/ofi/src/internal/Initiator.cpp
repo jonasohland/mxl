@@ -99,16 +99,6 @@ namespace mxl::lib::fabrics::ofi
             return MXL_ERR_UNKNOWN;
         }
 
-        // auto* buf = malloc(64 * 1024);
-        // auto region = Region{reinterpret_cast<std::uintptr_t>(buf), 64 * 1024};
-        // auto mr = MemoryRegion::reg(*_domain, region, FI_WRITE);
-        // std::vector<RegisteredRegion> regRegions{
-        //     RegisteredRegion{mr, region},
-        // };
-        // RegisteredRegionGroup regGroup{std::move(regRegions)};
-        // _localRegions.emplace_back(regGroup.toLocal());
-        // _registeredRegions.emplace_back(std::move(regGroup));
-
         for (auto const& group : regionGroups->view())
         {
             std::vector<RegisteredRegion> regRegions;
