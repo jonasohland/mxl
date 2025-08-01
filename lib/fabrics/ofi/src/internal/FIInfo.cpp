@@ -132,6 +132,7 @@ namespace mxl::lib::fabrics::ofi
         hints->caps = caps;
         hints->ep_attr->type = FI_EP_MSG;
         hints->fabric_attr->prov_name = strdup(prov.c_str());
+
         // hints: add condition to append FI_HMEM capability if needed!
 
         fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), 0, hints, &info);

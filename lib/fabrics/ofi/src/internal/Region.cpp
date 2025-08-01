@@ -66,12 +66,10 @@ namespace mxl::lib::fabrics::ofi
 
             auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow->grainAt(i));
             auto grainInfoSize = sizeof(GrainHeader);
-            auto grainPayloadBaseAddr = grainInfoBaseAddr + sizeof(GrainHeader);
             auto grainPayloadSize = grain->header.info.grainSize;
 
             auto regionGroup = RegionGroup({
-                Region{grainInfoBaseAddr,    grainInfoSize   },
-                Region{grainPayloadBaseAddr, grainPayloadSize},
+                Region{grainInfoBaseAddr, grainInfoSize + grainPayloadSize},
             });
 
             regionGroups.emplace_back(std::move(regionGroup));
