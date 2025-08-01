@@ -6,7 +6,9 @@
 #include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
+#include <rdma/fi_endpoint.h>
 #include <rdma/fi_rma.h>
+#include "internal/Logging.hpp"
 #include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
@@ -121,7 +123,7 @@ namespace mxl::lib::fabrics::ofi
     {
         if (!_cq)
         {
-            throw std::runtime_error("Completion queue is not bound to the endpoint"); // Is this the right throw??
+            throw std::runtime_error("no Completion queue bound to the endpoint"); // Is this the right throw??
         }
 
         return *_cq;
@@ -132,7 +134,7 @@ namespace mxl::lib::fabrics::ofi
         {
             if (!_eq)
             {
-                throw std::runtime_error("Event queue is not bound to the endpoint"); // Is this the right throw??
+                throw std::runtime_error("No event queue bound to the endpoint"); // Is this the right throw??
             }
 
             return *_eq;
@@ -152,7 +154,8 @@ namespace mxl::lib::fabrics::ofi
     void Endpoint::write(LocalRegionGroup& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr, std::optional<uint64_t> immData)
     {
         uint64_t data = immData.value_or(0);
-        uint64_t flags = immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
+        uint64_t flags = FI_TRANSMIT_COMPLETE | FI_COMMIT_COMPLETE;
+        flags |= immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
 
         ::fi_msg_rma msg = {
             .msg_iov = localGroup.iovec(),
@@ -166,6 +169,16 @@ namespace mxl::lib::fabrics::ofi
         };
 
         fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
+
+        MXL_INFO("POSTED WRITEMSG");
+    }
+
+    void Endpoint::recv(LocalRegion& region)
+    {
+        auto iovec = region.toIov();
+        fiCall(::fi_recv, "Failed to push recv to work queue", _raw, iovec.iov_base, iovec.iov_len, nullptr, FI_ADDR_UNSPEC, nullptr);
+
+        MXL_INFO("POST RECV");
     }
 
 }

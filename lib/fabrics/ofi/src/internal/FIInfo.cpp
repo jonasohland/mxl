@@ -3,7 +3,6 @@
 #include <cstring>
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
-#include "internal/Logging.hpp"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
 #include "FIVersion.hpp"
@@ -129,7 +128,7 @@ namespace mxl::lib::fabrics::ofi
 
         hints->domain_attr->mr_mode = FI_MR_LOCAL | FI_MR_VIRT_ADDR | FI_MR_ALLOCATED | FI_MR_PROV_KEY;
 
-        hints->mode |= FI_RX_CQ_DATA;
+        hints->mode = 0;
         hints->caps = caps;
         hints->ep_attr->type = FI_EP_MSG;
         hints->fabric_attr->prov_name = strdup(prov.c_str());
