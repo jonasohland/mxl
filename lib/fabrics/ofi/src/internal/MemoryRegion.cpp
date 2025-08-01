@@ -99,7 +99,7 @@ namespace mxl::lib::fabrics::ofi
     {
         if (_raw)
         {
-            MXL_INFO("Closing memory region with rkey={:x}", rkey());
+            MXL_DEBUG("Closing memory region with rkey={:x}", rkey());
             fiCall(::fi_close, "Failed to close memory region", &_raw->fid);
             _raw = nullptr;
         }

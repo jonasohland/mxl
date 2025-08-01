@@ -46,7 +46,7 @@ namespace mxl::lib::fabrics::ofi
         std::shared_ptr<EventQueue> eventQueue() const;
 
         /**
-         * Push a remote write work request to the endpoint.
+         * Push a remote write work request to the endpoint work queue.
          * \param localGroup Source memory regions to write from
          * \param remoteGroup Destination memory regions to write to
          * \param destAddr The destination address of the target endpoint. This is unused when using connected endpoints.
@@ -54,6 +54,13 @@ namespace mxl::lib::fabrics::ofi
          */
         void write(LocalRegionGroup& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
             std::optional<uint64_t> immData = std::nullopt);
+
+        /*
+         * Push a recv work request to the endpoint work queue.
+         * \param region Source memory region to receive data into
+
+         */
+        void recv(LocalRegion& region);
 
         ::fid_ep* raw() noexcept;
 

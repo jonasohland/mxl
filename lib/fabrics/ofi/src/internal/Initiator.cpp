@@ -22,6 +22,8 @@
 #include "FIInfo.hpp"
 #include "MemoryRegion.hpp"
 #include "Provider.hpp"
+#include "Region.hpp"
+#include "RegisteredRegion.hpp"
 #include "RMATarget.hpp"
 #include "TargetInfo.hpp"
 
@@ -73,7 +75,8 @@ namespace mxl::lib::fabrics::ofi
             return MXL_ERR_INVALID_ARG;
         }
 
-        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE);
+        auto fabricInfoList = FIInfoList::get(
+            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE | FI_REMOTE_WRITE);
 
         auto bestFabricInfo = RMATarget::findBestFabric(fabricInfoList, config.provider);
         if (!bestFabricInfo)
@@ -81,7 +84,11 @@ namespace mxl::lib::fabrics::ofi
             throw Exception::make(MXL_ERR_NO_FABRIC, "No suitable fabric available");
         }
 
-        auto fabricInfo = std::make_shared<FIInfo>(bestFabricInfo->owned());
+        auto info = bestFabricInfo->owned();
+
+        MXL_INFO("Selected provider: {}", ::fi_tostr(info.raw(), FI_TYPE_INFO));
+
+        auto fabricInfo = std::make_shared<FIInfo>(info);
 
         auto fabric = Fabric::open(fabricInfo);
         _domain = Domain::open(fabric);
@@ -91,6 +98,16 @@ namespace mxl::lib::fabrics::ofi
         {
             return MXL_ERR_UNKNOWN;
         }
+
+        // auto* buf = malloc(64 * 1024);
+        // auto region = Region{reinterpret_cast<std::uintptr_t>(buf), 64 * 1024};
+        // auto mr = MemoryRegion::reg(*_domain, region, FI_WRITE);
+        // std::vector<RegisteredRegion> regRegions{
+        //     RegisteredRegion{mr, region},
+        // };
+        // RegisteredRegionGroup regGroup{std::move(regRegions)};
+        // _localRegions.emplace_back(regGroup.toLocal());
+        // _registeredRegions.emplace_back(std::move(regGroup));
 
         for (auto const& group : regionGroups->view())
         {
@@ -124,7 +141,7 @@ namespace mxl::lib::fabrics::ofi
         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
         endpoint->bind(cq, FI_TRANSMIT);
 
-        MXL_INFO("Connecting endpoint to target with encoded address: {}", rfl::json::write(targetInfo.fabricAddress));
+        MXL_DEBUG("Connecting endpoint to target with encoded address: {}", rfl::json::write(targetInfo.fabricAddress));
         endpoint->connect(targetInfo.fabricAddress);
 
         // TODO: use a cancellation token to exit this loop

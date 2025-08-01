@@ -4,7 +4,6 @@
 #include <bits/types/struct_iovec.h>
 #include "internal/DiscreteFlowData.hpp"
 #include "internal/Flow.hpp"
-#include "internal/Logging.hpp"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
 
@@ -94,17 +93,6 @@ namespace mxl::lib::fabrics::ofi
     std::vector<RegionGroup> const& RegionGroups::view() const noexcept
     {
         return _inner;
-    }
-
-    void RegionGroups::print() const noexcept
-    {
-        for (auto const& group : _inner)
-        {
-            for (auto const& region : group.view())
-            {
-                MXL_INFO("Region addr={:x} len={}", region.base, region.size);
-            }
-        }
     }
 
 }

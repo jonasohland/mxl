@@ -1,5 +1,6 @@
 #include "Domain.hpp"
 #include <memory>
+#include <rdma/fabric.h>
 #include "Exception.hpp"
 #include "Fabric.hpp"
 
@@ -71,7 +72,12 @@ namespace mxl::lib::fabrics::ofi
 
     bool Domain::usingVirtualAddresses() const noexcept
     {
-        return _fabric->info()->raw()->domain_attr->mr_mode && FI_MR_VIRT_ADDR != 0;
+        return (_fabric->info()->raw()->domain_attr->mr_mode & FI_MR_VIRT_ADDR) != 0;
+    }
+
+    bool Domain::usingRecvBufForCqData() const noexcept
+    {
+        return (_fabric->info()->raw()->domain_attr->mode & FI_RX_CQ_DATA) != 0;
     }
 
 }

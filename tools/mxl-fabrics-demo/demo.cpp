@@ -207,16 +207,12 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
         return status;
     }
 
-    MXL_INFO("Done initiator setup");
-
     status = mxlFabricsInitiatorAddTarget(initiator, targetInfo);
     if (status != MXL_STATUS_OK)
     {
         MXL_ERROR("Failed to add target with status '{}'", static_cast<int>(status));
         return status;
     }
-
-    MXL_INFO("Done adding target");
 
     // Extract the FlowInfo structure.
     FlowInfo flow_info;
@@ -407,8 +403,6 @@ static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInsta
 
         MXL_INFO("Comitted grain with index={} commitedSize={} grainSize={}", grainIndex, dummyGrainInfo.commitedSize, dummyGrainInfo.grainSize);
     }
-
-    MXL_INFO("Exiting");
 
     return MXL_STATUS_OK;
 }

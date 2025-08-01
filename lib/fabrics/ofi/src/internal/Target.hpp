@@ -10,6 +10,7 @@
 #include <mxl/mxl.h>
 #include "Domain.hpp"
 #include "Endpoint.hpp"
+#include "LocalRegion.hpp"
 #include "PassiveEndpoint.hpp"
 #include "RegisteredRegion.hpp"
 #include "TargetInfo.hpp"
@@ -73,6 +74,10 @@ namespace mxl::lib::fabrics::ofi
         std::unique_ptr<Target> _inner;
         std::optional<std::shared_ptr<Domain>> _domain = std::nullopt;
         std::vector<RegisteredRegionGroup> _regRegions;
+
+        // Used when FI_CQ_RX_DATA mode is required
+        uint64_t _immData;
+        LocalRegion _immDataRegion;
 
         State _state = StateFresh{};
     };

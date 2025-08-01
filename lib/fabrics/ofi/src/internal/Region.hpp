@@ -72,8 +72,6 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         std::vector<RegionGroup> const& view() const noexcept;
 
-        void print() const noexcept;
-
     private:
         explicit RegionGroups(std::vector<RegionGroup> inner)
             : _inner(std::move(inner))

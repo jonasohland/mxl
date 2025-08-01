@@ -33,6 +33,10 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         bool usingVirtualAddresses() const noexcept;
 
+        // When this returns true, it means the target must post a fi_recv in order to receive completions
+        [[nodiscard]]
+        bool usingRecvBufForCqData() const noexcept;
+
     private:
         void close();
 
