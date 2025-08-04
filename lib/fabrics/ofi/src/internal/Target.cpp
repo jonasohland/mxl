@@ -1,13 +1,13 @@
 #include "Target.hpp"
 #include <chrono>
 #include <cstdint>
-#include <cstdlib>
 #include <memory>
 #include <optional>
 #include <variant>
 #include <fmt/format.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
+#include <sys/types.h>
 #include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
@@ -191,14 +191,16 @@ namespace mxl::lib::fabrics::ofi
         MXL_DEBUG(
             "setting up target [endpoint = {}:{}, provider = {}]", config.endpointAddress.node, config.endpointAddress.service, config.provider);
 
-        auto provider = providerFromAPI(config.provider);
+        auto provider = Provider::fromAPI(config.provider);
         if (!provider)
         {
             return {MXL_ERR_INVALID_ARG, nullptr};
         }
 
-        auto fabricInfoList = FIInfoList::get(
-            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_REMOTE_WRITE);
+        uint64_t caps = FI_RMA | FI_REMOTE_WRITE;
+        caps |= config.deviceSupport ? FI_HMEM : 0;
+
+        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value(), caps);
 
         auto bestFabricInfo = RMATarget::findBestFabric(fabricInfoList, config.provider);
         if (!bestFabricInfo)

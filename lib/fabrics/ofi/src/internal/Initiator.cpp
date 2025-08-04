@@ -1,8 +1,6 @@
 #include "Initiator.hpp"
 #include <chrono>
 #include <cstdint>
-#include <cstdio>
-#include <cstdlib>
 #include <memory>
 #include <fcntl.h>
 #include <unistd.h>
@@ -69,7 +67,7 @@ namespace mxl::lib::fabrics::ofi
 
     mxlStatus Initiator::setup(mxlInitiatorConfig const& config)
     {
-        auto provider = providerFromAPI(config.provider);
+        auto provider = Provider::fromAPI(config.provider);
         if (!provider)
         {
             return MXL_ERR_INVALID_ARG;

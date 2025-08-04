@@ -198,6 +198,7 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
         .endpointAddress = {.node = config.node.c_str(), .service = config.service.c_str()},
         .provider = config.provider,
         .regions = regions,
+        .deviceSupport = true,
     };
 
     status = mxlFabricsInitiatorSetup(initiator, &initiatorConfig);
@@ -330,6 +331,7 @@ static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInsta
         .endpointAddress = {.node = config.node.c_str(), .service = config.service.c_str()},
         .provider = config.provider,
         .regions = regions,
+        .deviceSupport = true,
     };
 
     status = mxlFabricsCreateTarget(fabricsInstance, &target);

@@ -1,6 +1,5 @@
 #include "FIInfo.hpp"
 #include <cstdint>
-#include <cstring>
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
 #include "mxl/mxl.h"
@@ -124,14 +123,12 @@ namespace mxl::lib::fabrics::ofi
             // TODO: throw an error?
         }
 
-        auto prov = fmt::format("{}", provider);
-
         hints->domain_attr->mr_mode = FI_MR_LOCAL | FI_MR_VIRT_ADDR | FI_MR_ALLOCATED | FI_MR_PROV_KEY;
 
         hints->mode = 0;
         hints->caps = caps;
-        hints->ep_attr->type = FI_EP_MSG;
-        hints->fabric_attr->prov_name = strdup(prov.c_str());
+        hints->ep_attr->type = provider.endpointType();
+        hints->fabric_attr->prov_name = strdup(fmt::format("{}", provider).c_str());
 
         // hints: add condition to append FI_HMEM capability if needed!
 

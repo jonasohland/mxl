@@ -569,9 +569,9 @@ namespace
     extern "C" MXL_EXPORT
     mxlStatus mxlFabricsProviderFromString(char const* in_string, mxlFabricsProvider* out_provider)
     {
-        if (auto provider = ofi::providerFromString(in_string); provider)
+        if (auto provider = ofi::Provider::fromString(in_string); provider)
         {
-            *out_provider = ofi::providerToAPI(provider.value());
+            *out_provider = provider->toAPI();
             return MXL_STATUS_OK;
         }
 
@@ -612,6 +612,7 @@ namespace
             case MXL_SHARING_PROVIDER_TCP:   return providerEnumValueToString(out_string, in_stringSize, "tcp");
             case MXL_SHARING_PROVIDER_EFA:   return providerEnumValueToString(out_string, in_stringSize, "efa");
             case MXL_SHARING_PROVIDER_VERBS: return providerEnumValueToString(out_string, in_stringSize, "verbs");
+            case MXL_SHARING_PROVIDER_SHM:   return providerEnumValueToString(out_string, in_stringSize, "shm");
             default:                         return MXL_ERR_INVALID_ARG;
         }
     }

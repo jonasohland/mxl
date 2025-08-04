@@ -24,6 +24,7 @@ extern "C"
         MXL_SHARING_PROVIDER_TCP = 1,
         MXL_SHARING_PROVIDER_VERBS = 2,
         MXL_SHARING_PROVIDER_EFA = 3,
+        MXL_SHARING_PROVIDER_SHM = 4,
     } mxlFabricsProvider;
 
     typedef struct mxlEndpointAddress_t
@@ -39,6 +40,7 @@ extern "C"
         mxlEndpointAddress endpointAddress;
         mxlFabricsProvider provider;
         mxlRegions regions;
+        bool deviceSupport;
     } mxlTargetConfig;
 
     typedef struct mxlInitiatorConfig_t
@@ -46,6 +48,7 @@ extern "C"
         mxlEndpointAddress endpointAddress;
         mxlFabricsProvider provider;
         mxlRegions regions;
+        bool deviceSupport;
     } mxlInitiatorConfig;
 
     typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
