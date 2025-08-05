@@ -1,14 +1,10 @@
 #pragma once
 
 #include <cstdint>
-#include <map>
 #include <memory>
-#include <optional>
 #include <uuid.h>
 #include "mxl/fabrics.h"
-#include "mxl/mxl.h"
 #include "Endpoint.hpp"
-#include "RegisteredRegion.hpp"
 #include "RemoteRegion.hpp"
 #include "TargetInfo.hpp"
 
@@ -17,32 +13,33 @@ namespace mxl::lib::fabrics::ofi
 
     struct InitiatorTargetEntry
     {
-        std::shared_ptr<Endpoint> endpoint;
+        Endpoint endpoint;
         std::vector<RemoteRegionGroup> remoteGroups;
     };
 
-    class Initiator final
+    class Initiator
     {
     public:
-        Initiator() = default;
-        ~Initiator();
+        virtual ~Initiator() = default;
 
-        static Initiator* fromAPI(mxlFabricsInitiator api);
+        virtual void addTarget(TargetInfo const& targetInfo) = 0;
+        virtual void removeTarget(TargetInfo const& targetInfo) = 0;
+        virtual void transferGrain(uint64_t grainIndex) = 0;
+    };
 
+    class InitiatorWrapper
+    {
+    public:
+        static InitiatorWrapper* fromAPI(mxlFabricsInitiator api) noexcept;
         mxlFabricsInitiator toAPI() noexcept;
 
-        mxlStatus setup(mxlInitiatorConfig const& config);
-        mxlStatus addTarget(TargetInfo const& targetInfo);
-        mxlStatus removeTarget(TargetInfo const& targetInfo);
+        void setup(mxlInitiatorConfig const& config);
 
-        mxlStatus transferGrain(uint64_t grainIndex);
+        void addTarget(TargetInfo const& targetInfo);
+        void removeTarget(TargetInfo const& targetInfo);
+        void transferGrain(uint64_t grainIndex);
 
     private:
-        void flushCq(InitiatorTargetEntry const& target) const noexcept;
-
-        std::optional<std::shared_ptr<Domain>> _domain = std::nullopt;
-        std::vector<RegisteredRegionGroup> _registeredRegions;
-        std::vector<LocalRegionGroup> _localRegions;
-        std::map<uuids::uuid, InitiatorTargetEntry> _targets;
+        std::unique_ptr<Initiator> _inner;
     };
 }

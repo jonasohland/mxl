@@ -25,7 +25,7 @@ namespace mxl::lib::fabrics::ofi
         Endpoint(Endpoint&&) noexcept;
         Endpoint& operator=(Endpoint&&);
 
-        static std::shared_ptr<Endpoint> create(std::shared_ptr<Domain> domain, std::shared_ptr<FIInfo> info);
+        static Endpoint create(std::shared_ptr<Domain> domain, FIInfoView);
 
         void bind(std::shared_ptr<EventQueue> eq);
         void bind(std::shared_ptr<CompletionQueue> cq, uint64_t flags);
@@ -60,7 +60,7 @@ namespace mxl::lib::fabrics::ofi
          * \param region Source memory region to receive data into
 
          */
-        void recv(LocalRegion& region);
+        void recv(LocalRegion region);
 
         ::fid_ep* raw() noexcept;
 
@@ -70,12 +70,11 @@ namespace mxl::lib::fabrics::ofi
     private:
         void close();
 
-        Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::shared_ptr<FIInfo> info,
-            std::optional<std::shared_ptr<CompletionQueue>> cq = std::nullopt, std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt);
+        Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq = std::nullopt,
+            std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt);
 
         ::fid_ep* _raw;
         std::shared_ptr<Domain> _domain;
-        std::shared_ptr<FIInfo> _info;
 
         std::optional<std::shared_ptr<CompletionQueue>> _cq;
         std::optional<std::shared_ptr<EventQueue>> _eq;

@@ -95,8 +95,9 @@ set(mxl_fabrics_sources
         src/internal/Region.cpp
         src/internal/RegisteredRegion.cpp
         src/internal/RemoteRegion.cpp
-        src/internal/RMATarget.cpp
         src/internal/Target.cpp
+        src/internal/RCTarget.cpp
+        src/internal/RCInitiator.cpp
         src/internal/TargetInfo.cpp
 )
 

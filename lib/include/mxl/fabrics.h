@@ -53,8 +53,13 @@ extern "C"
     MXL_EXPORT
     mxlStatus mxlFabricsRegionsFromFlow(mxlFlowData const in_flowData, mxlRegions* out_regions);
 
+    /**
+     * Free a regions object previously allocated by mxlFabricsRegionsFromFlow.
+     * \param in_regions The regions object to free
+     * \return MXL_STATUS_OK if the regions object was freed
+     */
     MXL_EXPORT
-    mxlStatus mxlFabricsRegionsFree(mxlRegions regions);
+    mxlStatus mxlFabricsRegionsFree(mxlRegions in_regions);
 
     /**
      * Create a new mxl-fabrics from an mxl instance. Targets and initiators created from this mxl-fabrics instance

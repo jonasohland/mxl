@@ -245,21 +245,11 @@ namespace
 
         try
         {
-            auto target = ofi::TargetWrapper::fromAPI(in_target);
-            auto [status, info] = target->setup(*in_config);
-            if (status == MXL_STATUS_OK && info)
-            {
-                *out_info = info.release()->toAPI();
-                return MXL_STATUS_OK;
-            }
+            // Set up the target, release the returned unique_ptr, convert to external API type, assign the the pointer location
+            // passed by the user.
+            *out_info = ofi::TargetWrapper::fromAPI(in_target)->setup(*in_config).release()->toAPI();
 
-            // Something went wrong, but status is ok.
-            if (status == MXL_STATUS_OK)
-            {
-                status = MXL_ERR_UNKNOWN;
-            }
-
-            return status;
+            return MXL_STATUS_OK;
         }
         catch (ofi::Exception& e)
         {
@@ -290,14 +280,14 @@ namespace
         try
         {
             auto target = ofi::TargetWrapper::fromAPI(in_target);
-            auto res = target->tryGrain();
-            if (res.grainCompleted.has_value())
+            auto res = target->read();
+            if (res.grainAvailable.has_value())
             {
-                *out_index = res.grainCompleted.value();
+                *out_index = res.grainAvailable.value();
                 return MXL_STATUS_OK;
             }
 
-            return MXL_ERR_TIMEOUT; // TODO: replace with something like 'MXL_ERR_NOT_READY' ?
+            return MXL_ERR_NOT_READY;
         }
 
         catch (ofi::Exception& e)
@@ -333,10 +323,10 @@ namespace
         try
         {
             auto target = ofi::TargetWrapper::fromAPI(in_target);
-            auto res = target->waitForGrain(std::chrono::milliseconds(in_timeoutMs));
-            if (res.grainCompleted.has_value())
+            auto res = target->readBlocking(std::chrono::milliseconds(in_timeoutMs));
+            if (res.grainAvailable)
             {
-                *out_index = res.grainCompleted.value();
+                *out_index = res.grainAvailable.value();
                 return MXL_STATUS_OK;
             }
 
@@ -417,7 +407,7 @@ namespace
         try
         {
             auto instance = ofi::FabricsInstance::fromAPI(in_fabricsInstance);
-            instance->destroyInitiator(ofi::Initiator::fromAPI(in_initiator));
+            instance->destroyInitiator(ofi::InitiatorWrapper::fromAPI(in_initiator));
         }
         catch (ofi::Exception& e)
         {
@@ -449,9 +439,9 @@ namespace
 
         try
         {
-            auto initiator = ofi::Initiator::fromAPI(in_initiator);
+            ofi::InitiatorWrapper::fromAPI(in_initiator)->setup(*in_config);
 
-            return initiator->setup(*in_config);
+            return MXL_STATUS_OK;
         }
         catch (ofi::Exception& e)
         {
@@ -481,9 +471,11 @@ namespace
 
         try
         {
-            auto initiator = ofi::Initiator::fromAPI(in_initiator);
+            auto initiator = ofi::InitiatorWrapper::fromAPI(in_initiator);
             auto targetInfo = ofi::TargetInfo::fromAPI(in_targetInfo);
-            return initiator->addTarget(*targetInfo);
+            initiator->addTarget(*targetInfo);
+
+            return MXL_STATUS_OK;
         }
         catch (ofi::Exception& e)
         {
@@ -512,10 +504,12 @@ namespace
         }
         try
         {
-            auto initiator = ofi::Initiator::fromAPI(in_initiator);
+            auto initiator = ofi::InitiatorWrapper::fromAPI(in_initiator);
             auto targetInfo = ofi::TargetInfo::fromAPI(in_targetInfo);
 
-            return initiator->removeTarget(*targetInfo);
+            initiator->removeTarget(*targetInfo);
+
+            return MXL_STATUS_OK;
         }
         catch (ofi::Exception& e)
         {
@@ -545,8 +539,9 @@ namespace
 
         try
         {
-            auto initiator = ofi::Initiator::fromAPI(in_initiator);
-            return initiator->transferGrain(in_grainIndex);
+            ofi::InitiatorWrapper::fromAPI(in_initiator)->transferGrain(in_grainIndex);
+
+            return MXL_STATUS_OK;
         }
         catch (ofi::Exception& e)
         {
@@ -579,14 +574,9 @@ namespace
     }
 
     extern "C" MXL_EXPORT
-    mxlStatus mxlFabricsProviderToString(mxlFabricsProvider in_provider, char* out_string, size_t* in_stringSize)
+    mxlStatus mxlFabricsProviderToString(mxlFabricsProvider in_provider, char* out_string, size_t* in_out_stringSize)
     {
         // TODO: review if this can be simplified, should we instead allocate in this function and provider a free ?
-        if (out_string == nullptr)
-        {
-            return MXL_ERR_INVALID_ARG;
-        }
-
         auto providerEnumValueToString = [](char* outString, size_t* inOutStringSize, char const* providerString)
         {
             if (outString == nullptr)
@@ -608,10 +598,10 @@ namespace
 
         switch (in_provider)
         {
-            case MXL_SHARING_PROVIDER_AUTO:  return providerEnumValueToString(out_string, in_stringSize, "auto");
-            case MXL_SHARING_PROVIDER_TCP:   return providerEnumValueToString(out_string, in_stringSize, "tcp");
-            case MXL_SHARING_PROVIDER_EFA:   return providerEnumValueToString(out_string, in_stringSize, "efa");
-            case MXL_SHARING_PROVIDER_VERBS: return providerEnumValueToString(out_string, in_stringSize, "verbs");
+            case MXL_SHARING_PROVIDER_AUTO:  return providerEnumValueToString(out_string, in_out_stringSize, "auto");
+            case MXL_SHARING_PROVIDER_TCP:   return providerEnumValueToString(out_string, in_out_stringSize, "tcp");
+            case MXL_SHARING_PROVIDER_EFA:   return providerEnumValueToString(out_string, in_out_stringSize, "efa");
+            case MXL_SHARING_PROVIDER_VERBS: return providerEnumValueToString(out_string, in_out_stringSize, "verbs");
             default:                         return MXL_ERR_INVALID_ARG;
         }
     }
@@ -627,19 +617,19 @@ namespace
         try
         {
             auto deserializedTargetInfo = rfl::json::read<ofi::TargetInfo>(in_string);
-            if (deserializedTargetInfo)
+            if (!deserializedTargetInfo)
             {
-                auto targetInfo = std::make_unique<ofi::TargetInfo>(deserializedTargetInfo.value());
-                *out_targetInfo = targetInfo.release()->toAPI();
-
-                return MXL_STATUS_OK;
+                throw ofi::Exception::invalidArgument("Failed to deserialize json: {}", deserializedTargetInfo.error().what());
             }
 
-            MXL_ERROR("Failed to deserialize target info from string with error \"{}\"", deserializedTargetInfo.error().what());
+            auto targetInfo = std::make_unique<ofi::TargetInfo>(deserializedTargetInfo.value());
+            *out_targetInfo = targetInfo.release()->toAPI();
+
+            return MXL_STATUS_OK;
         }
         catch (ofi::Exception& e)
         {
-            MXL_ERROR("Failed to create instance: {}", e.what());
+            MXL_ERROR("Failed to read target info from string: {}", e.what());
 
             return e.status();
         }
@@ -690,7 +680,7 @@ namespace
 
         catch (ofi::Exception& e)
         {
-            MXL_ERROR("Failed to create instance: {}", e.what());
+            MXL_ERROR("Failed to serialize target info: {}", e.what());
 
             return e.status();
         }

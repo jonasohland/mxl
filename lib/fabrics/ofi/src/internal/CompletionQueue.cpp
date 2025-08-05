@@ -13,7 +13,7 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    CompletionQueueAttr CompletionQueueAttr::get_default()
+    CompletionQueueAttr CompletionQueueAttr::defaults()
     {
         CompletionQueueAttr attr{};
         attr.size = 8;                  // default size, this should be parameterized
@@ -130,7 +130,9 @@ namespace mxl::lib::fabrics::ofi
             ::fi_cq_err_entry err_entry;
             fi_cq_readerr(_raw, &err_entry, 0);
 
-            return CompletionEntry{CompletionQueueErrorEntry{err_entry}};
+            return CompletionEntry{
+                CompletionQueueErrorEntry{err_entry, this->shared_from_this()}
+            };
         }
 
         return CompletionEntry{CompletionQueueDataEntry{entry}};

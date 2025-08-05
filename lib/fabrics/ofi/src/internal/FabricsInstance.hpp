@@ -25,13 +25,13 @@ namespace mxl::lib::fabrics::ofi
 
         TargetWrapper* createTarget();
         void destroyTarget(TargetWrapper*);
-        Initiator* createInitiator();
-        void destroyInitiator(Initiator*);
+        InitiatorWrapper* createInitiator();
+        void destroyInitiator(InitiatorWrapper*);
 
     private:
         mxl::lib::Instance* _mxlInstance;
         std::list<TargetWrapper> _targets;
-        std::list<Initiator> _initiators;
+        std::list<InitiatorWrapper> _initiators;
     };
 
 }

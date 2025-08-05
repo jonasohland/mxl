@@ -3,7 +3,6 @@
 #include <cstring>
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
-#include "mxl/mxl.h"
 #include "Exception.hpp"
 #include "FIVersion.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
@@ -11,9 +10,33 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    FIInfo::FIInfo(::fi_info const* raw) noexcept
-        : _raw(::fi_dupinfo(raw))
+    // Main constructor, takes ownership of the provided fi_info
+    FIInfo::FIInfo(::fi_info* raw) noexcept
+        : _raw(raw)
     {}
+
+    // Construct from a non-owning view of a fi_info
+    FIInfo::FIInfo(FIInfoView view) noexcept
+        : _raw(::fi_dupinfo(view.raw()))
+    {}
+
+    // Clone a raw fi_info and take ownership
+    FIInfo FIInfo::clone(::fi_info const* info) noexcept
+    {
+        return FIInfo{::fi_dupinfo(info)};
+    }
+
+    // Own a raw fi_info
+    FIInfo FIInfo::own(::fi_info* info) noexcept
+    {
+        return FIInfo{info};
+    }
+
+    // Allocate an empty fi_info
+    FIInfo FIInfo::empty() noexcept
+    {
+        return FIInfo{::fi_allocinfo()};
+    }
 
     FIInfo::~FIInfo() noexcept
     {
@@ -55,6 +78,16 @@ namespace mxl::lib::fabrics::ofi
         return *_raw;
     }
 
+    ::fi_info* FIInfo::operator->() noexcept
+    {
+        return _raw;
+    }
+
+    ::fi_info const* FIInfo::operator->() const noexcept
+    {
+        return _raw;
+    }
+
     ::fi_info* FIInfo::raw() noexcept
     {
         return _raw;
@@ -63,6 +96,11 @@ namespace mxl::lib::fabrics::ofi
     ::fi_info const* FIInfo::raw() const noexcept
     {
         return _raw;
+    }
+
+    FIInfoView FIInfo::view() const noexcept
+    {
+        return FIInfoView{_raw};
     }
 
     void FIInfo::free() noexcept
@@ -74,8 +112,8 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    FIInfoView::FIInfoView(::fi_info* raw)
-        : _raw(raw)
+    FIInfoView::FIInfoView(::fi_info const* raw)
+        : _raw(const_cast<::fi_info*>(raw))
     {}
 
     ::fi_info& FIInfoView::operator*() noexcept
@@ -110,39 +148,31 @@ namespace mxl::lib::fabrics::ofi
 
     FIInfo FIInfoView::owned() noexcept
     {
-        return {_raw};
+        return FIInfo::clone(_raw);
     }
 
     FIInfoList FIInfoList::get(std::string node, std::string service, Provider provider, uint64_t caps)
     {
-        ::fi_info *info, *hints;
-
-        hints = fi_allocinfo();
-        if (hints == nullptr)
-        {
-            throw Exception::make(MXL_ERR_UNKNOWN, "Failed to allocate fi_info structure for hints");
-            // TODO: throw an error?
-        }
-
-        auto prov = fmt::format("{}", provider);
+        ::fi_info* info;
+        auto hints = FIInfo::empty();
 
         hints->domain_attr->mr_mode = FI_MR_LOCAL | FI_MR_VIRT_ADDR | FI_MR_ALLOCATED | FI_MR_PROV_KEY;
 
         hints->mode = 0;
         hints->caps = caps;
         hints->ep_attr->type = FI_EP_MSG;
-        hints->fabric_attr->prov_name = strdup(prov.c_str());
+        hints->fabric_attr->prov_name = strdup(fmt::to_string(provider).c_str());
 
         // hints: add condition to append FI_HMEM capability if needed!
 
-        fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), 0, hints, &info);
+        fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), 0, hints.raw(), &info);
 
         // fi_freeinfo(hints); // TODO: understand why this makes a crash.. according to the documentation hints shoud be freed after use.
 
         return FIInfoList{info};
     }
 
-    FIInfoList FIInfoList::owned(::fi_info* info) noexcept
+    FIInfoList FIInfoList::own(::fi_info* info) noexcept
     {
         return FIInfoList{info};
     }

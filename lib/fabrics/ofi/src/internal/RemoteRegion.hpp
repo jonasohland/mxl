@@ -9,6 +9,7 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+    class LocalRegionGroup;
 
     struct RemoteRegion
     {
@@ -76,7 +77,6 @@ namespace mxl::lib::fabrics::ofi
 
             [[nodiscard]]
             RemoteRegionGroup to_class() const
-
             {
                 return group.get();
             };

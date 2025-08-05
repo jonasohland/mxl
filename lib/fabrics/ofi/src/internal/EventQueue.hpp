@@ -15,7 +15,7 @@ namespace mxl::lib::fabrics::ofi
     {
         size_t size;
 
-        static EventQueueAttr get_default();
+        static EventQueueAttr defaults();
 
         [[nodiscard]]
         ::fi_eq_attr into_raw() const noexcept;
@@ -36,17 +36,17 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::fid_eq const* raw() const noexcept;
 
-        static std::shared_ptr<EventQueue> open(std::shared_ptr<Fabric>, EventQueueAttr const& attr = EventQueueAttr::get_default());
+        static std::shared_ptr<EventQueue> open(std::shared_ptr<Fabric>, EventQueueAttr const& attr = EventQueueAttr::defaults());
 
-        std::optional<std::shared_ptr<ConnNotificationEntry>> tryEntry();
-        std::optional<std::shared_ptr<ConnNotificationEntry>> waitForEntry(std::chrono::steady_clock::duration timeout);
+        std::optional<Event> readEntry();
+        std::optional<Event> readEntryBlocking(std::chrono::steady_clock::duration timeout);
 
     private:
         void close();
 
         EventQueue(::fid_eq* raw, std::shared_ptr<Fabric> fabric);
 
-        std::optional<std::shared_ptr<ConnNotificationEntry>> handleReadResult(ssize_t, uint32_t, ::fi_eq_cm_entry*);
+        std::optional<Event> handleReadResult(ssize_t, uint32_t, ::fi_eq_cm_entry*);
 
         ::fid_eq* _raw;
         std::shared_ptr<Fabric> _fabric;

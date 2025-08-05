@@ -13,7 +13,7 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    EventQueueAttr EventQueueAttr::get_default()
+    EventQueueAttr EventQueueAttr::defaults()
     {
         EventQueueAttr attr{};
         attr.size = 8; // default size, this should be parameterized
@@ -49,7 +49,7 @@ namespace mxl::lib::fabrics::ofi
         return std::make_shared<MakeSharedEnabler>(eq, fabric);
     }
 
-    std::optional<std::shared_ptr<ConnNotificationEntry>> EventQueue::tryEntry()
+    std::optional<Event> EventQueue::readEntry()
     {
         uint32_t eventType;
         ::fi_eq_cm_entry entry;
@@ -59,12 +59,13 @@ namespace mxl::lib::fabrics::ofi
         return handleReadResult(ret, eventType, &entry);
     }
 
-    std::optional<std::shared_ptr<ConnNotificationEntry>> EventQueue::waitForEntry(std::chrono::steady_clock::duration timeout)
+    std::optional<Event> EventQueue::readEntryBlocking(std::chrono::steady_clock::duration timeout)
     {
         uint32_t eventType;
         ::fi_eq_cm_entry entry;
 
-        auto ret = fi_eq_sread(_raw, &eventType, &entry, sizeof(entry), std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count(), 0);
+        auto ret = fi_eq_sread(
+            _raw, &eventType, &entry, sizeof(entry), std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count(), FI_PEEK);
 
         return handleReadResult(ret, eventType, &entry);
     }
@@ -114,7 +115,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    std::optional<std::shared_ptr<ConnNotificationEntry>> EventQueue::handleReadResult(ssize_t ret, uint32_t eventType, ::fi_eq_cm_entry* entry)
+    std::optional<Event> EventQueue::handleReadResult(ssize_t ret, uint32_t eventType, ::fi_eq_cm_entry* entry)
     {
         if (ret == -FI_EAGAIN)
         {
@@ -122,7 +123,7 @@ namespace mxl::lib::fabrics::ofi
             return std::nullopt;
         }
 
-        if (ret < 0)
+        if (ret == FI_EAVAIL)
         {
             ::fi_eq_err_entry eq_err{};
             fi_eq_readerr(_raw, &eq_err, 0);
@@ -136,7 +137,7 @@ namespace mxl::lib::fabrics::ofi
         // try to read the entry as a connection notification event, if it fails it is ok, because we have not consumed the event yet
         try
         {
-            auto connEntry = ConnNotificationEntry::from_raw(entry, eventType);
+            auto connEntry = Event::fromRaw(entry, eventType);
 
             // If we got here, we know it's a connection notification event, we can safely consume the event from the queue
             fi_eq_read(_raw, &eventType, entry, sizeof(entry), 0);

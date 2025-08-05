@@ -22,7 +22,7 @@ namespace mxl::lib::fabrics::ofi
         std::mt19937_64 gen(rd());
         std::uniform_int_distribution<uint64_t> dist(0, UINT64_MAX);
 
-        MXL_DEBUG("Registering memory region with address 0x{:p} and size {}", region.base, region.size);
+        MXL_DEBUG("Registering memory region with address 0x{} and size {}", reinterpret_cast<void*>(region.base), region.size);
 
         ::fi_mr_attr attr{};
         attr.mr_iov = region.as_iovec();
