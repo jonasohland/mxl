@@ -47,5 +47,4 @@ namespace mxl::lib::fabrics::ofi
 
     std::vector<RemoteRegionGroup> toRemote(std::vector<RegisteredRegionGroup> const& groups) noexcept;
     std::vector<LocalRegionGroup> toLocal(std::vector<RegisteredRegionGroup> const& groups) noexcept;
-
 }

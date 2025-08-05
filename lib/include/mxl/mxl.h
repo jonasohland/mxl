@@ -29,7 +29,11 @@ extern "C"
 
         /* fabrics.h errors */
         MXL_ERR_STRLEN = 1024,
-        MXL_ERR_NO_FABRIC
+        MXL_ERR_NO_FABRIC,
+        MXL_ERR_INVALID_STATE,
+        MXL_ERR_INTERNAL,
+        MXL_ERR_NOT_READY,
+        MXL_ERR_EXISTS,
     } mxlStatus;
 
     /// MXL SDK Semantic versionning structure.

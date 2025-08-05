@@ -7,6 +7,8 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+    class RemoteRegionGroup;
+
     struct LocalRegion
     {
         uint64_t addr;

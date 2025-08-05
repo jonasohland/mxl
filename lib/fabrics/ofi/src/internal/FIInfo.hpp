@@ -9,16 +9,22 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-
-    class FIInfoList;
-
     template<bool Const>
     class FIInfoIterator;
+
+    class FIInfoView;
+    class FIInfoList;
 
     class FIInfo
     {
     public:
+        static FIInfo clone(::fi_info const*) noexcept;
+        static FIInfo own(::fi_info*) noexcept;
+        static FIInfo empty() noexcept;
+
         ~FIInfo() noexcept;
+
+        FIInfo(FIInfoView) noexcept;
 
         FIInfo(FIInfo const&) noexcept;
         void operator=(FIInfo const& other) noexcept;
@@ -28,15 +34,18 @@ namespace mxl::lib::fabrics::ofi
 
         ::fi_info& operator*() noexcept;
         ::fi_info const& operator*() const noexcept;
+        ::fi_info* operator->() noexcept;
+        ::fi_info const* operator->() const noexcept;
 
         ::fi_info* raw() noexcept;
         [[nodiscard]]
         ::fi_info const* raw() const noexcept;
 
-    private:
-        friend class FIInfoView;
+        [[nodiscard]]
+        FIInfoView view() const noexcept;
 
-        FIInfo(::fi_info const*) noexcept;
+    private:
+        explicit FIInfo(::fi_info*) noexcept;
 
         void free() noexcept;
 
@@ -60,8 +69,9 @@ namespace mxl::lib::fabrics::ofi
     private:
         friend FIInfoIterator<true>;
         friend FIInfoIterator<false>;
+        friend FIInfo;
 
-        FIInfoView(::fi_info*);
+        FIInfoView(::fi_info const*);
         ::fi_info* _raw;
     };
 
@@ -129,7 +139,7 @@ namespace mxl::lib::fabrics::ofi
         static FIInfoList get(std::string node, std::string service, Provider provider, uint64_t caps);
 
         // Take ownership over a fi_info raw pointer.
-        static FIInfoList owned(::fi_info* info) noexcept;
+        static FIInfoList own(::fi_info* info) noexcept;
 
         // Type aliases for const and non-const versions of the iterator template
         using iterator = FIInfoIterator<false>;

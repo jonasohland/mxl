@@ -20,7 +20,7 @@ namespace mxl::lib::fabrics::ofi
     {
         ::fid_domain* domain;
 
-        fiCall(::fi_domain2, "Failed to open domain", fabric->raw(), fabric->info()->raw(), &domain, 0, nullptr);
+        fiCall(::fi_domain2, "Failed to open domain", fabric->raw(), fabric->info().raw(), &domain, 0, nullptr);
 
         struct MakeSharedEnabler : public Domain
         {
@@ -72,12 +72,12 @@ namespace mxl::lib::fabrics::ofi
 
     bool Domain::usingVirtualAddresses() const noexcept
     {
-        return (_fabric->info()->raw()->domain_attr->mr_mode & FI_MR_VIRT_ADDR) != 0;
+        return (_fabric->info().raw()->domain_attr->mr_mode & FI_MR_VIRT_ADDR) != 0;
     }
 
     bool Domain::usingRecvBufForCqData() const noexcept
     {
-        return (_fabric->info()->raw()->domain_attr->mode & FI_RX_CQ_DATA) != 0;
+        return (_fabric->info().raw()->domain_attr->mode & FI_RX_CQ_DATA) != 0;
     }
 
 }

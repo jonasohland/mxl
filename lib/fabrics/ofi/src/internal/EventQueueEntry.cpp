@@ -1,86 +1,94 @@
 #include "EventQueueEntry.hpp"
-#include <memory>
-#include <optional>
+#include "Exception.hpp"
 #include "FIInfo.hpp"
 #include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    std::shared_ptr<ConnNotificationEntry> ConnNotificationEntry::from_raw(::fi_eq_cm_entry const* entry, uint32_t eventType)
-    {
-        struct MakeSharedEnabler : public ConnNotificationEntry
-        {
-            MakeSharedEnabler(Event ev)
-                : ConnNotificationEntry(std::move(ev))
-            {}
-        };
+    Event::ConnectionRequested::ConnectionRequested(::fid_t fid, FIInfo info)
+        : _fid(fid)
+        , _info(std::move(info))
+    {}
 
+    fid_t Event::ConnectionRequested::fid() const noexcept
+    {
+        return _fid;
+    }
+
+    FIInfoView Event::ConnectionRequested::info() const noexcept
+    {
+        return _info.view();
+    }
+
+    Event::Connected::Connected(::fid_t fid)
+        : _fid(fid)
+    {}
+
+    ::fid_t Event::Connected::fid() const noexcept
+    {
+        return _fid;
+    }
+
+    Event::Shutdown::Shutdown(::fid_t fid)
+        : _fid(fid)
+    {}
+
+    ::fid_t Event::Shutdown::fid() const noexcept
+    {
+        return _fid;
+    }
+
+    Event::Event(Inner ev)
+        : _event(std::move(ev))
+    {}
+
+    Event Event::fromRaw(::fi_eq_cm_entry const* entry, uint32_t eventType)
+    {
+        // clang-format off
         switch (eventType)
         {
-            case FI_CONNREQ:   return std::make_shared<MakeSharedEnabler>(EventConnReq{entry->fid, FIInfoList::owned(entry->info)});
-            case FI_CONNECTED: return std::make_shared<MakeSharedEnabler>(EventConnected{entry->fid});
-            case FI_SHUTDOWN:  return std::make_shared<MakeSharedEnabler>(EventShutdown{entry->fid});
-            default:           throw std::invalid_argument("Invalid event type for ConnNotificationEntry");
+            case FI_CONNREQ:   return {ConnectionRequested{entry->fid, FIInfo::own(entry->info)}};
+            case FI_CONNECTED: return {Connected{entry->fid}};
+            case FI_SHUTDOWN:  return {Shutdown{entry->fid}};
+            default:           throw Exception::internal("Unsupported event type returned from queue");
         }
+        // clang-format on
     }
 
-    bool ConnNotificationEntry::isConnReq() const noexcept
+    bool Event::isConnReq() const noexcept
     {
-        return std::visit(overloaded{[](EventConnReq const&) { return true; },
-                              [](EventConnected const&) { return false; },
-                              [](EventShutdown const&)
-                              {
-                                  return false;
-                              }},
-            _event);
+        return std::holds_alternative<ConnectionRequested>(_event);
     }
 
-    bool ConnNotificationEntry::isConnected() const noexcept
+    bool Event::isConnected() const noexcept
     {
-        return std::visit(overloaded{[](EventConnReq const&) { return false; },
-                              [](EventConnected const&) { return true; },
-                              [](EventShutdown const&)
-                              {
-                                  return false;
-                              }},
-            _event);
+        return std::holds_alternative<Connected>(_event);
     }
 
-    bool ConnNotificationEntry::isShutdown() const noexcept
+    bool Event::isShutdown() const noexcept
     {
-        return std::visit(overloaded{[](EventConnReq const&) { return false; },
-                              [](EventConnected const&) { return false; },
-                              [](EventShutdown const&)
-                              {
-                                  return true;
-                              }},
-            _event);
+        return std::holds_alternative<Shutdown>(_event);
     }
 
-    std::optional<FIInfoView> ConnNotificationEntry::info() noexcept
+    FIInfoView Event::info() const
     {
-        return std::visit(overloaded{[](EventConnReq& ev) -> std::optional<FIInfoView> { return ev.info(); },
-                              [](EventConnected&) -> std::optional<FIInfoView> { return std::nullopt; },
-                              [](EventShutdown&) -> std::optional<FIInfoView>
-                              {
-                                  return std::nullopt;
-                              }},
-            _event);
+        if (auto connReq = std::get_if<ConnectionRequested>(&_event); connReq != nullptr)
+        {
+            return connReq->info();
+        }
+
+        throw Exception::invalidState("Tried to access fi_info from an event that is not a connection request");
     }
 
-    std::optional<fid_t> ConnNotificationEntry::fid() noexcept
+    fid_t Event::fid() noexcept
     {
-        return std::visit(overloaded{[](EventConnReq& ev) { return ev.fid(); },
-                              [](EventConnected& ev) { return ev.fid(); },
-                              [](EventShutdown& ev)
+        return std::visit(overloaded{[](ConnectionRequested& ev) { return ev.fid(); },
+                              [](Connected& ev) { return ev.fid(); },
+                              [](Shutdown& ev)
                               {
                                   return ev.fid();
                               }},
             _event);
     }
-
-    ConnNotificationEntry::ConnNotificationEntry(Event ev)
-        : _event(std::move(ev))
-    {}
 
 }

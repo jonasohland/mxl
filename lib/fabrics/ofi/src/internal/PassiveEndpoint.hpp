@@ -22,12 +22,12 @@ namespace mxl::lib::fabrics::ofi
         PassiveEndpoint(PassiveEndpoint&&) noexcept;
         PassiveEndpoint& operator=(PassiveEndpoint&&);
 
-        static std::shared_ptr<PassiveEndpoint> create(std::shared_ptr<Fabric>);
+        static PassiveEndpoint create(std::shared_ptr<Fabric>);
 
         void bind(std::shared_ptr<EventQueue> eq);
 
         void listen();
-        void reject(ConnNotificationEntry& entry);
+        void reject(Event& entry);
 
         [[nodiscard]]
         std::shared_ptr<EventQueue> eventQueue() const;

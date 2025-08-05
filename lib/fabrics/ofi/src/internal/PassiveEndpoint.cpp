@@ -12,20 +12,13 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    std::shared_ptr<PassiveEndpoint> PassiveEndpoint::create(std::shared_ptr<Fabric> fabric)
+    PassiveEndpoint PassiveEndpoint::create(std::shared_ptr<Fabric> fabric)
     {
         ::fid_pep* pep;
 
-        fiCall(::fi_passive_ep, "Failed to create passive endpoint", fabric->raw(), fabric->info()->raw(), &pep, nullptr);
+        fiCall(::fi_passive_ep, "Failed to create passive endpoint", fabric->raw(), fabric->info().raw(), &pep, nullptr);
 
-        struct MakeSharedEnabler : public PassiveEndpoint
-        {
-            MakeSharedEnabler(::fid_pep* raw, std::shared_ptr<Fabric> fabric, std::optional<std::shared_ptr<EventQueue>> eq)
-                : PassiveEndpoint(raw, std::move(fabric), std::move(eq))
-            {}
-        };
-
-        return std::make_shared<MakeSharedEnabler>(pep, fabric, std::nullopt);
+        return {pep, fabric, std::nullopt};
     }
 
     PassiveEndpoint::~PassiveEndpoint()
@@ -50,6 +43,8 @@ namespace mxl::lib::fabrics::ofi
 
     PassiveEndpoint::PassiveEndpoint(PassiveEndpoint&& other) noexcept
         : _raw(other._raw)
+        , _fabric(std::move(other._fabric))
+        , _eq(std::move(other._eq))
     {
         other._raw = nullptr;
     }
@@ -62,6 +57,7 @@ namespace mxl::lib::fabrics::ofi
         other._raw = nullptr;
 
         _fabric = std::move(other._fabric);
+        _eq = std::move(other._eq);
 
         return *this;
     }
@@ -78,7 +74,7 @@ namespace mxl::lib::fabrics::ofi
         fiCall(::fi_listen, "Failed to transition the endpoint into listener mode", _raw);
     }
 
-    void PassiveEndpoint::reject(ConnNotificationEntry& entry)
+    void PassiveEndpoint::reject(Event& entry)
     {
         auto fid = entry.fid();
         if (!fid)
@@ -87,19 +83,17 @@ namespace mxl::lib::fabrics::ofi
             return;
         }
 
-        fiCall(::fi_reject, "Failed to reject connection request", _raw, *fid, nullptr, 0);
+        fiCall(::fi_reject, "Failed to reject connection request", _raw, fid, nullptr, 0);
     }
 
     std::shared_ptr<EventQueue> PassiveEndpoint::eventQueue() const
     {
+        if (!_eq)
         {
-            if (!_eq)
-            {
-                throw std::runtime_error("Event queue is not bound to the endpoint"); // Is this the right throw??
-            }
-
-            return *_eq;
+            throw std::runtime_error("No event queue bound to this endpoint"); // Is this the right throw??
         }
+
+        return *_eq;
     }
 
     ::fid_pep* PassiveEndpoint::raw() noexcept

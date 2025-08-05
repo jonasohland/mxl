@@ -21,6 +21,30 @@ namespace mxl::lib::fabrics::ofi
             return Exception(fmt::format(fmt, std::forward<T>(args)...), status);
         }
 
+        template<typename... T>
+        static Exception invalidArgument(fmt::format_string<T...> fmt, T&&... args)
+        {
+            return make(MXL_ERR_INVALID_ARG, fmt, std::forward<T>(args)...);
+        }
+
+        template<typename... T>
+        static Exception internal(fmt::format_string<T...> fmt, T&&... args)
+        {
+            return make(MXL_ERR_INTERNAL, fmt, std::forward<T>(args)...);
+        }
+
+        template<typename... T>
+        static Exception invalidState(fmt::format_string<T...> fmt, T&&... args)
+        {
+            return make(MXL_ERR_INVALID_STATE, fmt, std::forward<T>(args)...);
+        }
+
+        template<typename... T>
+        static Exception exists(fmt::format_string<T...> fmt, T&&... args)
+        {
+            return make(MXL_ERR_EXISTS, fmt, std::forward<T>(args)...);
+        }
+
         [[nodiscard]]
         mxlStatus status() const noexcept;
 

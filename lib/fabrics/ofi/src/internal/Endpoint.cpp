@@ -8,7 +8,6 @@
 #include <rdma/fi_cm.h>
 #include <rdma/fi_endpoint.h>
 #include <rdma/fi_rma.h>
-#include "internal/Logging.hpp"
 #include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
@@ -20,21 +19,21 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    std::shared_ptr<Endpoint> Endpoint::create(std::shared_ptr<Domain> domain, std::shared_ptr<FIInfo> info)
+    Endpoint Endpoint::create(std::shared_ptr<Domain> domain, FIInfoView info)
     {
         ::fid_ep* raw;
 
-        fiCall(::fi_endpoint, "Failed to create endpoint", domain->raw(), info->raw(), &raw, nullptr);
+        fiCall(::fi_endpoint, "Failed to create endpoint", domain->raw(), info.raw(), &raw, nullptr);
 
         // expose the private constructor to std::make_shared inside this function
         struct MakeSharedEnabler : public Endpoint
         {
-            MakeSharedEnabler(::fid_ep* raw, std::shared_ptr<Domain> domain, std::shared_ptr<FIInfo> info)
-                : Endpoint(raw, domain, info)
+            MakeSharedEnabler(::fid_ep* raw, std::shared_ptr<Domain> domain)
+                : Endpoint(raw, domain)
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(raw, std::move(domain), std::move(info));
+        return {raw, std::move(domain)};
     }
 
     Endpoint::~Endpoint()
@@ -42,11 +41,10 @@ namespace mxl::lib::fabrics::ofi
         close();
     }
 
-    Endpoint::Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::shared_ptr<FIInfo> info,
-        std::optional<std::shared_ptr<CompletionQueue>> cq, std::optional<std::shared_ptr<EventQueue>> eq)
+    Endpoint::Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq,
+        std::optional<std::shared_ptr<EventQueue>> eq)
         : _raw(raw)
         , _domain(std::move(domain))
-        , _info(std::move(info))
         , _cq(std::move(cq))
         , _eq(std::move(eq))
     {}
@@ -63,6 +61,8 @@ namespace mxl::lib::fabrics::ofi
     Endpoint::Endpoint(Endpoint&& other) noexcept
         : _raw(other._raw)
         , _domain(std::move(other._domain))
+        , _cq(std::move(other._cq))
+        , _eq(std::move(other._eq))
     {
         other._raw = nullptr;
     }
@@ -75,6 +75,8 @@ namespace mxl::lib::fabrics::ofi
         other._raw = nullptr;
 
         _domain = std::move(other._domain);
+        _eq = std::move(other._eq);
+        _cq = std::move(other._cq);
 
         return *this;
     }
@@ -131,14 +133,12 @@ namespace mxl::lib::fabrics::ofi
 
     std::shared_ptr<EventQueue> Endpoint::eventQueue() const
     {
+        if (!_eq)
         {
-            if (!_eq)
-            {
-                throw std::runtime_error("No event queue bound to the endpoint"); // Is this the right throw??
-            }
-
-            return *_eq;
+            throw std::runtime_error("No event queue bound to the endpoint"); // Is this the right throw??
         }
+
+        return *_eq;
     }
 
     ::fid_ep* Endpoint::raw() noexcept
@@ -171,10 +171,9 @@ namespace mxl::lib::fabrics::ofi
         fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
     }
 
-    void Endpoint::recv(LocalRegion& region)
+    void Endpoint::recv(LocalRegion region)
     {
         auto iovec = region.toIov();
         fiCall(::fi_recv, "Failed to push recv to work queue", _raw, iovec.iov_base, iovec.iov_len, nullptr, FI_ADDR_UNSPEC, nullptr);
     }
-
 }

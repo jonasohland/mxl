@@ -15,14 +15,13 @@ namespace mxl::lib::fabrics::ofi
         size_t size;
         enum fi_wait_obj wait_obj;
 
-        static CompletionQueueAttr get_default();
+        static CompletionQueueAttr defaults();
 
         [[nodiscard]]
         ::fi_cq_attr into_raw() const noexcept;
     };
 
-    class CompletionQueue
-
+    class CompletionQueue : private std::enable_shared_from_this<CompletionQueue>
     {
     public:
         ~CompletionQueue();
@@ -38,7 +37,7 @@ namespace mxl::lib::fabrics::ofi
         ::fid_cq const* raw() const noexcept;
 
         static std::shared_ptr<CompletionQueue> open(std::shared_ptr<Domain> domain,
-            CompletionQueueAttr const& attr = CompletionQueueAttr::get_default());
+            CompletionQueueAttr const& attr = CompletionQueueAttr::defaults());
 
         std::optional<CompletionEntry> tryEntry();
         std::optional<CompletionEntry> waitForEntry(std::chrono::steady_clock::duration timeout);

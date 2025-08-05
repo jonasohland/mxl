@@ -3,6 +3,7 @@
 #include <variant>
 #include <rdma/fi_eq.h>
 #include "mxl/mxl.h"
+#include "CompletionQueue.hpp" // IWYU pragma: keep
 #include "Exception.hpp"
 #include "VariantUtils.hpp"
 
@@ -29,9 +30,9 @@ namespace mxl::lib::fabrics::ofi
         return (_raw.flags & FI_RMA) && (_raw.flags & FI_WRITE);
     }
 
-    std::string CompletionQueueErrorEntry::toString(::fid_cq* cq) const
+    std::string CompletionQueueErrorEntry::toString() const
     {
-        return ::fi_cq_strerror(cq, _raw.prov_errno, _raw.err_data, nullptr, 0);
+        return ::fi_cq_strerror(_queue->raw(), _raw.prov_errno, _raw.err_data, nullptr, 0);
     }
 
     CompletionEntry::CompletionEntry(CompletionQueueDataEntry entry)

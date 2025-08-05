@@ -31,7 +31,7 @@ namespace mxl::lib::fabrics::ofi
         return &_targets.emplace_back();
     }
 
-    Initiator* FabricsInstance::createInitiator()
+    InitiatorWrapper* FabricsInstance::createInitiator()
     {
         return &_initiators.emplace_back();
     }
@@ -44,9 +44,9 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void FabricsInstance::destroyInitiator(Initiator* initiator)
+    void FabricsInstance::destroyInitiator(InitiatorWrapper* initiator)
     {
-        if (!_initiators.remove_if([&](Initiator const& lhs) { return &lhs == initiator; }))
+        if (!_initiators.remove_if([&](InitiatorWrapper const& lhs) { return &lhs == initiator; }))
         {
             throw Exception::make(MXL_ERR_INVALID_ARG, "Initiator to remove is not known to instance");
         }

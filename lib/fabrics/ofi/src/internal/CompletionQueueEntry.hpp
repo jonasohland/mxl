@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <variant>
@@ -7,6 +8,8 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+    class CompletionQueue;
+
     class CompletionQueueDataEntry final
     {
     public:
@@ -28,15 +31,17 @@ namespace mxl::lib::fabrics::ofi
     class CompletionQueueErrorEntry final
     {
     public:
-        explicit CompletionQueueErrorEntry(::fi_cq_err_entry& raw)
+        explicit CompletionQueueErrorEntry(::fi_cq_err_entry& raw, std::shared_ptr<CompletionQueue> queue)
             : _raw(raw)
+            , _queue(std::move(queue))
         {}
 
         [[nodiscard]]
-        std::string toString(::fid_cq* cq) const;
+        std::string toString() const;
 
     private:
         ::fi_cq_err_entry _raw;
+        std::shared_ptr<CompletionQueue> _queue;
     };
 
     class CompletionEntry
@@ -59,8 +64,8 @@ namespace mxl::lib::fabrics::ofi
         bool isErrEntry() const noexcept;
 
     private:
-        using CompletionEntryInner = std::variant<CompletionQueueDataEntry, CompletionQueueErrorEntry>;
+        using Inner = std::variant<CompletionQueueDataEntry, CompletionQueueErrorEntry>;
 
-        CompletionEntryInner _inner;
+        Inner _inner;
     };
 }
