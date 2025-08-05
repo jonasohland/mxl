@@ -102,7 +102,7 @@ namespace mxl::lib::fabrics::ofi
             std::vector<RegisteredRegion> regRegions;
             for (auto const& region : group.view())
             {
-                regRegions.emplace_back(MemoryRegion::reg(*_domain, region, FI_WRITE), region);
+                regRegions.emplace_back(MemoryRegion::reg(*_domain, region, FI_WRITE | FI_READ | FI_REMOTE_WRITE | FI_REMOTE_READ), region);
             }
 
             RegisteredRegionGroup regGroup{std::move(regRegions)};

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <bits/types/struct_iovec.h>
 #include <mxl/mxl.h>
 #include "mxl/flow.h"
 #include "mxl/platform.h"
@@ -51,10 +52,33 @@ extern "C"
         bool deviceSupport;
     } mxlInitiatorConfig;
 
+    typedef enum mxlMemoryRegionType_t // TODO:  this Might be redundant with PayloadLocation in flow.h
+    {
+        MXL_MEMORY_REGION_TYPE_HOST = 0,
+        MXL_MEMORY_REGION_TYPE_CUDA = 1,
+    } mxlMemoryRegionType;
+
+    typedef struct mxlMemoryRegion_t
+    {
+        uint64_t addr;
+        size_t size;
+        mxlMemoryRegionType type;
+    } mxlMemoryRegion;
+
+    // A group of memory regions that should be processed/transfered together
+    typedef struct mxlMemoryRegionGroup_t
+    {
+        mxlMemoryRegion* memoryRegions;
+        size_t count;
+    } mxlMemoryRegionGroup;
+
     typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
 
     MXL_EXPORT
     mxlStatus mxlFabricsRegionsFromFlow(mxlFlowData const in_flowData, mxlRegions* out_regions);
+
+    MXL_EXPORT
+    mxlStatus mxlFabricsRegionsFromBufferGroups(mxlMemoryRegionGroup const* in_groups, size_t in_count, mxlRegions* out_regions);
 
     MXL_EXPORT
     mxlStatus mxlFabricsRegionsFree(mxlRegions regions);

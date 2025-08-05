@@ -197,8 +197,8 @@ namespace mxl::lib::fabrics::ofi
             return {MXL_ERR_INVALID_ARG, nullptr};
         }
 
-        uint64_t caps = FI_RMA | FI_REMOTE_WRITE;
-        caps |= config.deviceSupport ? FI_HMEM : 0;
+        uint64_t caps = FI_RMA | FI_REMOTE_WRITE | FI_HMEM;
+        // caps |= config.deviceSupport ? FI_HMEM : 0;
 
         auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value(), caps);
 
@@ -230,7 +230,7 @@ namespace mxl::lib::fabrics::ofi
             std::vector<RegisteredRegion> registeredGroup;
             for (auto const& region : group.view())
             {
-                registeredGroup.emplace_back(MemoryRegion::reg(*_domain, region, FI_REMOTE_WRITE), region);
+                registeredGroup.emplace_back(MemoryRegion::reg(*_domain, region, FI_WRITE | FI_REMOTE_READ | FI_READ | FI_REMOTE_WRITE), region);
             }
             _regRegions.emplace_back(registeredGroup);
         }

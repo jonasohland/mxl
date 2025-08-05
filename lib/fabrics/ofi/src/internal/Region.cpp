@@ -1,14 +1,25 @@
 #include "Region.hpp"
 #include <cstdint>
 #include <algorithm>
+#include <utility>
 #include <bits/types/struct_iovec.h>
 #include "internal/DiscreteFlowData.hpp"
 #include "internal/Flow.hpp"
+#include "mxl/fabrics.h"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
+
+    Region::RegionType Region::fromAPI(mxlMemoryRegionType api) noexcept
+    {
+        switch (api)
+        {
+            case MXL_MEMORY_REGION_TYPE_HOST: return Region::RegionType::Host;
+            case MXL_MEMORY_REGION_TYPE_CUDA: return Region::RegionType::Cuda;
+        }
+    }
 
     ::iovec const* Region::as_iovec() const noexcept
     {
@@ -76,6 +87,24 @@ namespace mxl::lib::fabrics::ofi
         }
 
         return RegionGroups{std::move(regionGroups)};
+    }
+
+    RegionGroups RegionGroups::fromGroups(mxlMemoryRegionGroup const* groups, size_t count)
+    {
+        std::vector<RegionGroup> outGroups;
+        for (size_t i = 0; i < count; i++)
+        {
+            std::vector<Region> outRegions;
+            auto group = groups[i];
+            for (size_t j = 0; j < group.count; j++)
+            {
+                auto memoryRegion = outRegions.emplace_back(
+                    group.memoryRegions[j].addr, group.memoryRegions[j].size, Region::fromAPI(group.memoryRegions[j].type));
+            }
+            outGroups.emplace_back(std::move(outRegions));
+        }
+
+        return RegionGroups{std::move(outGroups)};
     }
 
     RegionGroups* RegionGroups::fromAPI(mxlRegions regions) noexcept

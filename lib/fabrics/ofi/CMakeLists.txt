@@ -3,8 +3,6 @@ include(GNUInstallDirs)
 find_package(PkgConfig)
 find_package(reflectcpp CONFIG REQUIRED)
 
-
-
 pkg_check_modules(libfabric REQUIRED IMPORTED_TARGET libfabric)
 
 add_library(mxl-fabrics SHARED)

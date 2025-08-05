@@ -4,6 +4,8 @@
 #include <memory>
 #include <random>
 #include <bits/types/struct_iovec.h>
+#include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
 #include <sys/mman.h>
@@ -15,6 +17,24 @@
 namespace mxl::lib::fabrics::ofi
 {
 
+    ::fi_hmem_iface hmemIfaceFromRegionType(Region::RegionType const& regionType)
+    {
+        switch (regionType)
+        {
+            case Region::RegionType::Host: return FI_HMEM_SYSTEM;
+            case Region::RegionType::Cuda: return FI_HMEM_CUDA;
+        }
+    }
+
+    uint64_t getFlags(Region::RegionType const& regionType)
+    {
+        switch (regionType)
+        {
+            case Region::RegionType::Host: return 0;
+            case Region::RegionType::Cuda: return FI_HMEM_DEVICE_ONLY;
+        }
+    }
+
     std::shared_ptr<MemoryRegion> MemoryRegion::reg(std::shared_ptr<Domain> domain, Region const& region, uint64_t access)
     {
         ::fid_mr* raw;
@@ -22,7 +42,10 @@ namespace mxl::lib::fabrics::ofi
         std::mt19937_64 gen(rd());
         std::uniform_int_distribution<uint64_t> dist(0, UINT64_MAX);
 
-        MXL_DEBUG("Registering memory region with address 0x{:p} and size {}", region.base, region.size);
+        MXL_INFO("Registering memory region with address 0x{:x} and size {} type {}",
+            region.base,
+            region.size,
+            region.type == Region::RegionType::Host ? "host" : "cuda");
 
         ::fi_mr_attr attr{};
         attr.mr_iov = region.as_iovec();
@@ -33,18 +56,14 @@ namespace mxl::lib::fabrics::ofi
         attr.context = nullptr;         // not used
         attr.auth_key_size = 0;
         attr.auth_key = nullptr;
-        attr.iface = FI_HMEM_SYSTEM;
+        attr.iface = hmemIfaceFromRegionType(region.type);
+        attr.device.cuda = 0;   // TODO: make it so we can select a device, for now select device id 0
         attr.hmem_data = nullptr;
         attr.page_size = 4096;  // not used'
         attr.base_mr = nullptr; // not used
         attr.sub_mr_cnt = 0;    // not used
 
-        fiCall(fi_mr_regattr,
-            "Failed to register memory region",
-            domain->raw(),
-            &attr,
-            0, // flags: this will need to be modified when we will add HMEM support
-            &raw);
+        fiCall(fi_mr_regattr, "Failed to register memory region", domain->raw(), &attr, getFlags(region.type), &raw);
 
         struct MakeSharedEnabler : public MemoryRegion
         {

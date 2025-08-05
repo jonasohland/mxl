@@ -3,7 +3,11 @@
 #include <cstdlib>
 #include <string>
 #include <uuid.h>
+#include <bits/types/struct_iovec.h>
 #include <CLI/CLI.hpp>
+#include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
+#include <driver_types.h>
 #include <mxl/fabrics.h>
 #include <mxl/flow.h>
 #include <mxl/mxl.h>
@@ -33,6 +37,7 @@ struct Config
     std::string const& node;
     std::string const& service;
     mxlFabricsProvider provider;
+    bool useCuda;
 };
 
 void signal_handler(int)
@@ -43,6 +48,29 @@ void signal_handler(int)
 
 static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, mxlTargetInfo_t* targetInfo);
 static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, std::string const& flowConfigFile);
+
+static void createDummyCudaBuffers(std::vector<mxlMemoryRegionGroup>& deviceGroups)
+{
+    // creating dummy cuda buffers for testing purpose
+    for (size_t i = 0; i < 2; i++) // for grain
+    {
+        auto deviceRegions = static_cast<mxlMemoryRegion*>(std::malloc(1 * sizeof(mxlMemoryRegion)));
+
+        void* deviceBuf;
+        if (cudaMalloc(&deviceBuf, 64 * 1024) != cudaSuccess)
+        {
+            MXL_ERROR("failed to allocate cuda memory");
+        }
+
+        MXL_INFO("cudaMalloc success addr=0x{:p}", deviceBuf);
+
+        deviceRegions[0].addr = reinterpret_cast<std::uintptr_t>(deviceBuf);
+        deviceRegions[0].size = 64 * 1024;
+        deviceRegions[0].type = MXL_MEMORY_REGION_TYPE_CUDA;
+
+        deviceGroups.emplace_back(mxlMemoryRegionGroup{.memoryRegions = deviceRegions, .count = 1});
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -92,6 +120,11 @@ int main(int argc, char** argv)
         "The target information. This is used when configured as an initiator . This is the target information to send to."
         "You first start the target and it will print the targetInfo that you paste to this argument");
 
+    bool useCuda;
+    auto useCudaOpt = app.add_flag(
+        "--use-cuda", useCuda, "Use cuda memory (temporary for testing until the Flow API supports GPU memory representation");
+    useCudaOpt->default_val(false);
+
     CLI11_PARSE(app, argc, argv);
 
     mxlFabricsProvider mxlProvider;
@@ -107,6 +140,7 @@ int main(int argc, char** argv)
         .node = node,
         .service = service,
         .provider = mxlProvider,
+        .useCuda = useCuda,
     };
 
     int exit_status = EXIT_SUCCESS;
@@ -178,27 +212,54 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
         return status;
     }
 
-    mxlFlowData flowData;
-    status = mxlFlowReaderGetFlowData(reader, &flowData);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to get flow data with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
     mxlRegions regions;
-    status = mxlFabricsRegionsFromFlow(flowData, &regions);
-    if (status != MXL_STATUS_OK)
+    if (config.useCuda)
     {
-        MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
-        return status;
-    }
+        int currentDevice;
 
+        if (cudaSetDevice(0) != cudaSuccess)
+        {
+            MXL_INFO("Failed to set CUDA device");
+        }
+
+        if (auto ret = cudaGetDevice(&currentDevice); ret != cudaSuccess)
+        {
+            MXL_ERROR("failed to get device! {}", (int)ret);
+            return MXL_ERR_UNKNOWN;
+        }
+        MXL_INFO("Current CUDA device {}", currentDevice);
+
+        std::vector<mxlMemoryRegionGroup> deviceGroups;
+        createDummyCudaBuffers(deviceGroups);
+
+        status = mxlFabricsRegionsFromBufferGroups(deviceGroups.data(), deviceGroups.size(), &regions);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get regions from buffer group swith status '{}'", static_cast<int>(status));
+        }
+    }
+    else
+    {
+        mxlFlowData flowData;
+        status = mxlFlowReaderGetFlowData(reader, &flowData);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get flow data with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        status = mxlFabricsRegionsFromFlow(flowData, &regions);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
+            return status;
+        }
+    }
     mxlInitiatorConfig initiatorConfig = {
         .endpointAddress = {.node = config.node.c_str(), .service = config.service.c_str()},
         .provider = config.provider,
         .regions = regions,
-        .deviceSupport = true,
+        .deviceSupport = config.useCuda,
     };
 
     status = mxlFabricsInitiatorSetup(initiator, &initiatorConfig);
@@ -307,20 +368,48 @@ static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInsta
         MXL_ERROR("Failed to create flow writer with status '{}'", static_cast<int>(status));
     }
 
-    mxlFlowData flowData;
-    status = mxlFlowWriterGetFlowData(writer, &flowData);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to get flow data with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
     mxlRegions regions;
-    status = mxlFabricsRegionsFromFlow(flowData, &regions);
-    if (status != MXL_STATUS_OK)
+    if (config.useCuda)
     {
-        MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
-        return status;
+        int currentDevice;
+
+        if (cudaSetDevice(0) != cudaSuccess)
+        {
+            MXL_INFO("Failed to set CUDA device");
+        }
+
+        if (auto ret = cudaGetDevice(&currentDevice); ret != cudaSuccess)
+        {
+            MXL_ERROR("failed to get device! {}", (int)ret);
+            return MXL_ERR_UNKNOWN;
+        }
+        MXL_INFO("Current CUDA device {}", currentDevice);
+
+        std::vector<mxlMemoryRegionGroup> deviceGroups;
+        createDummyCudaBuffers(deviceGroups);
+
+        status = mxlFabricsRegionsFromBufferGroups(deviceGroups.data(), deviceGroups.size(), &regions);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get regions from buffer group swith status '{}'", static_cast<int>(status));
+        }
+    }
+    else
+    {
+        mxlFlowData flowData;
+        status = mxlFlowWriterGetFlowData(writer, &flowData);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get flow data with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        status = mxlFabricsRegionsFromFlow(flowData, &regions);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
+            return status;
+        }
     }
 
     // create and setup the fabrics target
@@ -331,7 +420,7 @@ static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInsta
         .endpointAddress = {.node = config.node.c_str(), .service = config.service.c_str()},
         .provider = config.provider,
         .regions = regions,
-        .deviceSupport = true,
+        .deviceSupport = config.useCuda,
     };
 
     status = mxlFabricsCreateTarget(fabricsInstance, &target);

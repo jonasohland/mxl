@@ -12,9 +12,24 @@ namespace mxl::lib::fabrics::ofi
     class Region
     {
     public:
-        explicit Region(std::uintptr_t base, size_t size)
+        enum class RegionType
+        {
+            Host,
+            Cuda,
+        };
+        static RegionType fromAPI(mxlMemoryRegionType api) noexcept;
+
+        explicit Region(void* base, size_t size, RegionType type = Region::RegionType::Host)
+            : base(reinterpret_cast<std::uintptr_t>(base))
+            , size(size)
+            , type(type)
+            , _iovec(iovecFromRegion(reinterpret_cast<std::uintptr_t>(base), size))
+        {}
+
+        explicit Region(std::uintptr_t base, size_t size, RegionType type = Region::RegionType::Host)
             : base(base)
             , size(size)
+            , type(type)
             , _iovec(iovecFromRegion(base, size))
         {}
 
@@ -22,6 +37,7 @@ namespace mxl::lib::fabrics::ofi
 
         std::uintptr_t base;
         size_t size;
+        RegionType type;
 
         [[nodiscard]]
         ::iovec const* as_iovec() const noexcept;
@@ -64,6 +80,7 @@ namespace mxl::lib::fabrics::ofi
     {
     public:
         static RegionGroups fromFlow(FlowData* flow);
+        static RegionGroups fromGroups(mxlMemoryRegionGroup const* groups, size_t count);
 
         static RegionGroups* fromAPI(mxlRegions) noexcept;
         [[nodiscard]]
