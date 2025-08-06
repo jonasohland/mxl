@@ -1,5 +1,6 @@
 #include "RCInitiator.hpp"
 #include <chrono>
+#include <algorithm>
 #include <rfl/json/write.hpp>
 #include "internal/Logging.hpp"
 #include "Exception.hpp"
@@ -24,12 +25,13 @@ namespace mxl::lib::fabrics::ofi
         return std::holds_alternative<Done>(_state);
     }
 
-    bool RCInitiatorTarget::activate(std::shared_ptr<CompletionQueue> const& cq, std::shared_ptr<EventQueue> const& eq)
+    void RCInitiatorTarget::activate(std::shared_ptr<CompletionQueue> const& cq, std::shared_ptr<EventQueue> const& eq)
     {
         _state = std::visit(
             overloaded{
                 [&](Idle state) -> State
                 {
+                    // If the target is in the idle state for more than 5 seconds, it will be restarted.
                     auto idleDuration = std::chrono::steady_clock::now() - state.idleSince;
                     if (idleDuration < std::chrono::seconds(5))
                     {
@@ -39,10 +41,12 @@ namespace mxl::lib::fabrics::ofi
                     MXL_INFO("Endpoint has been idle for {}ms, activating",
                         std::chrono::duration_cast<std::chrono::milliseconds>(idleDuration).count());
 
+                    // The endpoint in an idle target is always fresh and thus needs to be bound the the queues.
                     state.ep.bind(eq);
                     state.ep.bind(cq, FI_TRANSMIT);
-                    state.ep.connect(_addr);
 
+                    // Transition into the connecting state
+                    state.ep.connect(_addr);
                     return Connecting{.ep = std::move(state.ep)};
                 },
                 [](Connecting state) -> State { return state; },
@@ -51,15 +55,13 @@ namespace mxl::lib::fabrics::ofi
                 [](Done state) -> State { return state; },
             },
             std::move(_state));
-
-        return hasPendingWork();
     }
 
-    bool RCInitiatorTarget::consume(Event ev)
+    void RCInitiatorTarget::consume(Event ev)
     {
         _state = std::visit(
             overloaded{
-                [](Idle state) -> State { return state; },
+                [](Idle state) -> State { return state; }, // Nothing to do when idle.
                 [&](Connecting state) -> State
                 {
                     if (ev.isError())
@@ -93,7 +95,6 @@ namespace mxl::lib::fabrics::ofi
                     if (ev.isError())
                     {
                         MXL_WARN("Received an error event in connected state, going idle. Error: {}", ev.errorString());
-
                         return Idle{
                             .ep = Endpoint::create(state.ep.domain(), state.ep.id(), state.ep.info()), .idleSince = std::chrono::steady_clock::now()};
                     }
@@ -111,11 +112,9 @@ namespace mxl::lib::fabrics::ofi
                 [](Done state) -> State { return state; },
             },
             std::move(_state));
-
-        return hasPendingWork();
     }
 
-    bool RCInitiatorTarget::consume(Completion completion)
+    void RCInitiatorTarget::consume(Completion completion)
     {
         if (auto error = completion.tryErr(); error)
         {
@@ -125,16 +124,17 @@ namespace mxl::lib::fabrics::ofi
         {
             handleCompletionData(*data);
         }
-
-        return hasPendingWork();
     }
 
     void RCInitiatorTarget::postTransfer(LocalRegionGroup const& local, uint64_t index)
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
+            // Find the remote region to which this grain should be written.
             auto const& remote = _regions[index % _regions.size()];
 
+            // Post a write work item to the endpoint and increment the pending counter. When the write is complete, a completion will be posted to
+            // the completion queue, after which the counter will be decremented again if the target is still in the connected state.
             connected->ep.write(local, remote, FI_ADDR_UNSPEC, index);
             ++connected->pending;
         }
@@ -187,12 +187,13 @@ namespace mxl::lib::fabrics::ofi
     {
         return std::visit(
             overloaded{
-                [](std::monostate) { return false; },
-                [](Idle const&) { return false; },
-                [](Connecting const&) { return true; },
-                [](Connected const& state) { return state.pending > 0; },
-                [](Shutdown const&) { return true; },
-                [](Done const&) { return false; },
+                [](std::monostate) { return false; },   // Something went wrong with this target, but there is probably no work to do.
+                [](Idle const&) { return false; },      // An idle target means there is no work to do right now.
+                [](Connecting const&) { return true; }, // In the connecting state, the target is waiting for a connected event.
+                [](Connected const& state)
+                { return state.pending > 0; }, // While connected, a target has pending work when there are transfers that have not yet completed.
+                [](Shutdown const&) { return true; }, // In the shutdown state, the target is waiting for a FI_SHUTDOWN event.
+                [](Done const&) { return false; },    // In the done state, there is no pending work.
             },
             _state);
     }
@@ -259,9 +260,8 @@ namespace mxl::lib::fabrics::ofi
 
     void RCInitiator::addTarget(TargetInfo const& targetInfo)
     {
-        auto endpoint = Endpoint::create(_domain, targetInfo.identifier);
-
-        _targets.emplace(endpoint.id(), RCInitiatorTarget{std::move(endpoint), targetInfo.fabricAddress, targetInfo.remoteRegionGroups});
+        _targets.emplace(targetInfo.id,
+            RCInitiatorTarget{Endpoint::create(_domain, targetInfo.id), targetInfo.fabricAddress, targetInfo.remoteRegionGroups});
     }
 
     void RCInitiator::removeTarget(TargetInfo const& targetInfo)
@@ -269,26 +269,88 @@ namespace mxl::lib::fabrics::ofi
 
     void RCInitiator::transferGrain(uint64_t index)
     {
+        // Find the local region in which the grain with this index is stored.
         auto& localRegion = _localRegions[index % _localRegions.size()];
+
+        // Post a transfer work item to all targets. If the target is not in a connected state
+        // this is a no-op.
         for (auto& [_, target] : _targets)
         {
             target.postTransfer(localRegion, index);
         }
     }
 
-    bool RCInitiator::pollCQ()
+    bool RCInitiator::hasPendingWork() const noexcept
     {
-        bool pending = false;
+        // Check if any of the targets have pending work.
+        for (auto& [_, target] : _targets)
+        {
+            if (target.hasPendingWork())
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void RCInitiator::activateIdlePeers()
+    {
+        // Call the activate function on all endpoints. This is a no-op when the endpoint is not idle
+        // and there is probably not that many of them.
+        for (auto& [_, target] : _targets)
+        {
+            target.activate(_cq, _eq);
+        }
+    }
+
+    void RCInitiator::evictDeadPeers()
+    {
+        std::erase_if(_targets, [](auto const& item) { return item.second.canEvict(); });
+    }
+
+    void RCInitiator::blockOnCQ(std::chrono::system_clock::duration timeout)
+    {
+        // A zero timeout would cause the queue to block indefinetly, which
+        // is not our documented behaviour.
+        if (timeout == std::chrono::milliseconds::zero())
+        {
+            // So just behave exactly like the non-blocking variant.
+            makeProgress();
+            return;
+        }
 
         for (;;)
         {
-            auto completion = _cq->tryEntry();
+            auto completion = _cq->readBlocking(timeout);
+            if (!completion)
+            {
+                return;
+            }
+
+            // Find the endpoint that this completion was generated from
+            auto ep = _targets.find(Endpoint::idFromFID(completion->fid()));
+            if (ep == _targets.end())
+            {
+                MXL_WARN("Received completion for an unknown endpoint");
+            }
+
+            return ep->second.consume(*completion);
+        }
+    }
+
+    void RCInitiator::pollCQ()
+    {
+        for (;;)
+        {
+            auto completion = _cq->read();
             if (!completion)
             {
                 break;
             }
 
-            auto ep = _targets.find(Endpoint::idFromFID(completion->endpoint()));
+            // Find the endpoint this completion was generated from.
+            auto ep = _targets.find(Endpoint::idFromFID(completion->fid()));
             if (ep == _targets.end())
             {
                 MXL_WARN("Received completion for an unknown endpoint");
@@ -296,16 +358,12 @@ namespace mxl::lib::fabrics::ofi
                 continue;
             }
 
-            pending = ep->second.consume(*completion) || pending;
+            ep->second.consume(*completion);
         }
-
-        return pending;
     }
 
-    bool RCInitiator::pollEQ()
+    void RCInitiator::pollEQ()
     {
-        bool pending = false;
-
         for (;;)
         {
             auto event = _eq->readEntry();
@@ -314,6 +372,7 @@ namespace mxl::lib::fabrics::ofi
                 break;
             }
 
+            // Find the endpoint this event was generated from.
             auto ep = _targets.find(Endpoint::idFromFID(event->fid()));
             if (ep == _targets.end())
             {
@@ -322,42 +381,61 @@ namespace mxl::lib::fabrics::ofi
                 continue;
             }
 
-            pending = ep->second.consume(*event) || pending;
+            ep->second.consume(*event);
         }
-
-        return pending;
-    }
-
-    bool RCInitiator::activateIdlePeers()
-    {
-        bool pending = false;
-
-        for (auto& [_, target] : _targets)
-        {
-            pending = target.activate(_cq, _eq) || pending;
-        }
-
-        return pending;
-    }
-
-    void RCInitiator::evictDeadPeers()
-    {
-        std::erase_if(_targets, [](auto const& item) { return item.second.canEvict(); });
     }
 
     bool RCInitiator::makeProgress()
     {
-        auto pending = activateIdlePeers();
-        pending = pollCQ() || pending;
-        pending = pollEQ() || pending;
+        // Activate any peers that might be idle and waiting for activation.
+        activateIdlePeers();
 
+        // Poll the completion and event queue once and process pending events.
+        pollCQ();
+        pollEQ();
+
+        // Evict any peers that are dead and no longer will make progress.
         evictDeadPeers();
 
-        return pending;
+        return hasPendingWork();
     }
 
-    bool RCInitiator::makeProgressBlocking(std::chrono::steady_clock::duration)
+    bool RCInitiator::makeProgressBlocking(std::chrono::steady_clock::duration timeout)
     {
-        throw Exception::internal("blocking progress not implemented");
+        // If the timeout is less than our maintainance interval. Just check all the queues once, execute all maintainance tasks once
+        // and block on the completion queue for the rest of the time.
+        if (timeout < EQPollInterval)
+        {
+            makeProgress();
+            blockOnCQ(timeout);
+            return hasPendingWork();
+        }
+
+        auto deadline = std::chrono::steady_clock::now() + timeout;
+
+        for (;;)
+        {
+            // If there is nothing more to do, return control to the caller.
+            if (!hasPendingWork())
+            {
+                return false;
+            }
+
+            // Poll all queues, execute all maintainance actions
+            makeProgress();
+
+            // Calculate the remaining time until the user wants the blocking function to return. If there is no time left
+            // (millisecond precision) return right away.
+            auto timeUntilDeadline = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+            if (timeUntilDeadline <= decltype(timeUntilDeadline){0})
+            {
+                return hasPendingWork();
+            }
+
+            // Block on the completion queue until a completion arrives, or the interval timeout occurrs.
+            blockOnCQ(std::min(EQPollInterval, timeUntilDeadline));
+        }
+
+        return hasPendingWork();
     }
 }

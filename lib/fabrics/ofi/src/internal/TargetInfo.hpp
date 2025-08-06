@@ -17,10 +17,10 @@ namespace mxl::lib::fabrics::ofi
     {
         TargetInfo() = default;
 
-        TargetInfo(FabricAddress fabricAddress, std::vector<RemoteRegionGroup> regions, uuids::uuid identifier = uuids::uuid_system_generator{}())
+        TargetInfo(FabricAddress fabricAddress, std::vector<RemoteRegionGroup> regions, uuids::uuid id = uuids::uuid_system_generator{}())
             : fabricAddress(std::move(fabricAddress))
             , remoteRegionGroups(std::move(regions))
-            , identifier(identifier)
+            , id(id)
         {}
 
         static TargetInfo* fromAPI(mxlTargetInfo api) noexcept;
@@ -30,7 +30,7 @@ namespace mxl::lib::fabrics::ofi
 
         FabricAddress fabricAddress;
         std::vector<RemoteRegionGroup> remoteRegionGroups;
-        uuids::uuid identifier;
+        uuids::uuid id;
     };
 
     // namespace rlf_types
@@ -49,9 +49,8 @@ namespace mxl::lib::fabrics::ofi
                 rflRegions.value().emplace_back(reg);
             }
 
-            return TargetInfoRfl{.fabricAddress = FabricAddressRfl::from_class(ti.fabricAddress),
-                .regions = rflRegions,
-                .identifier = uuids::to_string(ti.identifier)};
+            return TargetInfoRfl{
+                .fabricAddress = FabricAddressRfl::from_class(ti.fabricAddress), .regions = rflRegions, .identifier = uuids::to_string(ti.id)};
         }
 
         [[nodiscard]]

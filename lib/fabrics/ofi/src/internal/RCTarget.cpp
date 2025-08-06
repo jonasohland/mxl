@@ -221,7 +221,7 @@ namespace mxl::lib::fabrics::ofi
                 },
                 [&](Connected state) -> State
                 {
-                    if (auto entry = state.ep.completionQueue()->waitForEntry(timeout); entry)
+                    if (auto entry = state.ep.completionQueue()->readBlocking(timeout); entry)
                     {
                         if (auto dataEntry = entry.value().tryData(); dataEntry)
                         {
