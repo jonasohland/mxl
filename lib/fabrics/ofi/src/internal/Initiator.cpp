@@ -54,4 +54,25 @@ namespace mxl::lib::fabrics::ofi
 
         _inner->transferGrain(grainIndex);
     }
+
+    bool InitiatorWrapper::makeProgress()
+    {
+        if (!_inner)
+        {
+            throw Exception::invalidState("Initiator is not set up");
+        }
+
+        return _inner->makeProgress();
+    }
+
+    bool InitiatorWrapper::makeProgressBlocking(std::chrono::steady_clock::duration timeout)
+    {
+        if (!_inner)
+        {
+            throw Exception::invalidState("Initiator is not set up");
+        }
+
+        return _inner->makeProgressBlocking(timeout);
+    }
+
 }

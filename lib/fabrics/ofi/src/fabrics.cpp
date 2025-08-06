@@ -359,7 +359,7 @@ namespace
         MXL_FABRICS_UNUSED(in_target);
         MXL_FABRICS_UNUSED(callbackFn);
 
-        return MXL_STATUS_OK;
+        return MXL_ERR_INTERNAL;
     }
 
     extern "C" MXL_EXPORT
@@ -557,6 +557,76 @@ namespace
         catch (...)
         {
             MXL_ERROR("Failed to remove target from initiator");
+            return MXL_ERR_UNKNOWN;
+        }
+    }
+
+    extern "C" MXL_EXPORT
+    mxlStatus mxlFabricsInitiatorMakeProgressNonBlocking(mxlFabricsInitiator in_initiator)
+    {
+        if (in_initiator == nullptr)
+        {
+            return MXL_ERR_INVALID_ARG;
+        }
+
+        try
+        {
+            if (ofi::InitiatorWrapper::fromAPI(in_initiator)->makeProgress())
+            {
+                return MXL_ERR_NOT_READY;
+            }
+
+            return MXL_STATUS_OK;
+        }
+        catch (ofi::Exception& e)
+        {
+            MXL_ERROR("Failed to make progress : {}", e.what());
+
+            return e.status();
+        }
+        catch (std::exception& e)
+        {
+            MXL_ERROR("Failed to make progress : {}", e.what());
+            return MXL_ERR_UNKNOWN;
+        }
+        catch (...)
+        {
+            MXL_ERROR("Failed to make progress in the initiator");
+            return MXL_ERR_UNKNOWN;
+        }
+    }
+
+    extern "C" MXL_EXPORT
+    mxlStatus mxlFabricsInitiatorMakeProgressBlocking(mxlFabricsInitiator in_initiator, uint16_t in_timeoutMs)
+    {
+        if (in_initiator == nullptr)
+        {
+            return MXL_ERR_INVALID_ARG;
+        }
+
+        try
+        {
+            if (ofi::InitiatorWrapper::fromAPI(in_initiator)->makeProgressBlocking(std::chrono::milliseconds(in_timeoutMs)))
+            {
+                return MXL_ERR_NOT_READY;
+            }
+
+            return MXL_STATUS_OK;
+        }
+        catch (ofi::Exception& e)
+        {
+            MXL_ERROR("Failed to make progress : {}", e.what());
+
+            return e.status();
+        }
+        catch (std::exception& e)
+        {
+            MXL_ERROR("Failed to make progress : {}", e.what());
+            return MXL_ERR_UNKNOWN;
+        }
+        catch (...)
+        {
+            MXL_ERROR("Failed to make progress in the initiator");
             return MXL_ERR_UNKNOWN;
         }
     }

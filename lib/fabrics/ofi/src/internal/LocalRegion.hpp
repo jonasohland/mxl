@@ -36,7 +36,7 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         size_t count() const noexcept;
 
-        void** desc() noexcept;
+        void* const* desc() const noexcept;
 
     private:
         static std::vector<::iovec> iovFromGroup(std::vector<LocalRegion> group) noexcept;

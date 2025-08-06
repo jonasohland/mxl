@@ -3,11 +3,13 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <uuid.h>
 #include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_endpoint.h>
 #include <rdma/fi_rma.h>
+#include "internal/Logging.hpp"
 #include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
@@ -19,21 +21,54 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+    Endpoint Endpoint::create(std::shared_ptr<Domain> domain)
+    {
+        return Endpoint::create(std::move(domain), uuids::uuid_system_generator{}());
+    }
+
     Endpoint Endpoint::create(std::shared_ptr<Domain> domain, FIInfoView info)
+    {
+        return Endpoint::create(std::move(domain), uuids::uuid_system_generator{}(), info);
+    }
+
+    Endpoint Endpoint::create(std::shared_ptr<Domain> domain, uuids::uuid epid, FIInfoView info)
     {
         ::fid_ep* raw;
 
-        fiCall(::fi_endpoint, "Failed to create endpoint", domain->raw(), info.raw(), &raw, nullptr);
+        auto uuidMem = std::make_unique<uuids::uuid>(epid);
+        fiCall(::fi_endpoint, "Failed to create endpoint", domain->raw(), info.raw(), &raw, uuidMem.get());
+
+        uuidMem.release();
 
         // expose the private constructor to std::make_shared inside this function
         struct MakeSharedEnabler : public Endpoint
         {
-            MakeSharedEnabler(::fid_ep* raw, std::shared_ptr<Domain> domain)
-                : Endpoint(raw, domain)
+            MakeSharedEnabler(::fid_ep* raw, FIInfoView info, std::shared_ptr<Domain> domain)
+                : Endpoint(raw, info, domain)
             {}
         };
 
-        return {raw, std::move(domain)};
+        return {raw, info, std::move(domain)};
+    }
+
+    Endpoint Endpoint::create(std::shared_ptr<Domain> domain, uuids::uuid epid)
+    {
+        return Endpoint::create(domain, epid, domain->fabric()->info());
+    }
+
+    uuids::uuid Endpoint::idFromFID(::fid_t fid) noexcept
+    {
+        return *reinterpret_cast<uuids::uuid*>(fid->context);
+    }
+
+    uuids::uuid Endpoint::idFromFID(::fid_ep* fid) noexcept
+    {
+        return Endpoint::idFromFID(&fid->fid);
+    }
+
+    uuids::uuid Endpoint::id() const noexcept
+    {
+        return Endpoint::idFromFID(&_raw->fid);
     }
 
     Endpoint::~Endpoint()
@@ -41,25 +76,35 @@ namespace mxl::lib::fabrics::ofi
         close();
     }
 
-    Endpoint::Endpoint(::fid_ep* raw, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq,
+    Endpoint::Endpoint(::fid_ep* raw, FIInfoView info, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq,
         std::optional<std::shared_ptr<EventQueue>> eq)
         : _raw(raw)
+        , _info(info.owned())
         , _domain(std::move(domain))
         , _cq(std::move(cq))
         , _eq(std::move(eq))
-    {}
+    {
+        MXL_INFO("Endpoint {} created", uuids::to_string(Endpoint::idFromFID(raw)));
+    }
 
     void Endpoint::close()
     {
         if (_raw)
         {
+            auto idp = reinterpret_cast<uuids::uuid*>(_raw->fid.context);
+            auto id = *idp;
+            delete idp;
             fiCall(::fi_close, "Failed to close endpoint", &_raw->fid);
+
+            MXL_INFO("Endoint {} closed", uuids::to_string(id));
+
             _raw = nullptr;
         }
     }
 
     Endpoint::Endpoint(Endpoint&& other) noexcept
         : _raw(other._raw)
+        , _info(std::move(other._info))
         , _domain(std::move(other._domain))
         , _cq(std::move(other._cq))
         , _eq(std::move(other._eq))
@@ -74,6 +119,7 @@ namespace mxl::lib::fabrics::ofi
         _raw = other._raw;
         other._raw = nullptr;
 
+        _info = std::move(other._info);
         _domain = std::move(other._domain);
         _eq = std::move(other._eq);
         _cq = std::move(other._cq);
@@ -141,6 +187,16 @@ namespace mxl::lib::fabrics::ofi
         return *_eq;
     }
 
+    std::shared_ptr<Domain> Endpoint::domain() const
+    {
+        return _domain;
+    }
+
+    FIInfoView Endpoint::info() const noexcept
+    {
+        return _info.view();
+    }
+
     ::fid_ep* Endpoint::raw() noexcept
     {
         return _raw;
@@ -151,7 +207,8 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
-    void Endpoint::write(LocalRegionGroup& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr, std::optional<uint64_t> immData)
+    void Endpoint::write(LocalRegionGroup const& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr,
+        std::optional<uint64_t> immData)
     {
         uint64_t data = immData.value_or(0);
         uint64_t flags = FI_TRANSMIT_COMPLETE | FI_COMMIT_COMPLETE;
@@ -159,12 +216,12 @@ namespace mxl::lib::fabrics::ofi
 
         ::fi_msg_rma msg = {
             .msg_iov = localGroup.iovec(),
-            .desc = localGroup.desc(),
+            .desc = const_cast<void**>(localGroup.desc()),
             .iov_count = localGroup.count(),
             .addr = destAddr,
             .rma_iov = remoteGroup.rmaIovs(),
             .rma_iov_count = remoteGroup.count(),
-            .context = nullptr,
+            .context = _raw,
             .data = data,
         };
 
@@ -173,6 +230,7 @@ namespace mxl::lib::fabrics::ofi
 
     void Endpoint::recv(LocalRegion region)
     {
+        // TODO: this should use fi_recvmsg and fi_msg so we can also pass the local endpoint in the context
         auto iovec = region.toIov();
         fiCall(::fi_recv, "Failed to push recv to work queue", _raw, iovec.iov_base, iovec.iov_len, nullptr, FI_ADDR_UNSPEC, nullptr);
     }

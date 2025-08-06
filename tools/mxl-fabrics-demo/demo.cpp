@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string>
+#include <thread>
 #include <uuid.h>
 #include <CLI/CLI.hpp>
 #include <mxl/fabrics.h>
@@ -214,6 +215,13 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
         return status;
     }
 
+    do
+    {
+        status = mxlFabricsInitiatorMakeProgressNonBlocking(initiator);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    while (status == MXL_ERR_NOT_READY);
+
     // Extract the FlowInfo structure.
     FlowInfo flow_info;
     status = mxlFlowReaderGetInfo(reader, &flow_info);
@@ -263,6 +271,13 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
             MXL_ERROR("Failed to transfer grain with status '{}'", static_cast<int>(ret));
             return status;
         }
+
+        do
+        {
+            status = mxlFabricsInitiatorMakeProgressNonBlocking(initiator);
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        while (status == MXL_ERR_NOT_READY);
 
         if (grainInfo.commitedSize != grainInfo.grainSize)
         {

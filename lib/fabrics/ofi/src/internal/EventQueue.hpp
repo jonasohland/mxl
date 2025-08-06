@@ -4,14 +4,13 @@
 #include <memory>
 #include <rdma/fabric.h>
 #include <rdma/fi_eq.h>
-#include "EventQueueEntry.hpp"
+#include "Event.hpp"
 #include "Fabric.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
 
     struct EventQueueAttr final
-
     {
         size_t size;
 
@@ -21,7 +20,7 @@ namespace mxl::lib::fabrics::ofi
         ::fi_eq_attr into_raw() const noexcept;
     };
 
-    class EventQueue
+    class EventQueue : public std::enable_shared_from_this<EventQueue>
     {
     public:
         ~EventQueue();
@@ -42,11 +41,10 @@ namespace mxl::lib::fabrics::ofi
         std::optional<Event> readEntryBlocking(std::chrono::steady_clock::duration timeout);
 
     private:
+        EventQueue(::fid_eq* raw, std::shared_ptr<Fabric> fabric);
         void close();
 
-        EventQueue(::fid_eq* raw, std::shared_ptr<Fabric> fabric);
-
-        std::optional<Event> handleReadResult(ssize_t, uint32_t, ::fi_eq_cm_entry*);
+        std::optional<Event> handleReadResult(ssize_t, uint32_t, ::fi_eq_entry const&);
 
         ::fid_eq* _raw;
         std::shared_ptr<Fabric> _fabric;

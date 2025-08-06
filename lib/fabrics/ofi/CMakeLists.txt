@@ -76,11 +76,11 @@ set(mxl_fabrics_sources
         src/fabrics.cpp
         src/internal/Address.cpp
         src/internal/CompletionQueue.cpp
-        src/internal/CompletionQueueEntry.cpp
+        src/internal/Completion.cpp
         src/internal/Domain.cpp
         src/internal/Endpoint.cpp
         src/internal/EventQueue.cpp
-        src/internal/EventQueueEntry.cpp
+        src/internal/Event.cpp
         src/internal/Exception.cpp
         src/internal/Fabric.cpp
         src/internal/FabricsInstance.cpp

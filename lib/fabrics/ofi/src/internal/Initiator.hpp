@@ -25,6 +25,8 @@ namespace mxl::lib::fabrics::ofi
         virtual void addTarget(TargetInfo const& targetInfo) = 0;
         virtual void removeTarget(TargetInfo const& targetInfo) = 0;
         virtual void transferGrain(uint64_t grainIndex) = 0;
+        virtual bool makeProgress() = 0;
+        virtual bool makeProgressBlocking(std::chrono::steady_clock::duration) = 0;
     };
 
     class InitiatorWrapper
@@ -38,6 +40,8 @@ namespace mxl::lib::fabrics::ofi
         void addTarget(TargetInfo const& targetInfo);
         void removeTarget(TargetInfo const& targetInfo);
         void transferGrain(uint64_t grainIndex);
+        bool makeProgress();
+        bool makeProgressBlocking(std::chrono::steady_clock::duration);
 
     private:
         std::unique_ptr<Initiator> _inner;

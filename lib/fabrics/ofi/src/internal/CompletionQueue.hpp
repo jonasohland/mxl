@@ -4,7 +4,7 @@
 #include <memory>
 #include <optional>
 #include <rdma/fi_eq.h>
-#include "CompletionQueueEntry.hpp"
+#include "Completion.hpp"
 #include "Domain.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -21,7 +21,7 @@ namespace mxl::lib::fabrics::ofi
         ::fi_cq_attr into_raw() const noexcept;
     };
 
-    class CompletionQueue : private std::enable_shared_from_this<CompletionQueue>
+    class CompletionQueue : public std::enable_shared_from_this<CompletionQueue>
     {
     public:
         ~CompletionQueue();
@@ -39,15 +39,15 @@ namespace mxl::lib::fabrics::ofi
         static std::shared_ptr<CompletionQueue> open(std::shared_ptr<Domain> domain,
             CompletionQueueAttr const& attr = CompletionQueueAttr::defaults());
 
-        std::optional<CompletionEntry> tryEntry();
-        std::optional<CompletionEntry> waitForEntry(std::chrono::steady_clock::duration timeout);
+        std::optional<Completion> tryEntry();
+        std::optional<Completion> waitForEntry(std::chrono::steady_clock::duration timeout);
 
     private:
         void close();
 
         CompletionQueue(::fid_cq* raw, std::shared_ptr<Domain> domain);
 
-        std::optional<CompletionEntry> handleReadResult(ssize_t ret, ::fi_cq_data_entry& entry);
+        std::optional<Completion> handleReadResult(ssize_t ret, ::fi_cq_data_entry const& entry);
 
         ::fid_cq* _raw;
         std::shared_ptr<Domain> _domain;
