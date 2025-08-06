@@ -39,8 +39,8 @@ namespace mxl::lib::fabrics::ofi
         static std::shared_ptr<CompletionQueue> open(std::shared_ptr<Domain> domain,
             CompletionQueueAttr const& attr = CompletionQueueAttr::defaults());
 
-        std::optional<Completion> tryEntry();
-        std::optional<Completion> waitForEntry(std::chrono::steady_clock::duration timeout);
+        std::optional<Completion> read();
+        std::optional<Completion> readBlocking(std::chrono::steady_clock::duration timeout);
 
     private:
         void close();

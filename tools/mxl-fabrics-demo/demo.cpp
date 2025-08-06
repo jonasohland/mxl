@@ -217,8 +217,7 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
 
     do
     {
-        status = mxlFabricsInitiatorMakeProgressNonBlocking(initiator);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        status = mxlFabricsInitiatorMakeProgressBlocking(initiator, 250);
     }
     while (status == MXL_ERR_NOT_READY);
 
@@ -274,8 +273,7 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
 
         do
         {
-            status = mxlFabricsInitiatorMakeProgressNonBlocking(initiator);
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            status = mxlFabricsInitiatorMakeProgressBlocking(initiator, 10);
         }
         while (status == MXL_ERR_NOT_READY);
 

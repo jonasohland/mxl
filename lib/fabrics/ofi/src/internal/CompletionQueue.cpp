@@ -52,7 +52,7 @@ namespace mxl::lib::fabrics::ofi
         return std::make_shared<MakeSharedEnabler>(cq, domain);
     }
 
-    std::optional<Completion> CompletionQueue::tryEntry()
+    std::optional<Completion> CompletionQueue::read()
     {
         fi_cq_data_entry entry;
 
@@ -61,7 +61,7 @@ namespace mxl::lib::fabrics::ofi
         return handleReadResult(ret, entry);
     }
 
-    std::optional<Completion> CompletionQueue::waitForEntry(std::chrono::steady_clock::duration timeout)
+    std::optional<Completion> CompletionQueue::readBlocking(std::chrono::steady_clock::duration timeout)
     {
         fi_cq_data_entry entry;
 

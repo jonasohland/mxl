@@ -42,7 +42,7 @@ namespace mxl::lib::fabrics::ofi
         return ::fi_cq_strerror(_cq->raw(), _raw.prov_errno, _raw.err_data, nullptr, 0);
     }
 
-    ::fid_ep* Completion::Error::endpoint() const noexcept
+    ::fid_ep* Completion::Error::fid() const noexcept
     {
         return reinterpret_cast<::fid_ep*>(_raw.op_context);
     }
@@ -57,7 +57,7 @@ namespace mxl::lib::fabrics::ofi
         throw Exception::invalidState("Failed to unwrap completion queue entry as data entry");
     }
 
-    ::fid_ep* Completion::Data::endpoint() const noexcept
+    ::fid_ep* Completion::Data::fid() const noexcept
     {
         return reinterpret_cast<::fid_ep*>(_raw.op_context);
     }
@@ -110,12 +110,12 @@ namespace mxl::lib::fabrics::ofi
         return std::holds_alternative<Error>(_inner);
     }
 
-    ::fid_ep* Completion::endpoint() const noexcept
+    ::fid_ep* Completion::fid() const noexcept
     {
         return std::visit(
             overloaded{
-                [](Completion::Data const& data) -> ::fid_ep* { return data.endpoint(); },
-                [](Completion::Error const& err) -> ::fid_ep* { return err.endpoint(); },
+                [](Completion::Data const& data) -> ::fid_ep* { return data.fid(); },
+                [](Completion::Error const& err) -> ::fid_ep* { return err.fid(); },
             },
             _inner);
     }

@@ -19,7 +19,7 @@ namespace mxl::lib::fabrics::ofi
             [[nodiscard]]
             std::optional<uint64_t> data() const noexcept;
             [[nodiscard]]
-            ::fid_ep* endpoint() const noexcept;
+            ::fid_ep* fid() const noexcept;
 
             [[nodiscard]]
             bool isRemoteWrite() const noexcept;
@@ -41,7 +41,7 @@ namespace mxl::lib::fabrics::ofi
             std::string toString() const;
 
             [[nodiscard]]
-            ::fid_ep* endpoint() const noexcept;
+            ::fid_ep* fid() const noexcept;
 
         private:
             explicit Error(::fi_cq_err_entry const& raw, std::shared_ptr<CompletionQueue> queue);
@@ -69,7 +69,7 @@ namespace mxl::lib::fabrics::ofi
         bool isErrEntry() const noexcept;
 
         [[nodiscard]]
-        ::fid_ep* endpoint() const noexcept;
+        ::fid_ep* fid() const noexcept;
 
     private:
         friend class CompletionQueue;

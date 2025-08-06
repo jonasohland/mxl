@@ -19,15 +19,18 @@ namespace mxl::lib::fabrics::ofi
         RCInitiatorTarget(Endpoint, FabricAddress remote, std::vector<RemoteRegionGroup>);
 
         [[nodiscard]]
+        bool hasPendingWork() const noexcept;
+
+        [[nodiscard]]
         bool isIdle() const noexcept;
 
         [[nodiscard]]
         bool canEvict() const noexcept;
 
-        bool activate(std::shared_ptr<CompletionQueue> const& cq, std::shared_ptr<EventQueue> const& eq);
+        void activate(std::shared_ptr<CompletionQueue> const& cq, std::shared_ptr<EventQueue> const& eq);
 
-        bool consume(Event);
-        bool consume(Completion);
+        void consume(Event);
+        void consume(Completion);
         void postTransfer(LocalRegionGroup const&, uint64_t index);
 
     private:
@@ -61,9 +64,6 @@ namespace mxl::lib::fabrics::ofi
         void handleConnected();
         void handleShutdown();
 
-        [[nodiscard]]
-        bool hasPendingWork() const noexcept;
-
         using State = std::variant<Idle, Connecting, Connected, Shutdown, Done>;
 
         State _state;
@@ -78,6 +78,9 @@ namespace mxl::lib::fabrics::ofi
 
         static std::unique_ptr<RCInitiator> setup(mxlInitiatorConfig const& config);
 
+        [[nodiscard]]
+        bool hasPendingWork() const noexcept;
+
         void addTarget(TargetInfo const& targetInfo) final;
         void removeTarget(TargetInfo const& targetInfo) final;
         void transferGrain(uint64_t grainIndex) final;
@@ -85,11 +88,15 @@ namespace mxl::lib::fabrics::ofi
         bool makeProgressBlocking(std::chrono::steady_clock::duration) final;
 
     private:
+        constexpr static auto EQPollInterval = std::chrono::milliseconds(100);
+
         RCInitiator(std::shared_ptr<Domain>, std::shared_ptr<CompletionQueue>, std::shared_ptr<EventQueue>, std::vector<RegisteredRegionGroup>);
 
-        bool pollCQ();
-        bool pollEQ();
-        bool activateIdlePeers();
+        void blockOnCQ(std::chrono::steady_clock::duration);
+        void pollCQ();
+        void pollEQ();
+
+        void activateIdlePeers();
         void evictDeadPeers();
 
         std::shared_ptr<Domain> _domain;
