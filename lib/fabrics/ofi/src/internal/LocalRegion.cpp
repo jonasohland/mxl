@@ -24,7 +24,7 @@ namespace mxl::lib::fabrics::ofi
         return _inner.size();
     }
 
-    void** LocalRegionGroup::desc() noexcept
+    void* const* LocalRegionGroup::desc() const noexcept
     {
         return _descs.data();
     }

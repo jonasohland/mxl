@@ -6,7 +6,7 @@
 #include <rdma/fi_errno.h>
 #include <sys/types.h>
 #include "internal/Logging.hpp"
-#include "CompletionQueueEntry.hpp"
+#include "Completion.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
 
@@ -52,7 +52,7 @@ namespace mxl::lib::fabrics::ofi
         return std::make_shared<MakeSharedEnabler>(cq, domain);
     }
 
-    std::optional<CompletionEntry> CompletionQueue::tryEntry()
+    std::optional<Completion> CompletionQueue::tryEntry()
     {
         fi_cq_data_entry entry;
 
@@ -61,7 +61,7 @@ namespace mxl::lib::fabrics::ofi
         return handleReadResult(ret, entry);
     }
 
-    std::optional<CompletionEntry> CompletionQueue::waitForEntry(std::chrono::steady_clock::duration timeout)
+    std::optional<Completion> CompletionQueue::waitForEntry(std::chrono::steady_clock::duration timeout)
     {
         fi_cq_data_entry entry;
 
@@ -116,7 +116,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    std::optional<CompletionEntry> CompletionQueue::handleReadResult(ssize_t ret, ::fi_cq_data_entry& entry)
+    std::optional<Completion> CompletionQueue::handleReadResult(ssize_t ret, ::fi_cq_data_entry const& entry)
     {
         if (ret == -FI_EAGAIN)
         {
@@ -127,14 +127,19 @@ namespace mxl::lib::fabrics::ofi
         if (ret == -FI_EAVAIL)
         {
             // An entry is available but in the error queue
-            ::fi_cq_err_entry err_entry;
-            fi_cq_readerr(_raw, &err_entry, 0);
+            ::fi_cq_err_entry err;
+            fi_cq_readerr(_raw, &err, 0);
 
-            return CompletionEntry{
-                CompletionQueueErrorEntry{err_entry, this->shared_from_this()}
+            return Completion{
+                Completion::Error{err, this->shared_from_this()}
             };
         }
 
-        return CompletionEntry{CompletionQueueDataEntry{entry}};
+        if (ret < 0)
+        {
+            throw FIException::make(ret, "Failed to read completion from queue: {}", ::fi_strerror(ret));
+        }
+
+        return Completion{Completion::Data{entry}};
     }
 }

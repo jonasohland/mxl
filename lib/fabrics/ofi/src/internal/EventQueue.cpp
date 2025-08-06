@@ -52,22 +52,21 @@ namespace mxl::lib::fabrics::ofi
     std::optional<Event> EventQueue::readEntry()
     {
         uint32_t eventType;
-        ::fi_eq_cm_entry entry;
+        ::fi_eq_entry entry;
 
-        auto ret = fi_eq_read(_raw, &eventType, &entry, sizeof(entry), FI_PEEK);
+        auto ret = fi_eq_read(_raw, &eventType, &entry, sizeof(entry), 0);
 
-        return handleReadResult(ret, eventType, &entry);
+        return handleReadResult(ret, eventType, entry);
     }
 
     std::optional<Event> EventQueue::readEntryBlocking(std::chrono::steady_clock::duration timeout)
     {
         uint32_t eventType;
-        ::fi_eq_cm_entry entry;
+        ::fi_eq_entry entry;
 
-        auto ret = fi_eq_sread(
-            _raw, &eventType, &entry, sizeof(entry), std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count(), FI_PEEK);
+        auto ret = fi_eq_sread(_raw, &eventType, &entry, sizeof(entry), std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count(), 0);
 
-        return handleReadResult(ret, eventType, &entry);
+        return handleReadResult(ret, eventType, entry);
     }
 
     EventQueue::EventQueue(::fid_eq* raw, std::shared_ptr<Fabric> fabric)
@@ -115,7 +114,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    std::optional<Event> EventQueue::handleReadResult(ssize_t ret, uint32_t eventType, ::fi_eq_cm_entry* entry)
+    std::optional<Event> EventQueue::handleReadResult(ssize_t ret, uint32_t eventType, ::fi_eq_entry const& entry)
     {
         if (ret == -FI_EAGAIN)
         {
@@ -123,31 +122,29 @@ namespace mxl::lib::fabrics::ofi
             return std::nullopt;
         }
 
-        if (ret == FI_EAVAIL)
+        if (ret == -FI_EAVAIL)
         {
             ::fi_eq_err_entry eq_err{};
             fi_eq_readerr(_raw, &eq_err, 0);
 
-            MXL_ERROR("Failed to read an entry from the event queue with an error: \"{}\"",
-                fi_eq_strerror(_raw, eq_err.prov_errno, eq_err.err_data, nullptr, 0));
-
-            return std::nullopt;
+            return Event::fromError(this->shared_from_this(), &eq_err);
         }
 
-        // try to read the entry as a connection notification event, if it fails it is ok, because we have not consumed the event yet
-        try
+        if (ret < 0)
         {
-            auto connEntry = Event::fromRaw(entry, eventType);
-
-            // If we got here, we know it's a connection notification event, we can safely consume the event from the queue
-            fi_eq_read(_raw, &eventType, entry, sizeof(entry), 0);
-
-            return connEntry;
+            throw FIException::make(ret, "Failed to read from event queue: {}", ::fi_strerror(ret));
         }
-        catch (...)
+
+        switch (eventType)
         {
-            // There is an entry in the event queue, but it is not a connection notification event
-            return std::nullopt;
+            case FI_CONNECTED:
+            case FI_CONNREQ:
+            case FI_SHUTDOWN:      return Event::fromRawCMEntry(*reinterpret_cast<fi_eq_cm_entry const*>(&entry), eventType); break;
+            case FI_NOTIFY:
+            case FI_MR_COMPLETE:
+            case FI_AV_COMPLETE:
+            case FI_JOIN_COMPLETE: return Event::fromRawEntry(entry, eventType); break;
+            default:               MXL_WARN("Unhandled event on event queue: code: {}", eventType); return std::nullopt;
         }
     }
 }

@@ -5,8 +5,8 @@
 #include <rdma/fabric.h>
 #include <rdma/fi_endpoint.h>
 #include "Address.hpp"
+#include "Event.hpp"
 #include "EventQueue.hpp"
-#include "EventQueueEntry.hpp"
 #include "Fabric.hpp"
 
 namespace mxl::lib::fabrics::ofi

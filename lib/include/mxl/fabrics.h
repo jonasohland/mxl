@@ -187,6 +187,17 @@ extern "C"
     MXL_EXPORT
     mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInitiator in_initiator, uint64_t in_grainIndex);
 
+    /**
+     *
+     */
+    MXL_EXPORT
+    mxlStatus mxlFabricsInitiatorMakeProgressNonBlocking(mxlFabricsInitiator in_initiator);
+
+    /**
+     */
+    MXL_EXPORT
+    mxlStatus mxlFabricsInitiatorMakeProgressBlocking(mxlFabricsInitiator in_initiator, uint16_t in_timeoutMs);
+
     // Below are helper functions
 
     /**
