@@ -1,4 +1,5 @@
 #include "Exception.hpp"
+#include <rdma/fi_errno.h>
 #include "mxl/fabrics.h"
 
 namespace mxl::lib::fabrics::ofi
@@ -30,7 +31,10 @@ namespace mxl::lib::fabrics::ofi
 
     mxlStatus mxlStatusFromFiErrno(int fiErrno)
     {
-        MXL_FABRICS_UNUSED(fiErrno);
+        if (fiErrno == FI_EINTR)
+        {
+            return MXL_ERR_INTERRUPTED;
+        }
 
         return MXL_ERR_UNKNOWN;
     }

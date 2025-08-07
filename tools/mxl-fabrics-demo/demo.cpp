@@ -304,6 +304,10 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
     do
     {
         status = mxlFabricsInitiatorMakeProgressBlocking(initiator, 250);
+        if (status == MXL_ERR_INTERRUPTED)
+        {
+            return MXL_STATUS_OK;
+        }
         if (status != MXL_ERR_NOT_READY && status != MXL_STATUS_OK)
         {
             return status;
@@ -420,6 +424,11 @@ static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInsta
             // No completion before a timeout was triggered, most likely a problem upstream.
             // MXL_WARN("wait for new grain timeout, most likely there is a problem upstream.");
             continue;
+        }
+
+        if (status == MXL_ERR_INTERRUPTED)
+        {
+            return MXL_STATUS_OK;
         }
 
         if (status != MXL_STATUS_OK)
