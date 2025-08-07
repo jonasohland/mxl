@@ -37,8 +37,8 @@ namespace mxl::lib::fabrics::ofi
 
         static std::shared_ptr<EventQueue> open(std::shared_ptr<Fabric>, EventQueueAttr const& attr = EventQueueAttr::defaults());
 
-        std::optional<Event> readEntry();
-        std::optional<Event> readEntryBlocking(std::chrono::steady_clock::duration timeout);
+        std::optional<Event> read();
+        std::optional<Event> readBlocking(std::chrono::steady_clock::duration timeout);
 
     private:
         EventQueue(::fid_eq* raw, std::shared_ptr<Fabric> fabric);

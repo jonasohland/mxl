@@ -1,6 +1,5 @@
 #include "Exception.hpp"
 #include <rdma/fi_errno.h>
-#include "mxl/fabrics.h"
 
 namespace mxl::lib::fabrics::ofi
 {

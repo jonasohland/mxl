@@ -180,7 +180,7 @@ namespace mxl::lib::fabrics::ofi
                 [&](WaitForConnectionRequest state) -> State
                 {
                     // Check if the entry is available and is a connection request
-                    if (auto entry = state.pep.eventQueue()->readEntryBlocking(timeout); entry && entry->isConnReq())
+                    if (auto entry = state.pep.eventQueue()->readBlocking(timeout); entry && entry->isConnReq())
                     {
                         MXL_DEBUG("Connection request received, creating endpoint for remote address: {}", entry->info().raw()->dest_addr);
                         auto endpoint = Endpoint::create(_domain.value(), entry->info());
@@ -203,7 +203,7 @@ namespace mxl::lib::fabrics::ofi
                 },
                 [&](WaitForConnection state) -> State
                 {
-                    if (auto entry = state.ep.eventQueue()->readEntryBlocking(timeout); entry && entry->isConnected())
+                    if (auto entry = state.ep.eventQueue()->readBlocking(timeout); entry && entry->isConnected())
                     {
                         // Create a local memory region. The grain indices will be written here when a transfer arrives.
                         auto dataRegion = std::make_unique<ImmediateDataLocation>();
@@ -221,9 +221,15 @@ namespace mxl::lib::fabrics::ofi
                 },
                 [&](Connected state) -> State
                 {
-                    if (auto entry = state.ep.completionQueue()->readBlocking(timeout); entry)
+                    auto [completion, event] = state.ep.poll();
+                    if (event && event.value().isShutdown())
                     {
-                        if (auto dataEntry = entry.value().tryData(); dataEntry)
+                        throw Exception::interrupted("Target received a shutdown event.");
+                    }
+
+                    if (completion)
+                    {
+                        if (auto dataEntry = completion.value().tryData(); dataEntry)
                         {
                             // The written grain index is sent as immediate data, and was returned
                             // from the completion queue.
@@ -235,7 +241,7 @@ namespace mxl::lib::fabrics::ofi
                         }
                         else
                         {
-                            MXL_ERROR("CQ Error={}", entry->err().toString());
+                            MXL_ERROR("CQ Error={}", completion->err().toString());
                         }
                     }
 

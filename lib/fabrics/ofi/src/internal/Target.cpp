@@ -1,5 +1,4 @@
 #include "Target.hpp"
-#include <cstdlib>
 #include <memory>
 #include <fmt/format.h>
 #include <rdma/fabric.h>

@@ -49,7 +49,7 @@ namespace mxl::lib::fabrics::ofi
         return std::make_shared<MakeSharedEnabler>(eq, fabric);
     }
 
-    std::optional<Event> EventQueue::readEntry()
+    std::optional<Event> EventQueue::read()
     {
         uint32_t eventType;
         ::fi_eq_entry entry;
@@ -59,7 +59,7 @@ namespace mxl::lib::fabrics::ofi
         return handleReadResult(ret, eventType, entry);
     }
 
-    std::optional<Event> EventQueue::readEntryBlocking(std::chrono::steady_clock::duration timeout)
+    std::optional<Event> EventQueue::readBlocking(std::chrono::steady_clock::duration timeout)
     {
         uint32_t eventType;
         ::fi_eq_entry entry;
