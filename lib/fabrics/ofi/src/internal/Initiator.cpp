@@ -73,8 +73,10 @@ namespace mxl::lib::fabrics::ofi
             return MXL_ERR_INVALID_ARG;
         }
 
-        auto fabricInfoList = FIInfoList::get(
-            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE | FI_REMOTE_WRITE);
+        uint64_t caps = FI_RMA | FI_WRITE | FI_HMEM;
+        caps |= config.deviceSupport ? FI_HMEM : 0;
+
+        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value(), caps);
 
         auto bestFabricInfo = RMATarget::findBestFabric(fabricInfoList, config.provider);
         if (!bestFabricInfo)
@@ -129,7 +131,7 @@ namespace mxl::lib::fabrics::ofi
         auto cq = CompletionQueue::open(*_domain, CompletionQueueAttr::get_default());
         endpoint->bind(cq, FI_TRANSMIT);
 
-        MXL_DEBUG("Connecting endpoint to target with encoded address: {}", rfl::json::write(targetInfo.fabricAddress));
+        MXL_INFO("Connecting endpoint to target with encoded address: {}", rfl::json::write(targetInfo.fabricAddress));
         endpoint->connect(targetInfo.fabricAddress);
 
         // TODO: use a cancellation token to exit this loop

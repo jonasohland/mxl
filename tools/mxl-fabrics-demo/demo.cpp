@@ -51,21 +51,28 @@ static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInsta
 
 static void createDummyCudaBuffers(std::vector<mxlMemoryRegionGroup>& deviceGroups)
 {
+    constexpr size_t regionSize = 32 * 1024;
+
     // creating dummy cuda buffers for testing purpose
     for (size_t i = 0; i < 2; i++) // for grain
+
     {
         auto deviceRegions = static_cast<mxlMemoryRegion*>(std::malloc(1 * sizeof(mxlMemoryRegion)));
 
         void* deviceBuf;
-        if (cudaMalloc(&deviceBuf, 64 * 1024) != cudaSuccess)
+        if (cudaMalloc(&deviceBuf, regionSize) != cudaSuccess)
         {
             MXL_ERROR("failed to allocate cuda memory");
         }
+        // if ((deviceBuf = malloc(regionSize)) == nullptr)
+        // {
+        //     MXL_ERROR("failed to allocate memory");
+        // }
 
         MXL_INFO("cudaMalloc success addr=0x{:p}", deviceBuf);
 
         deviceRegions[0].addr = reinterpret_cast<std::uintptr_t>(deviceBuf);
-        deviceRegions[0].size = 64 * 1024;
+        deviceRegions[0].size = regionSize;
         deviceRegions[0].type = MXL_MEMORY_REGION_TYPE_CUDA;
 
         deviceGroups.emplace_back(mxlMemoryRegionGroup{.memoryRegions = deviceRegions, .count = 1});
@@ -420,7 +427,7 @@ static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInsta
         .endpointAddress = {.node = config.node.c_str(), .service = config.service.c_str()},
         .provider = config.provider,
         .regions = regions,
-        .deviceSupport = config.useCuda,
+        .deviceSupport = false, //   config.useCuda,
     };
 
     status = mxlFabricsCreateTarget(fabricsInstance, &target);

@@ -34,8 +34,7 @@ RUN apt clean all && apt-get update \
     flex \
     htop \
     ccache \
-    rustup \
-    nvidia-cuda-toolkit
+    rustup 
 
 ARG CLANG_VERSION=19
 RUN apt-get install -y --no-install-recommends \
@@ -62,11 +61,15 @@ RUN apt-get install -y --no-install-recommends \
     librdmacm-dev \
     perftest
 
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.2.0/local_installers/cuda_12.2.0_535.54.03_linux.run \
+  && chmod +x cuda_12.2.0_535.54.03_linux.run \
+  && ./cuda_12.2.0_535.54.03_linux.run --silent --toolkit
+
 # Install libfabric
 RUN git clone -b v2.2.0 https://github.com/ofiwg/libfabric.git \
   && cd libfabric \
   && ./autogen.sh \
-  && ./configure --prefix=/usr \
+  && ./configure --prefix=/usr --with-cuda=/usr/local/cuda --enable-cuda-dlopen \
   && make install -j
  
 # Remove the default ubuntu user if it exists

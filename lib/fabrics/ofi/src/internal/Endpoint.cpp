@@ -157,6 +157,16 @@ namespace mxl::lib::fabrics::ofi
         uint64_t flags = FI_TRANSMIT_COMPLETE | FI_COMMIT_COMPLETE;
         flags |= immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
 
+        for (auto localRegion : localGroup.view())
+        {
+            MXL_INFO("local region -> addr={:x} size={} ", localRegion.addr, localRegion.len);
+        }
+
+        for (auto remoteRegion : remoteGroup.view())
+        {
+            MXL_INFO("remote region -> addr={:x} size={} rkey={:x}", remoteRegion.addr, remoteRegion.len, remoteRegion.rkey);
+        }
+
         ::fi_msg_rma msg = {
             .msg_iov = localGroup.iovec(),
             .desc = localGroup.desc(),

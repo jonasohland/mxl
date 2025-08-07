@@ -4,8 +4,6 @@
 #include <memory>
 #include <random>
 #include <bits/types/struct_iovec.h>
-#include <cuda_runtime.h>
-#include <cuda_runtime_api.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
 #include <sys/mman.h>
