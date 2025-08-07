@@ -51,6 +51,12 @@ namespace mxl::lib::fabrics::ofi
             return make(MXL_ERR_NOT_FOUND, fmt, std::forward<T>(args)...);
         }
 
+        template<typename... T>
+        static Exception interrupted(fmt::format_string<T...> fmt, T&&... args)
+        {
+            return make(MXL_ERR_INTERRUPTED, fmt, std::forward<T>(args)...);
+        }
+
         [[nodiscard]]
         mxlStatus status() const noexcept;
 

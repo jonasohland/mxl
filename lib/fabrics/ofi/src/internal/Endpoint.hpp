@@ -7,6 +7,7 @@
 #include <rdma/fabric.h>
 #include <rdma/fi_endpoint.h>
 #include "Address.hpp"
+#include "Completion.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
 #include "EventQueue.hpp"
@@ -54,6 +55,8 @@ namespace mxl::lib::fabrics::ofi
 
         [[nodiscard]]
         std::shared_ptr<EventQueue> eventQueue() const;
+
+        std::pair<std::optional<Completion>, std::optional<Event>> poll();
 
         [[nodiscard]]
         std::shared_ptr<Domain> domain() const;

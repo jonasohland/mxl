@@ -187,6 +187,24 @@ namespace mxl::lib::fabrics::ofi
         return *_eq;
     }
 
+    std::pair<std::optional<Completion>, std::optional<Event>> Endpoint::poll()
+    {
+        std::optional<Completion> completion{std::nullopt};
+        std::optional<Event> event{std::nullopt};
+
+        if (_cq)
+        {
+            completion = _cq.value()->read();
+        }
+
+        if (_eq)
+        {
+            event = _eq.value()->read();
+        }
+
+        return {completion, event};
+    }
+
     std::shared_ptr<Domain> Endpoint::domain() const
     {
         return _domain;

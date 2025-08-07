@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <string>
-#include <thread>
 #include <uuid.h>
 #include <CLI/CLI.hpp>
 #include <mxl/fabrics.h>
@@ -13,13 +12,14 @@
 #include "../../lib/fabrics/ofi/src/internal/Base64.hpp"
 #include "../../lib/src/internal/FlowParser.hpp"
 #include "../../lib/src/internal/Logging.hpp"
+#include "CLI/CLI.hpp"
 
 /*
     Example how to use:
 
-        1- Start a target: ./mlx-fabrics-sample -f bda7a5e7-32c1-483a-ae1e-055568cc4335 --node 2.2.2.2 --service 1234 --provider verbs -c flow.json
-        2- Paste the target info that gets printed in stdout to the -t argument of the sender.
-        3- Start a sender: ./mlx-fabrics-sample -s -f bda7a5e7-32c1-483a-ae1e-055568cc4335 --node 1.1.1.1 --service 1234 --provider verbs -t
+        1- Start a target: ./mlx-fabrics-demo -f <flow-file-to-produce> --node 2.2.2.2 --service 1234 --provider verbs
+        2- Paste the target info that gets printed in stdout to the --target-info argument of the initiator.
+        3- Start a sender: ./mlx-fabrics-demo -i -f <flow-to-transfer> --node 1.1.1.1 --service 1234 --provider verbs --target-info <targetInfo>
    <targetInfo>
 */
 
@@ -27,6 +27,8 @@ std::sig_atomic_t volatile g_exit_requested = 0;
 
 struct Config
 {
+    std::string const& domain;
+
     // flow configuration
     std::string const& flowID;
 
@@ -37,38 +39,500 @@ struct Config
 };
 
 void signal_handler(int)
-
 {
     g_exit_requested = 1;
 }
 
-static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, mxlTargetInfo_t* targetInfo);
-static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, std::string const& flowConfigFile);
+class AppInitator
+{
+public:
+    AppInitator(Config config)
+        : _config(std::move(config))
+    {}
+
+    ~AppInitator()
+    {
+        mxlStatus status;
+
+        if (_targetInfo != nullptr)
+        {
+            if (status = mxlFabricsFreeTargetInfo(_targetInfo); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to free target info with status '{}'", static_cast<int>(status));
+            }
+        }
+
+        if (_initiator != nullptr)
+        {
+            if (status = mxlFabricsDestroyInitiator(_fabricsInstance, _initiator); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to destroy fabrics initiator with status '{}'", static_cast<int>(status));
+            }
+        }
+
+        if (_fabricsInstance != nullptr)
+        {
+            if (status = mxlFabricsDestroyInstance(_fabricsInstance); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to destroy fabrics instance with status '{}'", static_cast<int>(status));
+            }
+        }
+
+        if (_reader != nullptr)
+        {
+            if (status = mxlReleaseFlowReader(_instance, _reader); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to release flow writer with status '{}'", static_cast<int>(status));
+            }
+        }
+
+        if (_instance != nullptr)
+        {
+            if (status = mxlDestroyInstance(_instance); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to destroy instance with status '{}'", static_cast<int>(status));
+            }
+        }
+    }
+
+    mxlStatus setup(std::string targetInfoStr)
+    {
+        _instance = mxlCreateInstance(_config.domain.c_str(), "");
+        if (_instance == nullptr)
+        {
+            MXL_ERROR("Failed to create MXL instance");
+            return MXL_ERR_INVALID_ARG;
+        }
+
+        auto status = mxlFabricsCreateInstance(_instance, &_fabricsInstance);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to create fabrics instance with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        // Create a flow reader for the given flow id.
+        status = mxlCreateFlowReader(_instance, _config.flowID.c_str(), "", &_reader);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to create flow reader with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        status = mxlFabricsCreateInitiator(_fabricsInstance, &_initiator);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to create fabrics initiator with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        mxlFlowData flowData;
+        status = mxlFlowReaderGetFlowData(_reader, &flowData);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get flow data with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        mxlRegions regions;
+        status = mxlFabricsRegionsFromFlow(flowData, &regions);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        mxlInitiatorConfig initiatorConfig = {
+            .endpointAddress = {.node = _config.node.c_str(), .service = _config.service.c_str()},
+            .provider = _config.provider,
+            .regions = regions,
+        };
+
+        status = mxlFabricsInitiatorSetup(_initiator, &initiatorConfig);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to setup fabrics initiator with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        status = mxlFabricsTargetInfoFromString(targetInfoStr.c_str(), &_targetInfo);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to parse target info string with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        status = mxlFabricsInitiatorAddTarget(_initiator, _targetInfo);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to add target with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        do
+        {
+            status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 250);
+        }
+        while (status == MXL_ERR_NOT_READY);
+
+        return MXL_STATUS_OK;
+    }
+
+    mxlStatus run()
+    { // Extract the FlowInfo structure.
+        FlowInfo flow_info;
+        auto status = mxlFlowReaderGetInfo(_reader, &flow_info);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get flow info with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        GrainInfo grainInfo;
+        uint8_t* payload;
+
+        // uint64_t grainIndex = flow_info.discrete.headIndex + 1;
+        uint64_t grainIndex = mxlGetCurrentHeadIndex(&flow_info.discrete.grainRate);
+
+        std::size_t ngrains = 0;
+
+        while (!g_exit_requested)
+        {
+            if (ngrains >= 100)
+            {
+                break;
+            }
+
+            auto ret = mxlFlowReaderGetGrain(_reader, grainIndex, 200000000, &grainInfo, &payload);
+            if (ret == MXL_ERR_OUT_OF_RANGE_TOO_LATE)
+            {
+                // We are too late.. time travel!
+                grainIndex = mxlGetCurrentHeadIndex(&flow_info.discrete.grainRate);
+                continue;
+            }
+            if (ret == MXL_ERR_OUT_OF_RANGE_TOO_EARLY)
+            {
+                // We are too early somehow.. retry the same grain later.
+                continue;
+            }
+            if (ret == MXL_ERR_TIMEOUT)
+            {
+                // No grains available before a timeout was triggered.. most likely a problem upstream.
+                continue;
+            }
+            if (ret != MXL_STATUS_OK)
+            {
+                // Something  unexpected occured, not much we can do, but log and retry
+                MXL_ERROR("Missed grain {}, err : {}", grainIndex, (int)ret);
+
+                continue;
+            }
+
+            // Okay the grain is ready, we can transfer it to the targets.
+            ret = mxlFabricsInitiatorTransferGrain(_initiator, grainIndex);
+            if (ret != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to transfer grain with status '{}'", static_cast<int>(ret));
+                return status;
+            }
+
+            do
+            {
+                status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 10);
+            }
+            while (status == MXL_ERR_NOT_READY);
+
+            if (grainInfo.commitedSize != grainInfo.grainSize)
+            {
+                // partial commit, we will need to work on the same grain again.
+                continue;
+            }
+
+            // If we get here, we have transfered the grain completely, we can work on the next grain.
+            grainIndex++;
+            ngrains++;
+        }
+
+        status = mxlFabricsInitiatorRemoveTarget(_initiator, _targetInfo);
+        if (status != MXL_STATUS_OK)
+        {
+            return status;
+        }
+
+        do
+        {
+            status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 250);
+            if (status == MXL_ERR_INTERRUPTED)
+            {
+                return MXL_STATUS_OK;
+            }
+            if (status != MXL_ERR_NOT_READY && status != MXL_STATUS_OK)
+            {
+                return status;
+            }
+        }
+        while (status == MXL_ERR_NOT_READY);
+
+        return MXL_STATUS_OK;
+    }
+
+private:
+    Config _config;
+
+    mxlInstance _instance;
+    mxlFabricsInstance _fabricsInstance;
+    mxlFlowReader _reader;
+    mxlFabricsInitiator _initiator;
+    mxlTargetInfo _targetInfo;
+};
+
+class AppTarget
+{
+public:
+    AppTarget(Config config)
+        : _config(std::move(config))
+    {}
+
+    ~AppTarget()
+    {
+        mxlStatus status;
+
+        if (_targetInfo != nullptr)
+        {
+            if (status = mxlFabricsFreeTargetInfo(_targetInfo); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to free target info with status '{}'", static_cast<int>(status));
+            }
+        }
+
+        if (_target != nullptr)
+        {
+            if (status = mxlFabricsDestroyTarget(_fabricsInstance, _target); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to destroy target with status '{}'", static_cast<int>(status));
+            }
+        }
+
+        if (_fabricsInstance != nullptr)
+        {
+            if (status = mxlFabricsDestroyInstance(_fabricsInstance); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to destroy fabrics instance with status '{}'", static_cast<int>(status));
+            }
+        }
+
+        if (_writer != nullptr)
+        {
+            if (status = mxlReleaseFlowWriter(_instance, _writer); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to release flow writer with status '{}'", static_cast<int>(status));
+            }
+        }
+
+        if (_flowExits)
+        {
+            if (status = mxlDestroyFlow(_instance, _config.flowID.c_str()); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to destroy flow with status '{}'", static_cast<int>(status));
+            }
+        }
+
+        if (_instance != nullptr)
+        {
+            if (status = mxlDestroyInstance(_instance); status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to destroy instance with status '{}'", static_cast<int>(status));
+            }
+        }
+    }
+
+    mxlStatus setup(std::string const& flowDescriptor)
+    {
+        _instance = mxlCreateInstance(_config.domain.c_str(), "");
+        if (_instance == nullptr)
+        {
+            MXL_ERROR("Failed to create MXL instance");
+            return MXL_ERR_INVALID_ARG;
+        }
+
+        auto status = mxlFabricsCreateInstance(_instance, &_fabricsInstance);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to create fabrics instance with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        FlowInfo flowInfo;
+        status = mxlCreateFlow(_instance, flowDescriptor.c_str(), nullptr, &flowInfo);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to create flow with status '{}'", static_cast<int>(status));
+            return status;
+        }
+        _flowExits = true;
+
+        // Create a flow writer for the given flow id.
+        status = mxlCreateFlowWriter(_instance, _config.flowID.c_str(), "", &_writer);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to create flow writer with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        mxlFlowData flowData;
+        status = mxlFlowWriterGetFlowData(_writer, &flowData);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get flow data with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        mxlRegions memoryRegions;
+        status = mxlFabricsRegionsFromFlow(flowData, &memoryRegions);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        status = mxlFabricsCreateTarget(_fabricsInstance, &_target);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to create fabrics target with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        mxlTargetConfig targetConfig = {
+            .endpointAddress = {.node = _config.node.c_str(), .service = _config.service.c_str()},
+            .provider = _config.provider,
+            .regions = memoryRegions,
+        };
+        status = mxlFabricsTargetSetup(_fabricsInstance, _target, &targetConfig, &_targetInfo);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to setup fabrics target with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        status = mxlFabricsRegionsFree(memoryRegions);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to free memory regions with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        return MXL_STATUS_OK;
+    }
+
+    mxlStatus printInfo()
+    {
+        auto targetInfoStr = std::string{};
+        size_t targetInfoStrSize;
+
+        auto status = mxlFabricsTargetInfoToString(_targetInfo, nullptr, &targetInfoStrSize);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to get target info string size with status '{}'", static_cast<int>(status));
+            return status;
+        }
+        targetInfoStr.resize(targetInfoStrSize);
+
+        status = mxlFabricsTargetInfoToString(_targetInfo, targetInfoStr.data(), &targetInfoStrSize);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to convert target info to string with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        MXL_INFO("Target info:  {}", base64::to_base64(targetInfoStr));
+
+        return MXL_STATUS_OK;
+    }
+
+    mxlStatus run()
+    {
+        GrainInfo dummyGrainInfo;
+        uint64_t grainIndex = 0;
+        uint8_t* dummyPayload;
+        mxlStatus status;
+
+        while (!g_exit_requested)
+        {
+            status = mxlFabricsTargetWaitForNewGrain(_target, &grainIndex, 200);
+            if (status == MXL_ERR_TIMEOUT)
+            {
+                // No completion before a timeout was triggered, most likely a problem upstream.
+                // MXL_WARN("wait for new grain timeout, most likely there is a problem upstream.");
+                continue;
+            }
+
+            if (status == MXL_ERR_INTERRUPTED)
+            {
+                return MXL_STATUS_OK;
+            }
+
+            if (status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to wait for grain with status '{}'", static_cast<int>(status));
+                return status;
+            }
+
+            // Here we open so that we can commit, we are not going to modify the grain as it was already modified by the initiator.
+            status = mxlFlowWriterOpenGrain(_writer, grainIndex, &dummyGrainInfo, &dummyPayload);
+            if (status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to open grain with status '{}'", static_cast<int>(status));
+                return status;
+            }
+
+            // GrainInfo and media payload was already written by the remote endpoint, we simply commit!.
+            status = mxlFlowWriterCommitGrain(_writer, &dummyGrainInfo);
+            if (status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to commit grain with status '{}'", static_cast<int>(status));
+                return status;
+            }
+
+            MXL_INFO("Comitted grain with index={} commitedSize={} grainSize={}", grainIndex, dummyGrainInfo.commitedSize, dummyGrainInfo.grainSize);
+        }
+
+        return MXL_STATUS_OK;
+    }
+
+private:
+    Config _config;
+
+    mxlInstance _instance;
+    mxlFabricsInstance _fabricsInstance;
+    mxlFlowWriter _writer;
+    mxlFabricsTarget _target;
+    mxlTargetInfo _targetInfo;
+
+    bool _flowExits{false};
+};
 
 int main(int argc, char** argv)
 {
     std::signal(SIGINT, &signal_handler);
     std::signal(SIGTERM, &signal_handler);
 
-    CLI::App app("mxl-fabrics-sample");
-
-    std::string flowConfigFile;
-    auto _ = app.add_option(
-        "-c, --flow-config-file", flowConfigFile, "The json file which contains the NMOS Flow configuration. Only used when configured as a target.");
+    CLI::App app("mxl-fabrics-demo");
 
     std::string domain;
     auto domainOpt = app.add_option("-d,--domain", domain, "The MXL domain directory");
     domainOpt->required(true);
     domainOpt->check(CLI::ExistingDirectory);
 
-    std::string flowID;
-    app.add_option("-f, --flow-id", flowID, "The flow ID. When configured as an initiator, this is the flow ID to read from.");
+    std::string flowConf;
+    app.add_option("-f, --flow-id",
+        flowConf,
+        "The flow ID when used as an initiator. The json file which contains the NMOS Flow configuration when used as a target.");
 
     bool runAsInitiator;
     auto runAsInitiatorOpt = app.add_flag("-i,--initiator",
         runAsInitiator,
         "Run as an initiator (flow reader + fabrics initiator). If not set, run as a receiver (fabrics target + flow writer).");
-    runAsInitiatorOpt->default_val(true);
+    runAsInitiatorOpt->default_val(false);
 
     std::string node;
     auto nodeOpt = app.add_option("-n,--node",
@@ -100,360 +564,77 @@ int main(int argc, char** argv)
     if (status != MXL_STATUS_OK)
     {
         MXL_ERROR("Failed to parse provider '{}'", provider);
-        return EXIT_FAILURE;
-    }
-
-    auto config = Config{
-        .flowID = flowID,
-        .node = node,
-        .service = service,
-        .provider = mxlProvider,
-    };
-
-    int exit_status = EXIT_SUCCESS;
-
-    auto instance = mxlCreateInstance(domain.c_str(), "");
-    if (instance == nullptr)
-    {
-        MXL_ERROR("Failed to create MXL instance");
-        exit_status = EXIT_FAILURE;
-        goto mxl_cleanup;
-    }
-
-    mxlFabricsInstance fabricsInstance;
-    status = mxlFabricsCreateInstance(instance, &fabricsInstance);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to create fabrics instance with status '{}'", static_cast<int>(status));
-        return EXIT_FAILURE;
+        return status;
     }
 
     if (runAsInitiator)
     {
-        mxlTargetInfo mxlTargetInfo;
+        MXL_INFO("Running as initiator");
 
-        auto decodedStr = base64::from_base64(targetInfo);
-        status = mxlFabricsTargetInfoFromString(decodedStr.c_str(), &mxlTargetInfo);
-        if (status != MXL_STATUS_OK)
+        auto app = AppInitator{
+            Config{
+                   .domain = domain,
+                   .flowID = flowConf,
+                   .node = node,
+                   .service = service,
+                   .provider = mxlProvider,
+                   },
+        };
+
+        if (status = app.setup(base64::from_base64(targetInfo)); status != MXL_STATUS_OK)
         {
-            MXL_ERROR("Failed to parse target info '{}'", targetInfo);
-            exit_status = EXIT_FAILURE;
-            goto mxl_cleanup;
+            MXL_ERROR("Failed to setup initiator with status '{}'", static_cast<int>(status));
+            return status;
         }
 
-        exit_status = runInitiator(instance, fabricsInstance, config, mxlTargetInfo);
-
-        mxlFabricsFreeTargetInfo(mxlTargetInfo);
+        if (status = app.run(); status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to run initiator with status '{}'", static_cast<int>(status));
+            return status;
+        }
     }
     else
     {
-        exit_status = runTarget(instance, fabricsInstance, config, flowConfigFile);
-    }
+        MXL_INFO("Running as target");
 
-mxl_cleanup:
-    if (instance != nullptr)
-    {
-        mxlDestroyInstance(instance);
-    }
-
-    return exit_status;
-}
-
-static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, mxlTargetInfo_t* targetInfo)
-{
-    mxlFlowReader reader;
-
-    // Create a flow reader for the given flow id.
-    mxlStatus status = mxlCreateFlowReader(instance, config.flowID.c_str(), "", &reader);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to create flow reader with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    mxlFabricsInitiator initiator;
-    status = mxlFabricsCreateInitiator(fabricsInstance, &initiator);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to create fabrics initiator with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    mxlFlowData flowData;
-    status = mxlFlowReaderGetFlowData(reader, &flowData);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to get flow data with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    mxlRegions regions;
-    status = mxlFabricsRegionsFromFlow(flowData, &regions);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    mxlInitiatorConfig initiatorConfig = {
-        .endpointAddress = {.node = config.node.c_str(), .service = config.service.c_str()},
-        .provider = config.provider,
-        .regions = regions,
-    };
-
-    status = mxlFabricsInitiatorSetup(initiator, &initiatorConfig);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to setup fabrics initiator with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    status = mxlFabricsInitiatorAddTarget(initiator, targetInfo);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to add target with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    do
-    {
-        status = mxlFabricsInitiatorMakeProgressBlocking(initiator, 250);
-    }
-    while (status == MXL_ERR_NOT_READY);
-
-    // Extract the FlowInfo structure.
-    FlowInfo flow_info;
-    status = mxlFlowReaderGetInfo(reader, &flow_info);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to get flow info with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    GrainInfo grainInfo;
-    uint8_t* payload;
-
-    // uint64_t grainIndex = flow_info.discrete.headIndex + 1;
-    uint64_t grainIndex = mxlGetCurrentHeadIndex(&flow_info.discrete.grainRate);
-
-    std::size_t ngrains = 0;
-
-    while (!g_exit_requested)
-    {
-        if (ngrains >= 100)
+        std::ifstream file(flowConf, std::ios::in | std::ios::binary);
+        if (!file)
         {
-            break;
+            MXL_ERROR("Failed to open file: '{}'", flowConf);
+            return MXL_ERR_INVALID_ARG;
         }
+        std::string flowDescriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+        mxl::lib::FlowParser descriptorParser{flowDescriptor};
 
-        auto ret = mxlFlowReaderGetGrain(reader, grainIndex, 200000000, &grainInfo, &payload);
-        if (ret == MXL_ERR_OUT_OF_RANGE_TOO_LATE)
-        {
-            // We are too late.. time travel!
-            grainIndex = mxlGetCurrentHeadIndex(&flow_info.discrete.grainRate);
-            continue;
-        }
-        if (ret == MXL_ERR_OUT_OF_RANGE_TOO_EARLY)
-        {
-            // We are too early somehow.. retry the same grain later.
-            continue;
-        }
-        if (ret == MXL_ERR_TIMEOUT)
-        {
-            // No grains available before a timeout was triggered.. most likely a problem upstream.
-            continue;
-        }
-        if (ret != MXL_STATUS_OK)
-        {
-            // Something  unexpected occured, not much we can do, but log and retry
-            MXL_ERROR("Missed grain {}, err : {}", grainIndex, (int)ret);
+        auto flowId = uuids::to_string(descriptorParser.getId());
 
-            continue;
-        }
+        auto app = AppTarget{
+            Config{
+                   .domain = domain,
+                   .flowID = flowId,
+                   .node = node,
+                   .service = service,
+                   .provider = mxlProvider,
+                   },
+        };
 
-        // Okay the grain is ready, we can transfer it to the targets.
-        ret = mxlFabricsInitiatorTransferGrain(initiator, grainIndex);
-        if (ret != MXL_STATUS_OK)
+        if (status = app.setup(flowDescriptor); status != MXL_STATUS_OK)
         {
-            MXL_ERROR("Failed to transfer grain with status '{}'", static_cast<int>(ret));
+            MXL_ERROR("Failed to setup target with status '{}'", static_cast<int>(status));
             return status;
         }
 
-        do
+        if (status = app.printInfo(); status != MXL_STATUS_OK)
         {
-            status = mxlFabricsInitiatorMakeProgressBlocking(initiator, 10);
-        }
-        while (status == MXL_ERR_NOT_READY);
-
-        if (grainInfo.commitedSize != grainInfo.grainSize)
-        {
-            // partial commit, we will need to work on the same grain again.
-            continue;
-        }
-
-        // If we get here, we have transfered the grain completely, we can work on the next grain.
-        grainIndex++;
-        ngrains++;
-    }
-
-    status = mxlFabricsInitiatorRemoveTarget(initiator, targetInfo);
-    if (status != MXL_STATUS_OK)
-    {
-        return status;
-    }
-
-    do
-    {
-        status = mxlFabricsInitiatorMakeProgressBlocking(initiator, 250);
-        if (status == MXL_ERR_INTERRUPTED)
-        {
-            return MXL_STATUS_OK;
-        }
-        if (status != MXL_ERR_NOT_READY && status != MXL_STATUS_OK)
-        {
-            return status;
-        }
-    }
-    while (status == MXL_ERR_NOT_READY);
-
-    status = mxlFabricsDestroyInitiator(fabricsInstance, initiator);
-    if (status != MXL_STATUS_OK)
-    {
-        return status;
-    }
-
-    return MXL_STATUS_OK;
-}
-
-static mxlStatus runTarget(mxlInstance instance, mxlFabricsInstance fabricsInstance, Config const& config, std::string const& flowConfigFile)
-{
-    std::ifstream file(flowConfigFile, std::ios::in | std::ios::binary);
-    if (!file)
-    {
-        MXL_ERROR("Failed to open file: '{}'", flowConfigFile);
-        return MXL_ERR_INVALID_ARG;
-    }
-    std::string flowDescriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
-    mxl::lib::FlowParser descriptorParser{flowDescriptor};
-
-    auto flowId = uuids::to_string(descriptorParser.getId());
-
-    FlowInfo flowInfo;
-    auto status = mxlCreateFlow(instance, flowDescriptor.c_str(), nullptr, &flowInfo);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to create flow with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    mxlFlowWriter writer;
-    // Create a flow writer for the given flow id.
-    status = mxlCreateFlowWriter(instance, flowId.c_str(), "", &writer);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to create flow writer with status '{}'", static_cast<int>(status));
-    }
-
-    mxlFlowData flowData;
-    status = mxlFlowWriterGetFlowData(writer, &flowData);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to get flow data with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    mxlRegions regions;
-    status = mxlFabricsRegionsFromFlow(flowData, &regions);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    // create and setup the fabrics target
-    mxlFabricsTarget target;
-    mxlTargetInfo targetInfo;
-
-    mxlTargetConfig targetConfig = {
-        .endpointAddress = {.node = config.node.c_str(), .service = config.service.c_str()},
-        .provider = config.provider,
-        .regions = regions,
-    };
-
-    status = mxlFabricsCreateTarget(fabricsInstance, &target);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to create fabrics target with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    status = mxlFabricsTargetSetup(fabricsInstance, target, &targetConfig, &targetInfo);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to setup fabrics target with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    auto targetInfoStr = std::string{};
-    size_t targetInfoStrSize;
-
-    status = mxlFabricsTargetInfoToString(targetInfo, nullptr, &targetInfoStrSize);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to get target info string size with status '{}'", static_cast<int>(status));
-        return status;
-    }
-    targetInfoStr.resize(targetInfoStrSize);
-
-    status = mxlFabricsTargetInfoToString(targetInfo, targetInfoStr.data(), &targetInfoStrSize);
-    if (status != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to convert target info to string with status '{}'", static_cast<int>(status));
-        return status;
-    }
-
-    MXL_INFO("Target info:  {}", base64::to_base64(targetInfoStr));
-
-    GrainInfo dummyGrainInfo;
-    uint64_t grainIndex = 0;
-    uint8_t* dummyPayload;
-    while (!g_exit_requested)
-    {
-        status = mxlFabricsTargetWaitForNewGrain(target, &grainIndex, 200);
-        if (status == MXL_ERR_TIMEOUT)
-        {
-            // No completion before a timeout was triggered, most likely a problem upstream.
-            // MXL_WARN("wait for new grain timeout, most likely there is a problem upstream.");
-            continue;
-        }
-
-        if (status == MXL_ERR_INTERRUPTED)
-        {
-            return MXL_STATUS_OK;
-        }
-
-        if (status != MXL_STATUS_OK)
-        {
-            MXL_ERROR("Failed to wait for grain with status '{}'", static_cast<int>(status));
+            MXL_ERROR("Failed to print target info with status '{}'", static_cast<int>(status));
             return status;
         }
 
-        // Here we open so that we can commit, we are not going to modify the grain as it was already modified by the initiator.
-        status = mxlFlowWriterOpenGrain(writer, grainIndex, &dummyGrainInfo, &dummyPayload);
-        if (status != MXL_STATUS_OK)
+        if (status = app.run(); status != MXL_STATUS_OK)
         {
-            MXL_ERROR("Failed to open grain with status '{}'", static_cast<int>(status));
+            MXL_ERROR("Failed to run target with status '{}'", static_cast<int>(status));
             return status;
         }
-
-        // GrainInfo and media payload was already written by the remote endpoint, we simply commit!.
-        status = mxlFlowWriterCommitGrain(writer, &dummyGrainInfo);
-        if (status != MXL_STATUS_OK)
-        {
-            MXL_ERROR("Failed to commit grain with status '{}'", static_cast<int>(status));
-            return status;
-        }
-
-        MXL_INFO("Comitted grain with index={} commitedSize={} grainSize={}", grainIndex, dummyGrainInfo.commitedSize, dummyGrainInfo.grainSize);
     }
 
     return MXL_STATUS_OK;

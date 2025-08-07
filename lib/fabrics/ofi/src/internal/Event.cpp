@@ -1,6 +1,5 @@
 #include "Event.hpp"
 #include <rdma/fabric.h>
-#include "internal/Logging.hpp"
 #include "EventQueue.hpp"
 #include "Exception.hpp"
 #include "FIInfo.hpp"

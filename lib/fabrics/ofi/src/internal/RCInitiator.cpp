@@ -412,7 +412,7 @@ namespace mxl::lib::fabrics::ofi
     {
         for (;;)
         {
-            auto event = _eq->readEntry();
+            auto event = _eq->read();
             if (!event)
             {
                 break;
