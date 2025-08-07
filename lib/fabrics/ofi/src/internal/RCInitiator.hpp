@@ -27,8 +27,8 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         bool canEvict() const noexcept;
 
+        void shutdown();
         void activate(std::shared_ptr<CompletionQueue> const& cq, std::shared_ptr<EventQueue> const& eq);
-
         void consume(Event);
         void consume(Completion);
         void postTransfer(LocalRegionGroup const&, uint64_t index);
@@ -54,6 +54,7 @@ namespace mxl::lib::fabrics::ofi
         struct Shutdown
         {
             Endpoint ep;
+            bool final;
         };
 
         struct Done
@@ -63,6 +64,8 @@ namespace mxl::lib::fabrics::ofi
         void handleCompletionData(Completion::Data);
         void handleConnected();
         void handleShutdown();
+
+        Idle restart(Endpoint const&);
 
         using State = std::variant<Idle, Connecting, Connected, Shutdown, Done>;
 
