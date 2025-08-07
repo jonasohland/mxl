@@ -33,6 +33,7 @@ extern "C"
         MXL_ERR_INVALID_STATE,
         MXL_ERR_INTERNAL,
         MXL_ERR_NOT_READY,
+        MXL_ERR_NOT_FOUND,
         MXL_ERR_EXISTS,
     } mxlStatus;
 

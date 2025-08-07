@@ -236,8 +236,15 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
     // uint64_t grainIndex = flow_info.discrete.headIndex + 1;
     uint64_t grainIndex = mxlGetCurrentHeadIndex(&flow_info.discrete.grainRate);
 
+    std::size_t ngrains = 0;
+
     while (!g_exit_requested)
     {
+        if (ngrains >= 100)
+        {
+            break;
+        }
+
         auto ret = mxlFlowReaderGetGrain(reader, grainIndex, 200000000, &grainInfo, &payload);
         if (ret == MXL_ERR_OUT_OF_RANGE_TOO_LATE)
         {
@@ -285,6 +292,29 @@ static mxlStatus runInitiator(mxlInstance instance, mxlFabricsInstance fabricsIn
 
         // If we get here, we have transfered the grain completely, we can work on the next grain.
         grainIndex++;
+        ngrains++;
+    }
+
+    status = mxlFabricsInitiatorRemoveTarget(initiator, targetInfo);
+    if (status != MXL_STATUS_OK)
+    {
+        return status;
+    }
+
+    do
+    {
+        status = mxlFabricsInitiatorMakeProgressBlocking(initiator, 250);
+        if (status != MXL_ERR_NOT_READY && status != MXL_STATUS_OK)
+        {
+            return status;
+        }
+    }
+    while (status == MXL_ERR_NOT_READY);
+
+    status = mxlFabricsDestroyInitiator(fabricsInstance, initiator);
+    if (status != MXL_STATUS_OK)
+    {
+        return status;
     }
 
     return MXL_STATUS_OK;

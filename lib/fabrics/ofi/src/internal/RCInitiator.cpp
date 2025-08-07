@@ -1,6 +1,7 @@
 #include "RCInitiator.hpp"
 #include <chrono>
 #include <algorithm>
+#include <uuid.h>
 #include <rfl/json/write.hpp>
 #include "internal/Logging.hpp"
 #include "Exception.hpp"
@@ -23,6 +24,39 @@ namespace mxl::lib::fabrics::ofi
     bool RCInitiatorTarget::canEvict() const noexcept
     {
         return std::holds_alternative<Done>(_state);
+    }
+
+    bool RCInitiatorTarget::hasPendingWork() const noexcept
+    {
+        return std::visit(
+            overloaded{
+                [](std::monostate) { return false; },   // Something went wrong with this target, but there is probably no work to do.
+                [](Idle const&) { return false; },      // An idle target means there is no work to do right now.
+                [](Connecting const&) { return true; }, // In the connecting state, the target is waiting for a connected event.
+                [](Connected const& state)
+                { return state.pending > 0; }, // While connected, a target has pending work when there are transfers that have not yet completed.
+                [](Shutdown const&) { return true; }, // In the shutdown state, the target is waiting for a FI_SHUTDOWN event.
+                [](Done const&) { return false; },    // In the done state, there is no pending work.
+            },
+            _state);
+    }
+
+    void RCInitiatorTarget::shutdown()
+    {
+        _state = std::visit(
+            overloaded{
+                [](Idle state) -> State { return state; },
+                [](Connecting state) -> State { return state; },
+                [](Connected state) -> State
+                {
+                    MXL_INFO("Shutting down");
+                    state.ep.shutdown();
+                    return Shutdown{.ep = std::move(state.ep), .final = true};
+                },
+                [](Shutdown state) -> State { return state; },
+                [](Done state) -> State { return state; },
+            },
+            std::move(_state));
     }
 
     void RCInitiatorTarget::activate(std::shared_ptr<CompletionQueue> const& cq, std::shared_ptr<EventQueue> const& eq)
@@ -69,8 +103,7 @@ namespace mxl::lib::fabrics::ofi
                         MXL_ERROR("Failed to connect endpoint: {}", ev.errorString());
 
                         // Go into the idle state with a new endpoint
-                        return Idle{
-                            .ep = Endpoint::create(state.ep.domain(), state.ep.id(), state.ep.info()), .idleSince = std::chrono::steady_clock::now()};
+                        return restart(state.ep);
                     }
                     else if (ev.isConnected())
                     {
@@ -83,8 +116,7 @@ namespace mxl::lib::fabrics::ofi
                         MXL_WARN("Received a shutdown event while connecting, going idle");
 
                         // Go to idle state with a new endpoint
-                        return Idle{
-                            .ep = Endpoint::create(state.ep.domain(), state.ep.id(), state.ep.info()), .idleSince = std::chrono::steady_clock::now()};
+                        return restart(state.ep);
                     }
 
                     MXL_WARN("Received an unexpected event while establishing a connection");
@@ -95,20 +127,35 @@ namespace mxl::lib::fabrics::ofi
                     if (ev.isError())
                     {
                         MXL_WARN("Received an error event in connected state, going idle. Error: {}", ev.errorString());
-                        return Idle{
-                            .ep = Endpoint::create(state.ep.domain(), state.ep.id(), state.ep.info()), .idleSince = std::chrono::steady_clock::now()};
+                        return restart(state.ep);
                     }
                     else if (ev.isShutdown())
                     {
                         MXL_INFO("Remote endpoint has closed the connection");
 
-                        return Idle{
-                            .ep = Endpoint::create(state.ep.domain(), state.ep.id(), state.ep.info()), .idleSince = std::chrono::steady_clock::now()};
+                        return restart(state.ep);
                     }
 
                     return state;
                 },
-                [](Shutdown state) -> State { return state; },
+                [&](Shutdown state) -> State
+                {
+                    if (ev.isShutdown())
+                    {
+                        MXL_INFO("Shutdown complete");
+                        return Done{};
+                    }
+                    else if (ev.isError())
+                    {
+                        MXL_ERROR("Received an error while shutting down: {}", ev.errorString());
+                        return Done{};
+                    }
+                    else
+                    {
+                        MXL_ERROR("Received an unexpected event while shutting down");
+                        return state;
+                    }
+                },
                 [](Done state) -> State { return state; },
             },
             std::move(_state));
@@ -183,19 +230,9 @@ namespace mxl::lib::fabrics::ofi
         MXL_ERROR("TODO: handle completion error: {}", err.toString());
     }
 
-    bool RCInitiatorTarget::hasPendingWork() const noexcept
+    RCInitiatorTarget::Idle RCInitiatorTarget::restart(Endpoint const& old)
     {
-        return std::visit(
-            overloaded{
-                [](std::monostate) { return false; },   // Something went wrong with this target, but there is probably no work to do.
-                [](Idle const&) { return false; },      // An idle target means there is no work to do right now.
-                [](Connecting const&) { return true; }, // In the connecting state, the target is waiting for a connected event.
-                [](Connected const& state)
-                { return state.pending > 0; }, // While connected, a target has pending work when there are transfers that have not yet completed.
-                [](Shutdown const&) { return true; }, // In the shutdown state, the target is waiting for a FI_SHUTDOWN event.
-                [](Done const&) { return false; },    // In the done state, there is no pending work.
-            },
-            _state);
+        return Idle{.ep = Endpoint::create(old.domain(), old.id(), old.info()), .idleSince = std::chrono::steady_clock::now()};
     }
 
     std::unique_ptr<RCInitiator> RCInitiator::setup(mxlInitiatorConfig const& config)
@@ -265,7 +302,16 @@ namespace mxl::lib::fabrics::ofi
     }
 
     void RCInitiator::removeTarget(TargetInfo const& targetInfo)
-    {}
+    {
+        if (auto it = _targets.find(targetInfo.id); it != _targets.end())
+        {
+            it->second.shutdown();
+        }
+        else
+        {
+            throw Exception::notFound("Target with id {} not found", uuids::to_string(targetInfo.id));
+        }
+    }
 
     void RCInitiator::transferGrain(uint64_t index)
     {
