@@ -31,7 +31,7 @@ namespace mxl::lib::fabrics::ofi
         return std::visit(
             overloaded{
                 [](std::monostate) { return false; },   // Something went wrong with this target, but there is probably no work to do.
-                [](Idle const&) { return false; },      // An idle target means there is no work to do right now.
+                [](Idle const&) { return true; },       // An idle target means there is no work to do right now.
                 [](Connecting const&) { return true; }, // In the connecting state, the target is waiting for a connected event.
                 [](Connected const& state)
                 { return state.pending > 0; }, // While connected, a target has pending work when there are transfers that have not yet completed.
