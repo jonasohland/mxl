@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <vector>
 #include "FlowData.hpp"
 
 namespace mxl::lib

@@ -10,4 +10,15 @@ namespace mxl::lib
     {}
 
     FlowData::~FlowData() = default;
+
+    mxlFlowData FlowData::toAPI() const noexcept
+    {
+        return reinterpret_cast<mxlFlowData>(const_cast<FlowData*>(this));
+    }
+
+    FlowData* FlowData::fromAPI(mxlFlowData flowData) noexcept
+    {
+        return reinterpret_cast<FlowData*>(flowData);
+    }
+
 }
