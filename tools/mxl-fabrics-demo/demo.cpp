@@ -201,7 +201,7 @@ public:
         uint8_t* payload;
 
         // uint64_t grainIndex = flow_info.discrete.headIndex + 1;
-        uint64_t grainIndex = mxlGetCurrentHeadIndex(&flow_info.discrete.grainRate);
+        uint64_t grainIndex = mxlGetCurrentIndex(&flow_info.discrete.grainRate);
 
         while (!g_exit_requested)
         {
@@ -209,7 +209,7 @@ public:
             if (ret == MXL_ERR_OUT_OF_RANGE_TOO_LATE)
             {
                 // We are too late.. time travel!
-                grainIndex = mxlGetCurrentHeadIndex(&flow_info.discrete.grainRate);
+                grainIndex = mxlGetCurrentIndex(&flow_info.discrete.grainRate);
                 continue;
             }
             if (ret == MXL_ERR_OUT_OF_RANGE_TOO_EARLY)
@@ -241,6 +241,15 @@ public:
             do
             {
                 status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 10);
+                if (status == MXL_ERR_INTERRUPTED)
+                {
+                    return MXL_STATUS_OK;
+                }
+
+                if (status != MXL_ERR_NOT_READY && status != MXL_STATUS_OK)
+                {
+                    return status;
+                }
             }
             while (status == MXL_ERR_NOT_READY);
 
