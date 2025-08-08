@@ -179,4 +179,9 @@ namespace mxl::lib
         return false;
     }
 
+    DiscreteFlowData* PosixDiscreteFlowReader::flowData() const noexcept
+    {
+        return _flowData.get();
+    }
+
 } // namespace mxl::lib

@@ -66,6 +66,9 @@ namespace mxl::lib
         ///
         virtual mxlStatus getGrain(std::uint64_t in_index, mxlGrainInfo* out_grainInfo, std::uint8_t** out_payload) override;
 
+        [[nodiscard]]
+        DiscreteFlowData* flowData() const noexcept override;
+
     protected:
         /// \see FlowReader::isFlowValid
         virtual bool isFlowValid() const override;
