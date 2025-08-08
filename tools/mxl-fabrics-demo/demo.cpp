@@ -241,6 +241,15 @@ public:
             do
             {
                 status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 10);
+                if (status == MXL_ERR_INTERRUPTED)
+                {
+                    return MXL_STATUS_OK;
+                }
+
+                if (status != MXL_ERR_NOT_READY && status != MXL_STATUS_OK)
+                {
+                    return status;
+                }
             }
             while (status == MXL_ERR_NOT_READY);
 
