@@ -172,6 +172,15 @@ public:
         do
         {
             status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 250);
+            if (status == MXL_ERR_INTERRUPTED)
+            {
+                return MXL_STATUS_OK;
+            }
+
+            if (status != MXL_ERR_NOT_READY && status != MXL_STATUS_OK)
+            {
+                return status;
+            }
         }
         while (status == MXL_ERR_NOT_READY);
 
@@ -194,15 +203,8 @@ public:
         // uint64_t grainIndex = flow_info.discrete.headIndex + 1;
         uint64_t grainIndex = mxlGetCurrentHeadIndex(&flow_info.discrete.grainRate);
 
-        std::size_t ngrains = 0;
-
         while (!g_exit_requested)
         {
-            if (ngrains >= 100)
-            {
-                break;
-            }
-
             auto ret = mxlFlowReaderGetGrain(_reader, grainIndex, 200000000, &grainInfo, &payload);
             if (ret == MXL_ERR_OUT_OF_RANGE_TOO_LATE)
             {
@@ -250,7 +252,6 @@ public:
 
             // If we get here, we have transfered the grain completely, we can work on the next grain.
             grainIndex++;
-            ngrains++;
         }
 
         status = mxlFabricsInitiatorRemoveTarget(_initiator, _targetInfo);
@@ -524,7 +525,7 @@ int main(int argc, char** argv)
     domainOpt->check(CLI::ExistingDirectory);
 
     std::string flowConf;
-    app.add_option("-f, --flow-id",
+    app.add_option("-f, --flow",
         flowConf,
         "The flow ID when used as an initiator. The json file which contains the NMOS Flow configuration when used as a target.");
 

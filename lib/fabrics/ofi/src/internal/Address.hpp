@@ -11,22 +11,42 @@ namespace mxl::lib::fabrics::ofi
     class FabricAddress final
     {
     public:
-        explicit FabricAddress();
+        /**
+         * Default is an empty fabric address
+         */
+        FabricAddress() = default;
 
-        static FabricAddress fromFid(::fid_t fid)
-        {
-            return retrieveFabricAddress(fid);
-        }
+        /**
+         * Retreive the fabric address of an endpoint by passing its fid.
+         */
+        static FabricAddress fromFid(::fid_t fid);
 
+        /**
+         * Convert the raw fabric address into a base64 encoded string.
+         */
         [[nodiscard]]
         std::string toBase64() const;
 
+        /**
+         * Parse a fabric address from a base64 encoded string
+         */
         static FabricAddress fromBase64(std::string_view data);
 
-        void* raw();
+        /**
+         * Pointer to the raw address data.
+         */
+        void* raw() noexcept;
 
+        /**
+         * Pointer to the raw address data.
+         */
         [[nodiscard]]
-        void* raw() const;
+        void const* raw() const noexcept;
+
+        /**
+         * Byte-length of the raw address data.
+         */
+        std::size_t size() const noexcept;
 
     private:
         explicit FabricAddress(std::vector<uint8_t> addr);

@@ -20,7 +20,7 @@ namespace mxl::lib::fabrics::ofi
         return attr;
     }
 
-    ::fi_eq_attr EventQueueAttr::into_raw() const noexcept
+    ::fi_eq_attr EventQueueAttr::raw() const noexcept
     {
         ::fi_eq_attr raw{};
         raw.size = size;
@@ -34,7 +34,7 @@ namespace mxl::lib::fabrics::ofi
     std::shared_ptr<EventQueue> EventQueue::open(std::shared_ptr<Fabric> fabric, EventQueueAttr const& attr)
     {
         ::fid_eq* eq;
-        auto eq_attr = attr.into_raw();
+        auto eq_attr = attr.raw();
 
         fiCall(::fi_eq_open, "Failed to open event queue", fabric->raw(), &eq_attr, &eq, nullptr);
 
@@ -54,17 +54,23 @@ namespace mxl::lib::fabrics::ofi
         uint32_t eventType;
         ::fi_eq_entry entry;
 
-        auto ret = fi_eq_read(_raw, &eventType, &entry, sizeof(entry), 0);
+        auto const ret = fi_eq_read(_raw, &eventType, &entry, sizeof(entry), 0);
 
         return handleReadResult(ret, eventType, entry);
     }
 
     std::optional<Event> EventQueue::readBlocking(std::chrono::steady_clock::duration timeout)
     {
+        auto timeoutMs = std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count();
+        if (timeoutMs == 0)
+        {
+            return read();
+        }
+
         uint32_t eventType;
         ::fi_eq_entry entry;
 
-        auto ret = fi_eq_sread(_raw, &eventType, &entry, sizeof(entry), std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count(), 0);
+        auto const ret = fi_eq_sread(_raw, &eventType, &entry, sizeof(entry), timeoutMs, 0);
 
         return handleReadResult(ret, eventType, entry);
     }

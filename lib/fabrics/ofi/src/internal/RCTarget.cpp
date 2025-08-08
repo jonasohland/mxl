@@ -221,7 +221,7 @@ namespace mxl::lib::fabrics::ofi
                 },
                 [&](Connected state) -> State
                 {
-                    auto [completion, event] = state.ep.poll();
+                    auto [completion, event] = state.ep.readQueuesBlocking(timeout);
                     if (event && event.value().isShutdown())
                     {
                         throw Exception::interrupted("Target received a shutdown event.");

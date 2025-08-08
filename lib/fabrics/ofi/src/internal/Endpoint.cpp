@@ -21,24 +21,50 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+    Endpoint::Id Endpoint::randomId() noexcept
+    {
+        std::uniform_int_distribution<Endpoint::Id> dist;
+        std::random_device rd;
+        std::mt19937 eng{rd()};
+
+        return dist(eng);
+    }
+
+    void* Endpoint::idToContextValue(Id id) noexcept
+    {
+        return reinterpret_cast<void*>(id);
+    }
+
+    Endpoint::Id Endpoint::contextValueToId(void* contextValue) noexcept
+    {
+        return reinterpret_cast<Endpoint::Id>(contextValue);
+    }
+
+    Endpoint::Id Endpoint::idFromFID(::fid_t fid) noexcept
+    {
+        return contextValueToId(fid->context);
+    }
+
+    Endpoint::Id Endpoint::idFromFID(::fid_ep* fid) noexcept
+    {
+        return idFromFID(&fid->fid);
+    }
+
     Endpoint Endpoint::create(std::shared_ptr<Domain> domain)
     {
-        return Endpoint::create(std::move(domain), uuids::uuid_system_generator{}());
+        return Endpoint::create(std::move(domain), randomId());
     }
 
     Endpoint Endpoint::create(std::shared_ptr<Domain> domain, FIInfoView info)
     {
-        return Endpoint::create(std::move(domain), uuids::uuid_system_generator{}(), info);
+        return Endpoint::create(std::move(domain), randomId(), info);
     }
 
-    Endpoint Endpoint::create(std::shared_ptr<Domain> domain, uuids::uuid epid, FIInfoView info)
+    Endpoint Endpoint::create(std::shared_ptr<Domain> domain, Id epid, FIInfoView info)
     {
         ::fid_ep* raw;
 
-        auto uuidMem = std::make_unique<uuids::uuid>(epid);
-        fiCall(::fi_endpoint, "Failed to create endpoint", domain->raw(), info.raw(), &raw, uuidMem.get());
-
-        uuidMem.release();
+        fiCall(::fi_endpoint, "Failed to create endpoint", domain->raw(), info.raw(), &raw, idToContextValue(epid));
 
         // expose the private constructor to std::make_shared inside this function
         struct MakeSharedEnabler : public Endpoint
@@ -51,24 +77,14 @@ namespace mxl::lib::fabrics::ofi
         return {raw, info, std::move(domain)};
     }
 
-    Endpoint Endpoint::create(std::shared_ptr<Domain> domain, uuids::uuid epid)
+    Endpoint Endpoint::create(std::shared_ptr<Domain> domain, Id epid)
     {
         return Endpoint::create(domain, epid, domain->fabric()->info());
     }
 
-    uuids::uuid Endpoint::idFromFID(::fid_t fid) noexcept
+    Endpoint::Id Endpoint::id() const noexcept
     {
-        return *reinterpret_cast<uuids::uuid*>(fid->context);
-    }
-
-    uuids::uuid Endpoint::idFromFID(::fid_ep* fid) noexcept
-    {
-        return Endpoint::idFromFID(&fid->fid);
-    }
-
-    uuids::uuid Endpoint::id() const noexcept
-    {
-        return Endpoint::idFromFID(&_raw->fid);
+        return contextValueToId(_raw->fid.context);
     }
 
     Endpoint::~Endpoint()
@@ -84,19 +100,18 @@ namespace mxl::lib::fabrics::ofi
         , _cq(std::move(cq))
         , _eq(std::move(eq))
     {
-        MXL_INFO("Endpoint {} created", uuids::to_string(Endpoint::idFromFID(raw)));
+        MXL_INFO("Endpoint {} created", Endpoint::idFromFID(raw));
     }
 
     void Endpoint::close()
     {
         if (_raw)
         {
-            auto idp = reinterpret_cast<uuids::uuid*>(_raw->fid.context);
-            auto id = *idp;
-            delete idp;
+            auto id = this->id();
+
             fiCall(::fi_close, "Failed to close endpoint", &_raw->fid);
 
-            MXL_INFO("Endoint {} closed", uuids::to_string(id));
+            MXL_INFO("Endoint {} closed", id);
 
             _raw = nullptr;
         }
@@ -187,22 +202,82 @@ namespace mxl::lib::fabrics::ofi
         return *_eq;
     }
 
-    std::pair<std::optional<Completion>, std::optional<Event>> Endpoint::poll()
+    std::pair<std::optional<Completion>, std::optional<Event>> Endpoint::readQueues()
     {
         std::optional<Completion> completion{std::nullopt};
         std::optional<Event> event{std::nullopt};
 
         if (_cq)
         {
-            completion = _cq.value()->read();
+            completion = (*_cq)->read();
         }
 
         if (_eq)
         {
-            event = _eq.value()->read();
+            event = (*_eq)->read();
         }
 
         return {completion, event};
+    }
+
+    std::pair<std::optional<Completion>, std::optional<Event>> Endpoint::readQueuesBlocking(std::chrono::steady_clock::duration timeout)
+    {
+        std::optional<Completion> completion{std::nullopt};
+        std::optional<Event> event{std::nullopt};
+
+        // No queues, no blocking;
+        if (!_eq && !_cq)
+        {
+            throw Exception::invalidState("No queues bound to endpoint");
+        }
+
+        // There is no event queue, so we just block on the completion queue.
+        if (!_eq)
+        {
+            return {(*_cq)->readBlocking(timeout), event};
+        }
+
+        auto timeoutMs = std::chrono::duration_cast<std::remove_const_t<decltype(EQReadInterval)>>(timeout);
+
+        // This is the simple case: The user-supplied timeout is less than the minimum EventQueue read interval. So we just read the EventQueue once
+        // and then block on the CompletionQueue until the specified timeout.
+        if (timeoutMs < EQReadInterval)
+        {
+            auto event = (*_eq)->read();
+            auto completion = (*_cq)->readBlocking(timeout);
+
+            return {completion, event};
+        }
+
+        // The time point at which we must return control to the user.
+        auto deadline = std::chrono::steady_clock::now() + timeout;
+
+        for (;;)
+        {
+            // The maximum duration we can block for until we must return control to the caller.
+            auto timeUntilDeadline = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - std::chrono::steady_clock::now());
+
+            // If the time is up, we return control.
+            if (timeUntilDeadline <= std::chrono::milliseconds(0))
+            {
+                return {completion, event};
+            }
+
+            // Do a non-blocking read of the event queue first.
+            event = (*_eq)->read();
+            if (event)
+            {
+                return {completion, event};
+            }
+
+            // And then block on the completion queue until either the minimum duration between event queue reads has elapsed, or the latest point in
+            // time at which we need to return control to the caller has been reached.
+            completion = (*_cq)->readBlocking(std::min(EQReadInterval, timeUntilDeadline));
+            if (completion)
+            {
+                return {completion, event};
+            }
+        }
     }
 
     std::shared_ptr<Domain> Endpoint::domain() const

@@ -10,23 +10,23 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    RCInitiatorTarget::RCInitiatorTarget(Endpoint ep, FabricAddress remote, std::vector<RemoteRegionGroup> rr)
+    RCInitiatorEndpoint::RCInitiatorEndpoint(Endpoint ep, FabricAddress remote, std::vector<RemoteRegionGroup> rr)
         : _state(Idle{.ep = std::move(ep), .idleSince = std::chrono::steady_clock::time_point{}})
         , _addr(std::move(remote))
         , _regions(std::move(rr))
     {}
 
-    bool RCInitiatorTarget::isIdle() const noexcept
+    bool RCInitiatorEndpoint::isIdle() const noexcept
     {
         return std::holds_alternative<Idle>(_state);
     }
 
-    bool RCInitiatorTarget::canEvict() const noexcept
+    bool RCInitiatorEndpoint::canEvict() const noexcept
     {
         return std::holds_alternative<Done>(_state);
     }
 
-    bool RCInitiatorTarget::hasPendingWork() const noexcept
+    bool RCInitiatorEndpoint::hasPendingWork() const noexcept
     {
         return std::visit(
             overloaded{
@@ -41,25 +41,37 @@ namespace mxl::lib::fabrics::ofi
             _state);
     }
 
-    void RCInitiatorTarget::shutdown()
+    void RCInitiatorEndpoint::shutdown()
     {
         _state = std::visit(
             overloaded{
-                [](Idle state) -> State { return state; },
-                [](Connecting state) -> State { return state; },
+                [](Idle) -> State
+                {
+                    MXL_INFO("Shutdown requested while waiting to activate, aborting.");
+                    return Done{};
+                },
+                [](Connecting) -> State
+                {
+                    MXL_INFO("Shutdown requested while trying to connect, aborting.");
+                    return Done{};
+                },
                 [](Connected state) -> State
                 {
                     MXL_INFO("Shutting down");
                     state.ep.shutdown();
-                    return Shutdown{.ep = std::move(state.ep), .final = true};
+                    return Shutdown{.ep = std::move(state.ep)};
                 },
-                [](Shutdown state) -> State { return state; },
+                [](Shutdown) -> State
+                {
+                    MXL_WARN("Another shutdown was requested while trying to shut down, aborting.");
+                    return Done{};
+                },
                 [](Done state) -> State { return state; },
             },
             std::move(_state));
     }
 
-    void RCInitiatorTarget::activate(std::shared_ptr<CompletionQueue> const& cq, std::shared_ptr<EventQueue> const& eq)
+    void RCInitiatorEndpoint::activate(std::shared_ptr<CompletionQueue> const& cq, std::shared_ptr<EventQueue> const& eq)
     {
         _state = std::visit(
             overloaded{
@@ -91,7 +103,7 @@ namespace mxl::lib::fabrics::ofi
             std::move(_state));
     }
 
-    void RCInitiatorTarget::consume(Event ev)
+    void RCInitiatorEndpoint::consume(Event ev)
     {
         _state = std::visit(
             overloaded{
@@ -161,7 +173,7 @@ namespace mxl::lib::fabrics::ofi
             std::move(_state));
     }
 
-    void RCInitiatorTarget::consume(Completion completion)
+    void RCInitiatorEndpoint::consume(Completion completion)
     {
         if (auto error = completion.tryErr(); error)
         {
@@ -173,7 +185,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiatorTarget::postTransfer(LocalRegionGroup const& local, uint64_t index)
+    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, uint64_t index)
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
@@ -187,7 +199,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiatorTarget::handleCompletionData(Completion::Data)
+    void RCInitiatorEndpoint::handleCompletionData(Completion::Data)
     {
         _state = std::visit(
             overloaded{[](Idle idleState) -> State
@@ -225,12 +237,12 @@ namespace mxl::lib::fabrics::ofi
             std::move(_state));
     }
 
-    void RCInitiatorTarget::handleCompletionError(Completion::Error err)
+    void RCInitiatorEndpoint::handleCompletionError(Completion::Error err)
     {
         MXL_ERROR("TODO: handle completion error: {}", err.toString());
     }
 
-    RCInitiatorTarget::Idle RCInitiatorTarget::restart(Endpoint const& old)
+    RCInitiatorEndpoint::Idle RCInitiatorEndpoint::restart(Endpoint const& old)
     {
         return Idle{.ep = Endpoint::create(old.domain(), old.id(), old.info()), .idleSince = std::chrono::steady_clock::now()};
     }
@@ -298,7 +310,7 @@ namespace mxl::lib::fabrics::ofi
     void RCInitiator::addTarget(TargetInfo const& targetInfo)
     {
         _targets.emplace(targetInfo.id,
-            RCInitiatorTarget{Endpoint::create(_domain, targetInfo.id), targetInfo.fabricAddress, targetInfo.remoteRegionGroups});
+            RCInitiatorEndpoint{Endpoint::create(_domain, targetInfo.id), targetInfo.fabricAddress, targetInfo.remoteRegionGroups});
     }
 
     void RCInitiator::removeTarget(TargetInfo const& targetInfo)
@@ -309,7 +321,7 @@ namespace mxl::lib::fabrics::ofi
         }
         else
         {
-            throw Exception::notFound("Target with id {} not found", uuids::to_string(targetInfo.id));
+            throw Exception::notFound("Target with id {} not found", targetInfo.id);
         }
     }
 
@@ -340,7 +352,7 @@ namespace mxl::lib::fabrics::ofi
         return false;
     }
 
-    void RCInitiator::activateIdlePeers()
+    void RCInitiator::activateIdleEndpoints()
     {
         // Call the activate function on all endpoints. This is a no-op when the endpoint is not idle
         // and there is probably not that many of them.
@@ -350,7 +362,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiator::evictDeadPeers()
+    void RCInitiator::evictDeadEndpoints()
     {
         std::erase_if(_targets, [](auto const& item) { return item.second.canEvict(); });
     }
@@ -434,21 +446,21 @@ namespace mxl::lib::fabrics::ofi
     bool RCInitiator::makeProgress()
     {
         // Activate any peers that might be idle and waiting for activation.
-        activateIdlePeers();
+        activateIdleEndpoints();
 
         // Poll the completion and event queue once and process pending events.
         pollCQ();
         pollEQ();
 
         // Evict any peers that are dead and no longer will make progress.
-        evictDeadPeers();
+        evictDeadEndpoints();
 
         return hasPendingWork();
     }
 
     bool RCInitiator::makeProgressBlocking(std::chrono::steady_clock::duration timeout)
     {
-        // If the timeout is less than our maintainance interval. Just check all the queues once, execute all maintainance tasks once
+        // If the timeout is less than our maintainance interval, just check all the queues once, execute all maintainance tasks once
         // and block on the completion queue for the rest of the time.
         if (timeout < EQPollInterval)
         {

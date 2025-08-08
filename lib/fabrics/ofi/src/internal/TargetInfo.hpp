@@ -1,11 +1,14 @@
 #pragma once
 
+#include <cstdlib>
 #include <rfl.hpp>
 #include <uuid.h>
+#include <fmt/format.h>
 #include <rfl/Field.hpp>
 #include <sys/types.h>
 #include "mxl/fabrics.h"
 #include "Address.hpp"
+#include "Endpoint.hpp"
 #include "RemoteRegion.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -17,7 +20,7 @@ namespace mxl::lib::fabrics::ofi
     {
         TargetInfo() = default;
 
-        TargetInfo(FabricAddress fabricAddress, std::vector<RemoteRegionGroup> regions, uuids::uuid id = uuids::uuid_system_generator{}())
+        TargetInfo(FabricAddress fabricAddress, std::vector<RemoteRegionGroup> regions, Endpoint::Id id = Endpoint::randomId())
             : fabricAddress(std::move(fabricAddress))
             , remoteRegionGroups(std::move(regions))
             , id(id)
@@ -30,7 +33,7 @@ namespace mxl::lib::fabrics::ofi
 
         FabricAddress fabricAddress;
         std::vector<RemoteRegionGroup> remoteRegionGroups;
-        uuids::uuid id;
+        Endpoint::Id id;
     };
 
     // namespace rlf_types
@@ -50,13 +53,13 @@ namespace mxl::lib::fabrics::ofi
             }
 
             return TargetInfoRfl{
-                .fabricAddress = FabricAddressRfl::from_class(ti.fabricAddress), .regions = rflRegions, .identifier = uuids::to_string(ti.id)};
+                .fabricAddress = FabricAddressRfl::from_class(ti.fabricAddress), .regions = rflRegions, .identifier = fmt::to_string(ti.id)};
         }
 
         [[nodiscard]]
         TargetInfo to_class() const
         {
-            return {fabricAddress.get().to_class(), regions.get(), uuids::uuid::from_string(identifier.get()).value()};
+            return {fabricAddress.get().to_class(), regions.get(), std::stoul(identifier.get())};
         };
     };
 

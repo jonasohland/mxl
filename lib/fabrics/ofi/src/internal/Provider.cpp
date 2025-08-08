@@ -4,7 +4,7 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    static std::map<std::string_view, Provider> providerStringMap = {
+    static std::map<std::string_view, Provider> const providerStringMap = {
         {"tcp",   Provider::TCP  },
         {"verbs", Provider::VERBS},
         {"efa",   Provider::EFA  }
@@ -36,10 +36,11 @@ namespace mxl::lib::fabrics::ofi
     std::optional<Provider> providerFromString(std::string const& s) noexcept
     {
         auto it = providerStringMap.find(s);
-        if (it != providerStringMap.end())
+        if (it == providerStringMap.end())
         {
-            return it->second;
+            return std::nullopt;
         }
-        return std::nullopt;
+
+        return it->second;
     }
 }

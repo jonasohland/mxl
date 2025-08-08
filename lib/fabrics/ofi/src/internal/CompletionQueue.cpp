@@ -16,16 +16,16 @@ namespace mxl::lib::fabrics::ofi
     CompletionQueueAttr CompletionQueueAttr::defaults()
     {
         CompletionQueueAttr attr{};
-        attr.size = 8;                  // default size, this should be parameterized
-        attr.wait_obj = FI_WAIT_UNSPEC; // TODO: EFA will require no wait object
+        attr.size = 8;                    // default size, this should be parameterized
+        attr.waitObject = FI_WAIT_UNSPEC; // TODO: EFA will require no wait object
         return attr;
     }
 
-    ::fi_cq_attr CompletionQueueAttr::into_raw() const noexcept
+    ::fi_cq_attr CompletionQueueAttr::raw() const noexcept
     {
         ::fi_cq_attr raw{};
         raw.size = size;
-        raw.wait_obj = wait_obj;
+        raw.wait_obj = waitObject;
         raw.format = FI_CQ_FORMAT_DATA;  // default format, this should be parameterized
         raw.wait_cond = FI_CQ_COND_NONE; // default condition, this should be parameterized
         raw.wait_set = nullptr;          // only used if wait_obj is FI_WAIT_SET
@@ -37,7 +37,7 @@ namespace mxl::lib::fabrics::ofi
     std::shared_ptr<CompletionQueue> CompletionQueue::open(std::shared_ptr<Domain> domain, CompletionQueueAttr const& attr)
     {
         ::fid_cq* cq;
-        auto cq_attr = attr.into_raw();
+        auto cq_attr = attr.raw();
 
         fiCall(::fi_cq_open, "Failed to open completion queue", domain->raw(), &cq_attr, &cq, nullptr);
 
@@ -63,9 +63,15 @@ namespace mxl::lib::fabrics::ofi
 
     std::optional<Completion> CompletionQueue::readBlocking(std::chrono::steady_clock::duration timeout)
     {
+        auto timeoutMs = std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count();
+        if (timeoutMs == 0)
+        {
+            return read();
+        }
+
         fi_cq_data_entry entry;
 
-        ssize_t ret = fi_cq_sread(_raw, &entry, 1, nullptr, std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count());
+        ssize_t ret = fi_cq_sread(_raw, &entry, 1, nullptr, timeoutMs);
         return handleReadResult(ret, entry);
     }
 
