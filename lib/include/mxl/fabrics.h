@@ -121,7 +121,7 @@ extern "C"
      * Create a regions object from a list of memory region groups.
      * \param in_groups A pointer to an array of memory region groups.
      * \param in_count The number of memory region groups in the array.
-     * \param out_regions Returns a pointer to the created regions object. The user is responsible fro freeing this object by calling
+     * \param out_regions Returns a pointer to the created regions object. The user is responsible for freeing this object by calling
      * `mxlFabricsRegionsFree()`.
      * \return MXL_STATUS_OK if the regions object was successfully created.
      */
