@@ -465,11 +465,23 @@ public:
         }
 
         mxlRegions memoryRegions;
-        status = mxlFabricsRegionsForFlowWriter(_writer, &memoryRegions);
-        if (status != MXL_STATUS_OK)
+        if (_config.useCuda)
         {
-            MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
-            return status;
+            status = allocateCudaMemory(&memoryRegions);
+            if (status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to convert flow regions to CUDA regions with status '{}'", static_cast<int>(status));
+                return status;
+            }
+        }
+        else
+        {
+            status = mxlFabricsRegionsForFlowWriter(_writer, &memoryRegions);
+            if (status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
+                return status;
+            }
         }
 
         status = mxlFabricsCreateTarget(_fabricsInstance, &_target);
