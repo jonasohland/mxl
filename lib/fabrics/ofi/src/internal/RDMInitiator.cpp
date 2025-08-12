@@ -86,7 +86,7 @@ namespace mxl::lib::fabrics::ofi
 
     std::unique_ptr<RDMInitiator> RDMInitiator::setup(mxlInitiatorConfig const& config)
     {
-        auto provider = providerFromAPI(config.provider);
+        auto provider = Provider::fromAPI(config.provider);
         if (!provider)
         {
             throw Exception::make(MXL_ERR_NO_FABRIC, "No provider available.");

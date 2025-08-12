@@ -112,6 +112,48 @@ namespace
     }
 
     extern "C" MXL_EXPORT
+    mxlStatus mxlFabricsRegionsFromBufferGroups(mxlFabricsMemoryRegionGroup const* in_groups, size_t in_count, mxlRegions* out_regions)
+    {
+        if (in_groups == nullptr || out_regions == nullptr)
+        {
+            return MXL_ERR_INVALID_ARG;
+        }
+
+        try
+        {
+            auto regions = ofi::RegionGroups::fromGroups(in_groups, in_count);
+
+            // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
+            auto regionPtr = std::make_unique<ofi::RegionGroups>(regions).release();
+
+            *out_regions = regionPtr->toAPI();
+
+            return MXL_STATUS_OK;
+        }
+
+        catch (ofi::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
+        catch (std::exception& e)
+        {
+            MXL_ERROR("Failed to create Regions object: {}", e.what());
+
+            return MXL_ERR_UNKNOWN;
+        }
+
+        catch (...)
+        {
+            MXL_ERROR("Failed to create Regions object.");
+
+            return MXL_ERR_UNKNOWN;
+        }
+    }
+
+    extern "C" MXL_EXPORT
     mxlStatus mxlFabricsRegionsFree(mxlRegions in_regions)
     {
         if (in_regions == nullptr)
@@ -680,9 +722,9 @@ namespace
     extern "C" MXL_EXPORT
     mxlStatus mxlFabricsProviderFromString(char const* in_string, mxlFabricsProvider* out_provider)
     {
-        if (auto provider = ofi::providerFromString(in_string); provider)
+        if (auto provider = ofi::Provider::fromString(in_string); provider)
         {
-            *out_provider = ofi::providerToAPI(provider.value());
+            *out_provider = provider->toAPI();
             return MXL_STATUS_OK;
         }
 
@@ -692,7 +734,6 @@ namespace
     extern "C" MXL_EXPORT
     mxlStatus mxlFabricsProviderToString(mxlFabricsProvider in_provider, char* out_string, size_t* in_out_stringSize)
     {
-        // TODO: review if this can be simplified, should we instead allocate in this function and provider a free ?
         auto providerEnumValueToString = [](char* outString, size_t* inOutStringSize, char const* providerString)
         {
             if (outString == nullptr)
@@ -825,9 +866,7 @@ namespace
 
         try
         {
-            auto info = ofi::TargetInfo::fromAPI(in_info);
-
-            delete info;
+            delete ofi::TargetInfo::fromAPI(in_info);
         }
         catch (ofi::Exception& e)
         {

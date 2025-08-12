@@ -57,6 +57,7 @@ extern "C"
         mxlEndpointAddress endpointAddress; /// Bind address for the local endpoint.
         mxlFabricsProvider provider;        /// The provider that should be used
         mxlRegions regions;                 /// Local memory regions of the flow that grains should be written to.
+        bool deviceSupport;
     } mxlTargetConfig;
 
     /// Configuration object required to set up an initiator.
@@ -65,7 +66,33 @@ extern "C"
         mxlEndpointAddress endpointAddress; /// Bind address for the local endpoint.
         mxlFabricsProvider provider;        /// The provider that should be used.
         mxlRegions regions;                 /// Local memory regions of the flow that grains should source of remote write requests.
+        bool deviceSupport;
     } mxlInitiatorConfig;
+
+    typedef enum mxlFabricsMemoryRegionType_t
+    {
+        MXL_MEMORY_REGION_TYPE_HOST = 0,
+        MXL_MEMORY_REGION_TYPE_CUDA = 1,
+    } mxlFabricsMemoryRegionType;
+
+    typedef struct mxlFabricsMemoryRegionLocation_t
+    {
+        mxlFabricsMemoryRegionType type;
+        uint64_t deviceId;
+    } mxlFabricsMemoryRegionLocation;
+
+    typedef struct mxlFabricsMemoryRegion_t
+    {
+        std::uintptr_t addr;
+        size_t size;
+        mxlFabricsMemoryRegionLocation loc;
+    } mxlFabricsMemoryRegion;
+
+    typedef struct mxlFabricsMemoryRegionGroup_t
+    {
+        mxlFabricsMemoryRegion* regions;
+        size_t count;
+    } mxlFabricsMemoryRegionGroup;
 
     /// A callback that can be passed to a target that will be called when a grain has been written.
     typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
@@ -90,6 +117,16 @@ extern "C"
     MXL_EXPORT
     mxlStatus mxlFabricsRegionsForFlowWriter(mxlFlowWriter in_writer, mxlRegions* out_regions);
 
+    /**
+     * Create a regions object from a list of memory region groups.
+     * \param in_groups A pointer to an array of memory region groups.
+     * \param in_count The number of memory region groups in the array.
+     * \param out_regions Returns a pointer to the created regions object. The user is responsible fro freeing this object by calling
+     * `mxlFabricsRegionsFree()`.
+     * \return MXL_STATUS_OK if the regions object was successfully created.
+     */
+    MXL_EXPORT
+    mxlStatus mxlFabricsRegionsFromBufferGroups(mxlFabricsMemoryRegionGroup const* in_groups, size_t in_count, mxlRegions* out_regions);
     /**
      * Free a regions object previously allocated by mxlFabricsRegionsFromFlow.
      * \param in_regions The regions object to free

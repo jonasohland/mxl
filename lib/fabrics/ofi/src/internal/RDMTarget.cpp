@@ -6,6 +6,7 @@
 #include "Exception.hpp"
 #include "FIInfo.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
+#include "Provider.hpp"
 #include "Region.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -14,7 +15,7 @@ namespace mxl::lib::fabrics::ofi
     {
         MXL_INFO("setting up target [endpoint = {}:{}, provider = {}]", config.endpointAddress.node, config.endpointAddress.service, config.provider);
 
-        auto provider = providerFromAPI(config.provider);
+        auto provider = Provider::fromAPI(config.provider);
         if (!provider)
         {
             throw Exception::invalidArgument("Invalid provider specified");

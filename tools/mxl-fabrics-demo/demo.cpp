@@ -5,6 +5,8 @@
 #include <string>
 #include <uuid.h>
 #include <CLI/CLI.hpp>
+#include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
 #include <mxl/fabrics.h>
 #include <mxl/flow.h>
 #include <mxl/mxl.h>
@@ -26,6 +28,11 @@
 
 std::sig_atomic_t volatile g_exit_requested = 0;
 
+void signal_handler(int)
+{
+    g_exit_requested = 1;
+}
+
 struct Config
 {
     std::string domain;
@@ -37,11 +44,27 @@ struct Config
     std::optional<std::string> node;
     std::optional<std::string> service;
     mxlFabricsProvider provider;
+
+    bool useCuda;
+    int cudaDeviceId{0};
 };
 
-void signal_handler(int)
+mxlStatus allocateCudaMemory(void** cudaBuf, mxlRegions* out_regions, int cudaDeviceId)
 {
-    g_exit_requested = 1;
+    if (cudaMalloc(cudaBuf, 64 * 1024) != cudaSuccess)
+    {
+        MXL_ERROR("Failed to allocate CUDA memory");
+    }
+
+    mxlFabricsMemoryRegion region{
+        reinterpret_cast<std::uintptr_t>(*cudaBuf),
+        64 * 1024,
+        {MXL_MEMORY_REGION_TYPE_CUDA, static_cast<uint32_t>(cudaDeviceId)},
+    };
+
+    mxlFabricsMemoryRegionGroup group{&region, 1};
+
+    return mxlFabricsRegionsFromBufferGroups(&group, 1, out_regions);
 }
 
 class AppInitator
@@ -54,6 +77,15 @@ public:
     ~AppInitator()
     {
         mxlStatus status;
+
+        if (_cudaBuf != nullptr)
+        {
+            if (cudaFree(_cudaBuf) != cudaSuccess)
+            {
+                MXL_ERROR("Failed to free CUDA memory");
+            }
+            _cudaBuf = nullptr;
+        }
 
         if (_targetInfo != nullptr)
         {
@@ -96,6 +128,11 @@ public:
         }
     }
 
+    mxlStatus allocateCudaMemory(mxlRegions* out_regions)
+    {
+        return ::allocateCudaMemory(&_cudaBuf, out_regions, _config.cudaDeviceId);
+    }
+
     mxlStatus setup(std::string targetInfoStr)
     {
         _instance = mxlCreateInstance(_config.domain.c_str(), "");
@@ -127,12 +164,26 @@ public:
             return status;
         }
 
+        // If we are using CUDA, we will allocate the memory regions on the CUDA device.        if (_config.useCuda)
         mxlRegions regions;
-        status = mxlFabricsRegionsForFlowReader(_reader, &regions);
-        if (status != MXL_STATUS_OK)
+        if (_config.useCuda)
         {
-            MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
-            return status;
+            status = allocateCudaMemory(&regions);
+            if (status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to convert flow regions to CUDA regions with status '{}'", static_cast<int>(status));
+                return status;
+            }
+        }
+
+        else
+        {
+            status = mxlFabricsRegionsForFlowReader(_reader, &regions);
+            if (status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
+                return status;
+            }
         }
 
         mxlInitiatorConfig initiatorConfig = {
@@ -140,12 +191,22 @@ public:
                                 .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = regions,
+            .deviceSupport = _config.useCuda
         };
 
         status = mxlFabricsInitiatorSetup(_initiator, &initiatorConfig);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to setup fabrics initiator with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        // After setting up the initiator, we can free the regions info object, the initator has kept a copy of that information during memory
+        // registration.
+        status = mxlFabricsRegionsFree(regions);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to free regions with status '{}'", static_cast<int>(status));
             return status;
         }
 
@@ -182,6 +243,7 @@ public:
     }
 
     mxlStatus run()
+
     { // Extract the FlowInfo structure.
         FlowInfo flow_info;
         auto status = mxlFlowReaderGetInfo(_reader, &flow_info);
@@ -292,6 +354,7 @@ private:
     mxlFlowReader _reader;
     mxlFabricsInitiator _initiator;
     mxlTargetInfo _targetInfo;
+    void* _cudaBuf{nullptr};
 };
 
 class AppTarget
@@ -304,6 +367,15 @@ public:
     ~AppTarget()
     {
         mxlStatus status;
+
+        if (_cudaBuf != nullptr)
+        {
+            if (cudaFree(_cudaBuf) != cudaSuccess)
+            {
+                MXL_ERROR("Failed to free CUDA memory");
+            }
+            _cudaBuf = nullptr;
+        }
 
         if (_targetInfo != nullptr)
         {
@@ -352,6 +424,11 @@ public:
                 MXL_ERROR("Failed to destroy instance with status '{}'", static_cast<int>(status));
             }
         }
+    }
+
+    mxlStatus allocateCudaMemory(mxlRegions* out_regions)
+    {
+        return ::allocateCudaMemory(&_cudaBuf, out_regions, _config.cudaDeviceId);
     }
 
     mxlStatus setup(std::string const& flowDescriptor)
@@ -407,6 +484,7 @@ public:
                                 .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = memoryRegions,
+            .deviceSupport = _config.useCuda,
         };
         status = mxlFabricsTargetSetup(_target, &targetConfig, &_targetInfo);
         if (status != MXL_STATUS_OK)
@@ -508,6 +586,7 @@ private:
     mxlFlowWriter _writer;
     mxlFabricsTarget _target;
     mxlTargetInfo _targetInfo;
+    void* _cudaBuf{nullptr};
 
     bool _flowExits{false};
 };
@@ -558,6 +637,15 @@ int main(int argc, char** argv)
         "The target information. This is used when configured as an initiator . This is the target information to send to."
         "You first start the target and it will print the targetInfo that you paste to this argument");
 
+    bool useCuda;
+    auto useCudaOpt = app.add_flag(
+        "--use-cuda", useCuda, "Use cuda memory (temporary for testing until the Flow API supports GPU memory representation");
+    useCudaOpt->default_val(false);
+
+    int cudaDeviceId;
+    auto cudaDeviceIdOpt = app.add_option("--cuda-index", cudaDeviceId, "Device index used to select the CUDA gpu.");
+    cudaDeviceIdOpt->default_val(0);
+
     CLI11_PARSE(app, argc, argv);
 
     mxlFabricsProvider mxlProvider;
@@ -579,6 +667,8 @@ int main(int argc, char** argv)
                    .node = node,
                    .service = service,
                    .provider = mxlProvider,
+                   .useCuda = useCuda,
+                   .cudaDeviceId = cudaDeviceId,
                    },
         };
 
@@ -616,6 +706,8 @@ int main(int argc, char** argv)
                    .node = node,
                    .service = service,
                    .provider = mxlProvider,
+                   .useCuda = useCuda,
+                   .cudaDeviceId = cudaDeviceId,
                    },
         };
 
