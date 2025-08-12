@@ -7,6 +7,7 @@
 #include <rdma/fabric.h>
 #include <rdma/fi_endpoint.h>
 #include "Address.hpp"
+#include "AddressVector.hpp"
 #include "Completion.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
@@ -78,6 +79,10 @@ namespace mxl::lib::fabrics::ofi
         /// Bind the endpoint to a completion queue. The endpoint can be bound to an event queue only once. The Endpoint object will take ownership of
         /// an instance of the shared pointer, so the queue can not be destroyed before the endpoint.
         void bind(std::shared_ptr<CompletionQueue> cq, uint64_t flags);
+
+        /// Bind the endpoint to an address vector. The endpoint can be bound to an address vector only once. The Endpoint object will take ownership
+        /// of an instance of the shared pointer, so the address vector can not be destroyed before the endpoint.
+        void bind(std::shared_ptr<AddressVector> av);
 
         /// This  call  transitions  the  endpoint into an enabled state.  An endpoint must be enabled before it may be used to perform data
         /// transfers. Enabling an endpoint typically results in hardware resources being assigned to it.
@@ -175,5 +180,6 @@ namespace mxl::lib::fabrics::ofi
 
         std::optional<std::shared_ptr<CompletionQueue>> _cq; /// Completion queue lives here after Endpoint::bind()
         std::optional<std::shared_ptr<EventQueue>> _eq;      /// Event queue lives here after Endpoint::bind()
+        std::optional<std::shared_ptr<AddressVector>> _av;   /// Address vector lives here after Endpoint::bind()
     };
 }

@@ -1,0 +1,104 @@
+#include "AddressVector.hpp"
+#include <rdma/fabric.h>
+#include <rdma/fi_domain.h>
+#include <sys/types.h>
+#include "Exception.hpp"
+
+namespace mxl::lib::fabrics::ofi
+{
+    ::fi_av_attr AddressVector::Attributes::toFi() const noexcept
+    {
+        ::fi_av_attr attr{};
+        attr.type = FI_AV_TABLE;
+        attr.count = count;
+        attr.ep_per_node = epPerNode;
+        attr.name = nullptr;
+        attr.map_addr = nullptr;
+        attr.flags = 0;
+        return attr;
+    }
+
+    std::shared_ptr<AddressVector> AddressVector::open(std::shared_ptr<Domain> domain, Attributes attr)
+    {
+        fid_av* raw;
+
+        auto fiAttr = attr.toFi();
+
+        fiCall(::fi_av_open, "Failed to open address vector", domain->raw(), &fiAttr, &raw, nullptr);
+
+        // expose the private constructor to std::make_shared inside this function
+        struct MakeSharedEnabler : public AddressVector
+        {
+            MakeSharedEnabler(fid_av* raw, std::shared_ptr<Domain> domain)
+                : AddressVector(raw, domain)
+            {}
+        };
+
+        return std::make_shared<MakeSharedEnabler>(raw, domain);
+    }
+
+    fi_addr_t AddressVector::insert(FabricAddress const& addr)
+    {
+        ::fi_addr_t fiAddr;
+
+        fiCall(::fi_av_insert, "Failed to insert address into the address vector.", _raw, addr.raw(), 1, &fiAddr, 0, nullptr);
+
+        return fiAddr;
+    }
+
+    void AddressVector::remove(::fi_addr_t addr) noexcept
+    {
+        fiCall(::fi_av_remove, "Failed to remove address from address vector", _raw, &addr, 1, 0);
+    }
+
+    std::string AddressVector::addrToString(FabricAddress const& addr) const
+    {
+        std::string s;
+        size_t len;
+
+        ::fi_av_straddr(_raw, addr.raw(), nullptr, &len);
+        s.resize(len);
+
+        auto ret = ::fi_av_straddr(_raw, addr.raw(), s.data(), &len);
+        if (ret == nullptr)
+        {
+            throw Exception::internal("Failed to convert address to string");
+        }
+
+        return s;
+    }
+
+    AddressVector::~AddressVector()
+    {
+        close();
+    }
+
+    // TODO: review move constructors
+    AddressVector::AddressVector(AddressVector&& other) noexcept
+        : _raw(other._raw)
+    {
+        other._raw = nullptr;
+    }
+
+    AddressVector& AddressVector::operator=(AddressVector&& other)
+    {
+        if (this != &other)
+        {
+            close();
+            _raw = other._raw;
+            other._raw = nullptr;
+        }
+        return *this;
+    }
+
+    // TODO: review move constructors
+
+    void AddressVector::close()
+    {
+        if (_raw)
+        {
+            fiCall(::fi_close, "Failed to close address vector", &_raw->fid);
+            _raw = nullptr;
+        }
+    }
+}
