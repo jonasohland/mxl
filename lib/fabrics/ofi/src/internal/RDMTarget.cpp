@@ -1,9 +1,11 @@
 #include "RDMTarget.hpp"
 #include <memory>
-#include <catch2/catch_tostring.hpp>
+#include <rdma/fabric.h>
 #include "internal/Logging.hpp"
+#include "AddressVector.hpp"
 #include "Exception.hpp"
 #include "FIInfo.hpp"
+#include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -17,13 +19,14 @@ namespace mxl::lib::fabrics::ofi
             throw Exception::invalidArgument("Invalid provider specified");
         }
 
-        // TODO:: this is copy-pasta... share this part with RCTarget!
         auto fabricInfoList = FIInfoList::get(
-            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_REMOTE_WRITE);
+            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_REMOTE_WRITE, FI_EP_RDM);
 
-        auto info = fabricInfoList.begin();
+        // TODO:: this is copy-pasta... share this part with RCTarget!
+        auto info = *fabricInfoList.begin();
+        MXL_INFO("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
 
-        auto fabric = Fabric::open(*info);
+        auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
 
         std::vector<RegisteredRegionGroup> localRegions;
@@ -45,25 +48,48 @@ namespace mxl::lib::fabrics::ofi
         }
         // TODO: share this part with RCTarget!
 
-        auto endpoint = Endpoint::create(domain);
+        auto endpoint = std::make_unique<Endpoint>(Endpoint::create(domain));
 
+        MXL_INFO("Create CQ and bind");
         auto cq = CompletionQueue::open(domain, CompletionQueueAttr::defaults());
-        endpoint.bind(cq, FI_RECV);
+        endpoint->bind(cq, FI_RECV | FI_TRANSMIT);
 
-        endpoint.enable();
+        MXL_INFO("Create AV and bind");
+        // Connectionless endpoints must be bound to an address vector. Even if it is not using the address vector.
+        auto av = AddressVector::open(domain);
+        endpoint->bind(av);
 
-        auto localAddress = endpoint.localAddress();
+        MXL_INFO("Try to enable the ep");
+        endpoint->enable();
+
+        MXL_INFO("Enabled endpoint!");
+
+        auto localAddress = endpoint->localAddress();
+        MXL_INFO("Got fabricAddress");
         auto remoteRegions = toRemote(localRegions);
+
+        for (auto const& group : remoteRegions)
+        {
+            for (auto const& region : group.view())
+            {
+                MXL_INFO("Remote region -> addr={:x} len={} rkey={:x}", region.addr, region.len, region.rkey);
+            }
+        }
 
         struct MakeUniqueEnabler : RDMTarget
         {
-            MakeUniqueEnabler(Endpoint endpoint, std::vector<RegisteredRegionGroup> regions)
-                : RDMTarget(std::move(endpoint), regions)
+            MakeUniqueEnabler(std::unique_ptr<Endpoint> endpoint, std::vector<RegisteredRegionGroup> regions)
+                : RDMTarget(std::move(endpoint), std::move(regions))
             {}
         };
 
-        return {std::make_unique<MakeUniqueEnabler>(std::move(endpoint), std::move(localRegions)),
-            std::make_unique<TargetInfo>(localAddress, std::move(remoteRegions))};
+        auto rdmTarget = std::make_unique<MakeUniqueEnabler>(std::move(endpoint), std::move(localRegions));
+        MXL_INFO("Created rdm target!");
+
+        auto targetInfo = std::make_unique<TargetInfo>(std::move(localAddress), std::move(remoteRegions));
+        MXL_INFO("Created targetInfo");
+
+        return {std::move(rdmTarget), std::move(targetInfo)};
     }
 
     Target::ReadResult RDMTarget::read()
@@ -76,7 +102,7 @@ namespace mxl::lib::fabrics::ofi
         return makeProgressBlocking(timeout);
     }
 
-    RDMTarget::RDMTarget(Endpoint endpoint, std::vector<RegisteredRegionGroup> regions)
+    RDMTarget::RDMTarget(std::unique_ptr<Endpoint> endpoint, std::vector<RegisteredRegionGroup> regions)
         : _endpoint(std::move(endpoint))
         , _regRegions(std::move(regions))
     {}
@@ -90,7 +116,7 @@ namespace mxl::lib::fabrics::ofi
     {
         Target::ReadResult result;
 
-        auto [completion, _] = _endpoint.readQueuesBlocking(timeout);
+        auto [completion, _] = _endpoint->readQueuesBlocking(timeout);
         if (completion)
         {
             if (auto dataEntry = completion.value().tryData(); dataEntry)

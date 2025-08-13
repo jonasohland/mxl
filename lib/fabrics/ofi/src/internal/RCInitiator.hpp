@@ -85,8 +85,6 @@ namespace mxl::lib::fabrics::ofi
 
         void handleCompletionError(Completion::Error); /// Handles a completion error event.
         void handleCompletionData(Completion::Data);   /// Handle a completion data event.
-        void handleConnected();                        /// Handles a Event::Connected event.
-        void handleShutdown();                         /// Handles an Event::Shutdown event.
 
         /// Restarts the endpoint. Produces a new Idle state from any previous state.
         Idle restart(Endpoint const&);

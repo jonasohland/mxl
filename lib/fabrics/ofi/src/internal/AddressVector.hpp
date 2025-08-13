@@ -46,11 +46,12 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         std::string addrToString(FabricAddress const& addr) const;
 
+        ::fid_av* raw() noexcept;
+        [[nodiscard]]
+        ::fid_av const* raw() const noexcept;
+
     private:
-        AddressVector(fid_av* raw, std::shared_ptr<Domain> domain)
-            : _raw(raw)
-            , _domain(std::move(domain))
-        {}
+        AddressVector(fid_av* raw, std::shared_ptr<Domain> domain);
 
         /// Close the address vector and release all resources. Called from the destructor and the move assignment operator.
         void close();

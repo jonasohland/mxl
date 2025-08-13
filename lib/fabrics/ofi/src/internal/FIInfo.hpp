@@ -136,7 +136,7 @@ namespace mxl::lib::fabrics::ofi
          * Get a list of provider configurations supported to the specified
          * node/service
          */
-        static FIInfoList get(std::string node, std::string service, Provider provider, uint64_t caps);
+        static FIInfoList get(std::string node, std::string service, Provider provider, uint64_t caps, ::fi_ep_type epType);
 
         // Take ownership over a fi_info raw pointer.
         static FIInfoList own(::fi_info* info) noexcept;

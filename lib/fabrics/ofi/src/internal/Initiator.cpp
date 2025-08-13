@@ -1,6 +1,8 @@
 #include "Initiator.hpp"
+#include "mxl/fabrics.h"
 #include "Exception.hpp"
 #include "RCInitiator.hpp"
+#include "RDMInitiator.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -22,7 +24,21 @@ namespace mxl::lib::fabrics::ofi
             _inner.release();
         }
 
-        _inner = RCInitiator::setup(config);
+        switch (config.provider)
+        {
+            case MXL_SHARING_PROVIDER_AUTO:
+            case MXL_SHARING_PROVIDER_VERBS: {
+                _inner = RCInitiator::setup(config);
+                return;
+            }
+
+            case MXL_SHARING_PROVIDER_TCP:
+            case MXL_SHARING_PROVIDER_SHM:
+            case MXL_SHARING_PROVIDER_EFA: {
+                _inner = RDMInitiator::setup(config);
+                return;
+            }
+        }
     }
 
     void InitiatorWrapper::addTarget(TargetInfo const& targetInfo)

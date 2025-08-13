@@ -2,6 +2,7 @@
 #include <chrono>
 #include <algorithm>
 #include <uuid.h>
+#include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
 #include "internal/Logging.hpp"
 #include "Exception.hpp"
@@ -255,7 +256,7 @@ namespace mxl::lib::fabrics::ofi
         }
 
         auto fabricInfoList = FIInfoList::get(
-            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE | FI_REMOTE_WRITE);
+            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE | FI_REMOTE_WRITE, FI_EP_MSG);
 
         if (fabricInfoList.begin() == fabricInfoList.end())
         {

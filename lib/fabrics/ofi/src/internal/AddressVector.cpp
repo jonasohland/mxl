@@ -1,7 +1,11 @@
 #include "AddressVector.hpp"
+#include <memory>
+#include <utility>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
+#include <rdma/fi_errno.h>
 #include <sys/types.h>
+#include "internal/Logging.hpp"
 #include "Exception.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -39,9 +43,21 @@ namespace mxl::lib::fabrics::ofi
 
     fi_addr_t AddressVector::insert(FabricAddress const& addr)
     {
-        ::fi_addr_t fiAddr;
+        ::fi_addr_t fiAddr{FI_ADDR_UNSPEC};
 
-        fiCall(::fi_av_insert, "Failed to insert address into the address vector.", _raw, addr.raw(), 1, &fiAddr, 0, nullptr);
+        std::string s;
+        char ss[1024];
+        size_t addrlen;
+        fi_av_straddr(_raw, addr.raw(), ss, &addrlen);
+
+        s.resize(addrlen + 1);
+        fi_av_straddr(_raw, addr.raw(), s.data(), &addrlen);
+        MXL_INFO("Attempt to insert address: {}", s);
+
+        if (auto ret = ::fi_av_insert(_raw, addr.raw(), 1, &fiAddr, 0, nullptr); ret != 1)
+        {
+            throw Exception::internal("Failed to insert address into the address vector. {}", ::fi_strerror(ret));
+        }
 
         return fiAddr;
     }
@@ -68,12 +84,16 @@ namespace mxl::lib::fabrics::ofi
         return s;
     }
 
+    AddressVector::AddressVector(::fid_av* raw, std::shared_ptr<Domain> domain)
+        : _raw(raw)
+        , _domain(std::move(domain))
+    {}
+
     AddressVector::~AddressVector()
     {
         close();
     }
 
-    // TODO: review move constructors
     AddressVector::AddressVector(AddressVector&& other) noexcept
         : _raw(other._raw)
     {
@@ -82,12 +102,11 @@ namespace mxl::lib::fabrics::ofi
 
     AddressVector& AddressVector::operator=(AddressVector&& other)
     {
-        if (this != &other)
-        {
-            close();
-            _raw = other._raw;
-            other._raw = nullptr;
-        }
+        close();
+
+        _raw = other._raw;
+        other._raw = nullptr;
+
         return *this;
     }
 
@@ -97,8 +116,20 @@ namespace mxl::lib::fabrics::ofi
     {
         if (_raw)
         {
+            MXL_INFO("Closing address vector");
+
             fiCall(::fi_close, "Failed to close address vector", &_raw->fid);
             _raw = nullptr;
         }
+    }
+
+    ::fid_av* AddressVector::raw() noexcept
+    {
+        return _raw;
+    }
+
+    ::fid_av const* AddressVector::raw() const noexcept
+    {
+        return _raw;
     }
 }

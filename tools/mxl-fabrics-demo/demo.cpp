@@ -176,11 +176,14 @@ public:
         }
         while (status == MXL_ERR_NOT_READY);
 
+        MXL_INFO("Target added and ready to transfer!");
+
         return MXL_STATUS_OK;
     }
 
     mxlStatus run()
     { // Extract the FlowInfo structure.
+        MXL_INFO("Running initiator");
         FlowInfo flow_info;
         auto status = mxlFlowReaderGetInfo(_reader, &flow_info);
         if (status != MXL_STATUS_OK)
@@ -221,6 +224,8 @@ public:
 
                 continue;
             }
+
+            MXL_INFO("New Grain to transfer {}", grainIndex);
 
             // Okay the grain is ready, we can transfer it to the targets.
             ret = mxlFabricsInitiatorTransferGrain(_initiator, grainIndex);

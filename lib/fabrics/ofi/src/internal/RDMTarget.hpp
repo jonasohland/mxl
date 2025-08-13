@@ -18,12 +18,12 @@ namespace mxl::lib::fabrics::ofi
         Target::ReadResult readBlocking(std::chrono::steady_clock::duration timeout) final;
 
     private:
-        RDMTarget(Endpoint endpoint, std::vector<RegisteredRegionGroup> regions);
+        RDMTarget(std::unique_ptr<Endpoint> endpoint, std::vector<RegisteredRegionGroup> regions);
 
         Target::ReadResult makeProgress();
         Target::ReadResult makeProgressBlocking(std::chrono::steady_clock::duration timeout);
 
-        Endpoint _endpoint;
+        std::unique_ptr<Endpoint> _endpoint;
         std::vector<RegisteredRegionGroup> _regRegions;
     };
 }

@@ -121,6 +121,11 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         std::shared_ptr<EventQueue> eventQueue() const;
 
+        /// If an address vector is associated with this endpoint. Get the AV. Throws an exception if no address vector is
+        /// associated with this endpoint
+        [[nodiscard]]
+        std::shared_ptr<AddressVector> addressVector() const;
+
         /// Do a non-blocking read of both the event and completion queue associated with this endpoint.
         std::pair<std::optional<Completion>, std::optional<Event>> readQueues();
 

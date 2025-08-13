@@ -39,6 +39,7 @@ extern "C"
         MXL_SHARING_PROVIDER_TCP = 1,   /// A provider used for debugging, uses linux tcp sockets.
         MXL_SHARING_PROVIDER_VERBS = 2, /// Provider for userspace verbs (libibverbs) and librdmcm for connection management.
         MXL_SHARING_PROVIDER_EFA = 3,   /// Provider for AWS Elastic Fabric Adapter.
+        MXL_SHARING_PROVIDER_SHM = 4,
     } mxlFabricsProvider;
 
     /// Address of a logical network endpoint. This is analogous to a hostname and port number in classic ipv4 networking.

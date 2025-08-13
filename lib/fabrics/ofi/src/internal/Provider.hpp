@@ -11,6 +11,7 @@ namespace mxl::lib::fabrics::ofi
         TCP,
         VERBS,
         EFA,
+        SHM,
     };
 
     /// Convert between external and internal versions of this type

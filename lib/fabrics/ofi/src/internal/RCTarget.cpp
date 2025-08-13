@@ -1,5 +1,6 @@
 #include "RCTarget.hpp"
 #include <cstdint>
+#include <rdma/fabric.h>
 #include "internal/Logging.hpp"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
@@ -50,7 +51,7 @@ namespace mxl::lib::fabrics::ofi
 
         // Get a list of available fabric configurations available on this machine.
         auto fabricInfoList = FIInfoList::get(
-            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_REMOTE_WRITE);
+            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_REMOTE_WRITE, FI_EP_MSG);
 
         if (fabricInfoList.begin() == fabricInfoList.end())
         {

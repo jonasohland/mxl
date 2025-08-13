@@ -24,6 +24,7 @@ struct fmt::formatter<mxlFabricsProvider>
             case MXL_SHARING_PROVIDER_TCP:   return fmt::format_to(ctx.out(), "tcp");
             case MXL_SHARING_PROVIDER_VERBS: return fmt::format_to(ctx.out(), "verbs");
             case MXL_SHARING_PROVIDER_EFA:   return fmt::format_to(ctx.out(), "efa");
+            case MXL_SHARING_PROVIDER_SHM:   return fmt::format_to(ctx.out(), "shm");
             default:                         return fmt::format_to(ctx.out(), "unknown");
         }
     }
@@ -45,6 +46,7 @@ struct fmt::formatter<ofi::Provider>
             case ofi::Provider::TCP:   return fmt::format_to(ctx.out(), "tcp");
             case ofi::Provider::VERBS: return fmt::format_to(ctx.out(), "verbs");
             case ofi::Provider::EFA:   return fmt::format_to(ctx.out(), "efa");
+            case ofi::Provider::SHM:   return fmt::format_to(ctx.out(), "shm");
             default:                   return fmt::format_to(ctx.out(), "unknown");
         }
     }

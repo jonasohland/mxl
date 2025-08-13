@@ -75,6 +75,7 @@ target_link_libraries(mxl-fabrics-static
 set(mxl_fabrics_sources
         src/fabrics.cpp
         src/internal/Address.cpp
+        src/internal/AddressVector.cpp
         src/internal/CompletionQueue.cpp
         src/internal/Completion.cpp
         src/internal/Domain.cpp
@@ -98,6 +99,8 @@ set(mxl_fabrics_sources
         src/internal/Target.cpp
         src/internal/RCTarget.cpp
         src/internal/RCInitiator.cpp
+        src/internal/RDMTarget.cpp
+        src/internal/RDMInitiator.cpp
         src/internal/TargetInfo.cpp
 )
 

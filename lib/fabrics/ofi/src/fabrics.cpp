@@ -713,6 +713,7 @@ namespace
             case MXL_SHARING_PROVIDER_TCP:   return providerEnumValueToString(out_string, in_out_stringSize, "tcp");
             case MXL_SHARING_PROVIDER_EFA:   return providerEnumValueToString(out_string, in_out_stringSize, "efa");
             case MXL_SHARING_PROVIDER_VERBS: return providerEnumValueToString(out_string, in_out_stringSize, "verbs");
+            case MXL_SHARING_PROVIDER_SHM:   return providerEnumValueToString(out_string, in_out_stringSize, "shm");
             default:                         return MXL_ERR_INVALID_ARG;
         }
     }
