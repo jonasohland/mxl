@@ -13,7 +13,7 @@
 #include <rfl/json.hpp>
 #include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
-#include "internal/FlowData.hpp"
+#include "internal/FlowReader.hpp"
 #include "internal/Initiator.hpp"
 #include "internal/Provider.hpp"
 #include "internal/Region.hpp"
@@ -28,19 +28,61 @@ namespace
     namespace mxl = mxl::lib;
 
     extern "C" MXL_EXPORT
-    mxlStatus mxlFabricsRegionsFromFlow(mxlFlowData const in_flowData, mxlRegions* out_regions)
+    mxlStatus mxlFabricsRegionsForFlowReader(mxlFlowReader in_reader, mxlRegions* out_regions)
     {
-        if (in_flowData == nullptr || out_regions == nullptr)
+        if (in_reader == nullptr || out_regions == nullptr)
         {
             return MXL_ERR_INVALID_ARG;
         }
 
         try
         {
-            auto regions = ofi::RegionGroups::fromFlow(mxl::FlowData::fromAPI(in_flowData));
+            auto reader = ::mxl::lib::to_FlowReader(in_reader);
 
             // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
-            auto regionPtr = std::make_unique<ofi::RegionGroups>(regions).release();
+            auto regionPtr = std::make_unique<ofi::RegionGroups>(ofi::RegionGroups::fromFlow(reader->getFlowData())).release();
+
+            *out_regions = regionPtr->toAPI();
+
+            return MXL_STATUS_OK;
+        }
+
+        catch (ofi::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
+        catch (std::exception& e)
+        {
+            MXL_ERROR("Failed to create Regions object: {}", e.what());
+
+            return MXL_ERR_UNKNOWN;
+        }
+
+        catch (...)
+        {
+            MXL_ERROR("Failed to create Regions object.");
+
+            return MXL_ERR_UNKNOWN;
+        }
+    }
+
+    extern "C" MXL_EXPORT
+    mxlStatus mxlFabricsRegionsForFlowWriter(mxlFlowWriter in_writer, mxlRegions* out_regions)
+    {
+        if (in_writer == nullptr || out_regions == nullptr)
+        {
+            return MXL_ERR_INVALID_ARG;
+        }
+
+        try
+        {
+            auto reader = ::mxl::lib::to_FlowWriter(in_writer);
+
+            // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
+            auto regionPtr = std::make_unique<ofi::RegionGroups>(ofi::RegionGroups::fromFlow(reader->getFlowData())).release();
 
             *out_regions = regionPtr->toAPI();
 

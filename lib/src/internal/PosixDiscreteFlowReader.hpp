@@ -35,6 +35,12 @@ namespace mxl::lib
         virtual mxlFlowInfo getFlowInfo() override;
 
         ///
+        /// Accessor for the underlying flow data.
+        /// The reader must be properly attached to the flow before invoking this method.
+        ///
+        virtual FlowData& getFlowData() override;
+
+        ///
         /// Accessor for a specific grain at a specific index.
         /// The index must be >= mxlFlowInfo.tailIndex.
         ///
@@ -61,9 +67,6 @@ namespace mxl::lib
         /// \return A status code describing the outcome of the call.
         ///
         virtual mxlStatus getGrain(std::uint64_t in_index, mxlGrainInfo* out_grainInfo, std::uint8_t** out_payload) override;
-
-        [[nodiscard]]
-        DiscreteFlowData* flowData() const noexcept override;
 
     private:
         std::unique_ptr<DiscreteFlowData> _flowData;

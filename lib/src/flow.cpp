@@ -8,8 +8,6 @@
 #include <uuid.h>
 #include "internal/Instance.hpp"
 #include "internal/Logging.hpp"
-#include "mxl/dataformat.h"
-#include "mxl/mxl.h"
 
 using namespace mxl::lib;
 
