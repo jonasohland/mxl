@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "DiscreteFlowData.hpp"
 #include "FlowWriter.hpp"
 
 namespace mxl::lib
@@ -16,9 +15,6 @@ namespace mxl::lib
         virtual mxlStatus commit(GrainInfo const& grainInfo) = 0;
 
         virtual mxlStatus cancel() = 0;
-
-        [[nodiscard]]
-        virtual DiscreteFlowData* flowData() const noexcept = 0;
 
     protected:
         using FlowWriter::FlowWriter;

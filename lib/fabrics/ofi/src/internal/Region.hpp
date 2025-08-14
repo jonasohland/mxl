@@ -63,7 +63,7 @@ namespace mxl::lib::fabrics::ofi
     class RegionGroups
     {
     public:
-        static RegionGroups fromFlow(FlowData* flow);
+        static RegionGroups fromFlow(FlowData& flow);
 
         static RegionGroups* fromAPI(mxlRegions) noexcept;
         [[nodiscard]]
