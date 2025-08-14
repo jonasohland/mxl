@@ -126,16 +126,8 @@ public:
             return status;
         }
 
-        mxlFlowData flowData;
-        status = mxlFlowReaderGetFlowData(_reader, &flowData);
-        if (status != MXL_STATUS_OK)
-        {
-            MXL_ERROR("Failed to get flow data with status '{}'", static_cast<int>(status));
-            return status;
-        }
-
         mxlRegions regions;
-        status = mxlFabricsRegionsFromFlow(flowData, &regions);
+        status = mxlFabricsRegionsForFlowReader(_reader, &regions);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
@@ -389,16 +381,8 @@ public:
             return status;
         }
 
-        mxlFlowData flowData;
-        status = mxlFlowWriterGetFlowData(_writer, &flowData);
-        if (status != MXL_STATUS_OK)
-        {
-            MXL_ERROR("Failed to get flow data with status '{}'", static_cast<int>(status));
-            return status;
-        }
-
         mxlRegions memoryRegions;
-        status = mxlFabricsRegionsFromFlow(flowData, &memoryRegions);
+        status = mxlFabricsRegionsForFlowWriter(_writer, &memoryRegions);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));

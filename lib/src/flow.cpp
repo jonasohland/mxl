@@ -299,7 +299,7 @@ mxlStatus mxlFlowWriterGetFlowData(mxlFlowWriter writer, mxlFlowData* out_flowDa
                     if (auto concreteWriter = dynamic_cast<DiscreteFlowWriter*>(cppWriter); concreteWriter != nullptr)
 
                     {
-                        *out_flowData = concreteWriter->flowData()->toAPI();
+                        *out_flowData = &concreteWriter->getFlowData();
                         return MXL_STATUS_OK;
                     }
                 }
@@ -340,7 +340,7 @@ mxlStatus mxlFlowReaderGetFlowData(mxlFlowReader reader, mxlFlowData* out_flowDa
                     if (auto concreteReader = dynamic_cast<DiscreteFlowReader*>(cppReader); concreteReader != nullptr)
 
                     {
-                        *out_flowData = concreteReader->flowData()->toAPI();
+                        *out_flowData = &concreteReader->getFlowData();
                         return MXL_STATUS_OK;
                     }
                 }
