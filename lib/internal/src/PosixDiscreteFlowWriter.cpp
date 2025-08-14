@@ -3,6 +3,7 @@
 
 #include "PosixDiscreteFlowWriter.hpp"
 #include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #include <fcntl.h>
 #include <uuid.h>
@@ -87,9 +88,12 @@ namespace mxl::lib
         return MXL_ERR_UNKNOWN;
     }
 
-    DiscreteFlowData* PosixDiscreteFlowWriter::flowData() const noexcept
+    FlowData& PosixDiscreteFlowWriter::getFlowData()
     {
-        return _flowData.get();
+        if (_flowData)
+        {
+            return *_flowData;
+        }
+        throw std::runtime_error("no open flow");
     }
-
 }

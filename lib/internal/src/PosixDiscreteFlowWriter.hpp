@@ -49,12 +49,14 @@ namespace mxl::lib
         virtual mxlStatus cancel() override;
 
         ///
+        /// \see FlowWriter::getFlowData()
+        ///
+        virtual FlowData& getFlowData() override;
+
+        ///
         /// \see FlowWriter
         ///
         virtual void flowRead() override;
-
-        [[nodiscard]]
-        DiscreteFlowData* flowData() const noexcept override;
 
     private:
         /// The FlowData for the currently opened flow. null if no flow is opened.

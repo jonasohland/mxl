@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include "DiscreteFlowData.hpp"
 #include "FlowReader.hpp"
 
 namespace mxl::lib
@@ -38,9 +37,6 @@ namespace mxl::lib
         /// \return A status code describing the outcome of the call.
         ///
         virtual mxlStatus getGrain(std::uint64_t in_index, mxlGrainInfo* out_grainInfo, std::uint8_t** out_payload) = 0;
-
-        [[nodiscard]]
-        virtual DiscreteFlowData* flowData() const noexcept = 0;
 
     protected:
         using FlowReader::FlowReader;
