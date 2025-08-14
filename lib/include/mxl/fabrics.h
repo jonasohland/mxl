@@ -13,43 +13,69 @@ extern "C"
 {
 #endif
 
+    /// Central instance object, holds resources that are global to all initiators and targets.
     typedef struct mxlFabricsInstance_t* mxlFabricsInstance;
+
+    /// The target is the logical receiver of grains transferred over the network. It is the receiver
+    /// of remote write requests by the 'initiator'.
     typedef struct mxlFabricsTarget_t* mxlFabricsTarget;
+
+    /// The TargetInfo object holds the local fabric address and keys for a target. It is returned after setting
+    /// up a new target and must be passed to the initiator to connect it.
     typedef struct mxlTargetInfo_t* mxlTargetInfo;
+
+    /// The initiator is the logical sender of grains over the network. It is the initiator of remote write requests
+    /// to registered memory regions of a target.
     typedef struct mxlFabricsInitiator_t* mxlFabricsInitiator;
+
+    /// A collection of memory regions that can be the target or the source of remote write operations.
+    /// Can be obtained by getting the flow data from a flow reader or writer, and converting it to a regions collection
+    /// with mxlFabricsRegionsFromFlow().
+    typedef struct mxlRegions_t* mxlRegions;
 
     typedef enum mxlFabricsProvider
     {
-        MXL_SHARING_PROVIDER_AUTO = 0,
-        MXL_SHARING_PROVIDER_TCP = 1,
-        MXL_SHARING_PROVIDER_VERBS = 2,
-        MXL_SHARING_PROVIDER_EFA = 3,
+        MXL_SHARING_PROVIDER_AUTO = 0,  /// Auto select the best provider
+        MXL_SHARING_PROVIDER_TCP = 1,   /// A provider used for debugging, uses linux tcp sockets.
+        MXL_SHARING_PROVIDER_VERBS = 2, /// Provider for userspace verbs (libibverbs) and librdmcm for connection management.
+        MXL_SHARING_PROVIDER_EFA = 3,   /// Provider for AWS Elastic Fabric Adapter.
     } mxlFabricsProvider;
 
+    /// Address of a logical network endpoint. This is analogous to a hostname and port number in classic ipv4 networking.
+    /// The actual values for node and service vary between providers, but often an ip address as the node value and a port number as the service
+    /// value are sufficient.
     typedef struct mxlEndpointAddress_t
     {
         char const* node;
         char const* service;
     } mxlEndpointAddress;
 
-    typedef void* mxlRegions;
-
+    /// Configuration object required to set up a new target.
     typedef struct mxlTargetConfig_t
     {
-        mxlEndpointAddress endpointAddress;
-        mxlFabricsProvider provider;
-        mxlRegions regions;
+        mxlEndpointAddress endpointAddress; /// Bind address for the local endpoint.
+        mxlFabricsProvider provider;        /// The provider that should be used
+        mxlRegions regions;                 /// Local memory regions of the flow that grains should be written to.
     } mxlTargetConfig;
 
+    /// Configuration object required to set up an initiator.
     typedef struct mxlInitiatorConfig_t
     {
-        mxlEndpointAddress endpointAddress;
-        mxlFabricsProvider provider;
-        mxlRegions regions;
+        mxlEndpointAddress endpointAddress; /// Bind address for the local endpoint.
+        mxlFabricsProvider provider;        /// The provider that should be used.
+        mxlRegions regions;                 /// Local memory regions of the flow that grains should source of remote write requests.
     } mxlInitiatorConfig;
 
+    /// A callback that can be passed to a target that will be called when a grain has been written.
     typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
 
+    /**
+     * Convert the flow data of a reader or writer to a collection of memory regions.
+     * The regions will be used to register the shared memory of the reader or writer as source or target of data transfer operations.
+     * The returned object must be freed with mxlFabricsRegionsFree(). The object can be freed after the target or initiator has been created.
+     * \param in_flowData Obtained from a flow reader or writer.
+     * \param out_regions A pointer to a memory location where the address of the returned collection of memory regions will be written.
+     */
     MXL_EXPORT
     mxlStatus mxlFabricsRegionsFromFlow(mxlFlowData const in_flowData, mxlRegions* out_regions);
 
@@ -80,10 +106,10 @@ extern "C"
     mxlStatus mxlFabricsDestroyInstance(mxlFabricsInstance in_instance);
 
     /**
-     * Create a fabrics target instance.
+     * Create a fabrics target. The target is the receiver of write operations from an initiator.
      * \param in_fabricsInstance A valid mxl fabrics instance
      * \param out_target A valid fabrics target
-     */
+     */ 
     MXL_EXPORT
     mxlStatus mxlFabricsCreateTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsTarget* out_target);
 
@@ -96,11 +122,14 @@ extern "C"
     mxlStatus mxlFabricsDestroyTarget(mxlFabricsInstance in_fabricsInstance, mxlFabricsTarget in_target);
 
     /**
-     * Configure the target.
+     * Configure the target. After the target has been configured, it is ready to receive transfers from an initiator.
+     * If additional connection setup is required by the underlying implementation it might not happen during the call to
+     * mxlFabricsTargetSetup, but be deferred until the first call to mxlFabricsTargetTryNewGrain().
      * \param in_target A valid fabrics target
      * \param in_config The target configuration. This will be used to create an endpoint and register a memory region. The memory region corresponds
      * to the one that will be written to by the initiator.
-     * \param out_info An mxlTargetInfo_t object which should be shared to a remote initiator which this target should receive data from.
+     * \param out_info An mxlTargetInfo_t object which should be shared to a remote initiator which this target should receive data from. The object
+     * must be freed with mxlFabricsFreeTargetInfo().
      * \return The result code. \see mxlStatus
      */
     MXL_EXPORT
@@ -108,27 +137,28 @@ extern "C"
         mxlTargetInfo* out_info);
 
     /**
-     * Non-blocking accessor for a flow grain at a specific index
+     * Non-blocking accessor for a flow grain at a specific index.
      * \param in_target A valid fabrics target
      * \param out_index The index of the grain that is ready, if any.
-     * \param out_completed Indicates if the grain was written. No distinction is made between a partial or fully written grain, they both return true.
-     * \return The result code. \see mxlStatus
+     * \return The result code. MXL_ERR_NOT_READY if no grain was available at the time of the call, and the call should be retried. \see mxlStatus
      */
     MXL_EXPORT
     mxlStatus mxlFabricsTargetTryNewGrain(mxlFabricsTarget in_target, uint64_t* out_index);
 
     /**
-     * Blocking accessor for a flow grain at a specific index
+     * Blocking accessor for a flow grain at a specific index.
      * \param in_target A valid fabrics target
      * \param out_index The index of the grain that is ready, if any.
      * \param in_timeoutMs How long should we wait for the grain (in milliseconds)
-     * \return The result code. \see mxlStatus
+     * \return The result code. MXL_ERR_NOT_READY if no grain was available before the timeout. \see mxlStatus
      */
     MXL_EXPORT
     mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint64_t* out_index, uint16_t in_timeoutMs);
 
     /**
-     * Set a callback function to be called everytime a new grain is available.
+     * Set a callback function to be called everytime a new grain is available. This function will spawn a background thread in
+     * which the callback function will be executed when a grain is available. The behaviour of the other grain accessor functions
+     * for the target is undefined when a callback has been set.
      * \param in_target A valid fabrics target
      * \param in_callback A callback function to be called when a new grain is available.
      * \return The result code. \see mxlStatus
@@ -163,7 +193,9 @@ extern "C"
     mxlStatus mxlFabricsInitiatorSetup(mxlFabricsInitiator in_initiator, mxlInitiatorConfig const* in_config);
 
     /**
-     * Add a target to the initiator. This will allow the initiator to send data to the target.
+     * Add a target to the initiator. This will allow the initiator to send data to the target in subsequent calls to
+     * mxlFabricsInitiatorTransferGrain(). This function is always non-blocking. If additional connection setup is required by the underlying
+     * implementation, it will only happen during a call to mxlFabricsInitiatorMakeProgress*().
      * \param in_initiator A valid fabrics initiator
      * \param in_targetInfo The target information. This should be the same as the one returned from "mxlFabricsTargetSetup".
      */
@@ -171,7 +203,10 @@ extern "C"
     mxlStatus mxlFabricsInitiatorAddTarget(mxlFabricsInitiator in_initiator, mxlTargetInfo const in_targetInfo);
 
     /**
-     * Remove a target from the initiator.
+     * Remove a target from the initiator. This function is always non-blocking. If any additional communication for a graceful shutdown is required
+     * it will happend during a call to mxlFabricsInitiatorMakeProgress*(). It is guaranteed that no new grain transfer operations will be queued
+     * for this target during calls to mxlFabricsInitiatorTransferGrain() after the target was removed, but it is only guaranteed that the connection
+     * shutdown has completed after mxlFabricsInitiatorMakeProgress*() no longer returns MXL_ERR_NOT_READY.
      * \param in_initiator A valid fabrics initiator
      * \param in_targetInfo The target information. This should be the same as the one returned from "mxlFabricsTargetSetup".
      */
@@ -179,7 +214,8 @@ extern "C"
     mxlStatus mxlFabricsInitiatorRemoveTarget(mxlFabricsInitiator in_initiator, mxlTargetInfo const in_targetInfo);
 
     /**
-     * Transfer of a grain to all added targets.
+     * Enqueue a transfer operation to all added targets. This function is always non-blocking. The transfer operation might be started right away,
+     * but is only guaranteed to have completed after mxlFabricsInitiatorMakeProgress*() no longer returns MXL_ERR_NOT_READY.
      * \param in_initiator A valid fabrics initiator
      * \param in_grainIndex The index of the grain to transfer.
      * \return The result code. \see mxlStatus
@@ -188,12 +224,20 @@ extern "C"
     mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInitiator in_initiator, uint64_t in_grainIndex);
 
     /**
-     *
+     * This function must be called regularly for the initiator to make progress on queued transfer operations, connection establishment operations
+     * and connection shutdown operations.
+     * \param in_initiator The initiator that should make progress.
+     * \return The result code. Returns MXL_ERR_NOT_READY if there is still progress to be made, and not all operations have completed.
      */
     MXL_EXPORT
     mxlStatus mxlFabricsInitiatorMakeProgressNonBlocking(mxlFabricsInitiator in_initiator);
 
     /**
+     * This function must be called regularly for the initiator to make progress on queued transfer operations, connection establishment operations
+     * and connection shutdown operations.
+     * \param in_initiator The initiator that should make progress.
+     * \return The result code. Returns MXL_ERR_NOT_READY if there is still progress to be made and not all operations have completed before the
+     * timeout.
      */
     MXL_EXPORT
     mxlStatus mxlFabricsInitiatorMakeProgressBlocking(mxlFabricsInitiator in_initiator, uint16_t in_timeoutMs);
@@ -201,7 +245,7 @@ extern "C"
     // Below are helper functions
 
     /**
-     * Convert a string to a fabrics provider.
+     * Convert a string to a fabrics provider enum value.
      * \param in_string A valid string to convert
      * \param out_provider A valid fabrics provider to convert to
      * \return The result code. \see mxlStatus
@@ -210,7 +254,7 @@ extern "C"
     mxlStatus mxlFabricsProviderFromString(char const* in_string, mxlFabricsProvider* out_provider);
 
     /**
-     * Convert a fabrics provider to a string.
+     * Convert a fabrics provider enum value to a string.
      * \param in_provider A valid fabrics provider to convert
      * \param out_string A user supplied buffer of the correct size. Initially you can pass a NULL pointer to obtain the size of the string.
      * \param in_stringSize The size of the output string.
@@ -219,7 +263,7 @@ extern "C"
     mxlStatus mxlFabricsProviderToString(mxlFabricsProvider in_provider, char* out_string, size_t* in_stringSize);
 
     /**
-     * Convert the target information to a string. This output string can be shared with a remote initiator.
+     * Serialize a target info object obtained from mxlFabricsTargetSetup() into a string representation.
      * \param in_targetInfo A valid target info to serialize
      * \param out_string A user supplied buffer of the correct size. Initially you can pass a NULL pointer to obtain the size of the string.
      * \param in_stringSize The size of the output string.
@@ -228,7 +272,7 @@ extern "C"
     mxlStatus mxlFabricsTargetInfoToString(mxlTargetInfo const in_targetInfo, char* out_string, size_t* in_stringSize);
 
     /**
-     * Convert a string to a  target information.
+     * Parse a targetInfo object from its string representation.
      * \param in_string A valid string to deserialize
      * \param out_targetInfo A valid target info to deserialize to
      */
