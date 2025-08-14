@@ -166,8 +166,6 @@ namespace mxl::lib::fabrics::ofi
 
         fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), FI_SOURCE, hints.raw(), &info);
 
-        // fi_freeinfo(hints); // TODO: understand why this makes a crash.. according to the documentation hints shoud be freed after use.
-
         return FIInfoList{info};
     }
 

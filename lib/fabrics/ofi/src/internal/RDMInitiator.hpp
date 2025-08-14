@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <rdma/fabric.h>
@@ -19,11 +20,6 @@ namespace mxl::lib::fabrics::ofi
     public:
         RDMInitiatorEndpoint(std::shared_ptr<Endpoint> ep, FabricAddress, std::vector<RemoteRegionGroup>);
 
-        /// Returns true if there is any pending events that the endpoint is waiting for, and for which
-        /// the queues must be polled
-        [[nodiscard]]
-        bool hasPendingWork() const noexcept;
-
         /// Returns true if the endpoint is idle and could be actived.
         [[nodiscard]]
         bool isIdle() const noexcept;
@@ -32,35 +28,31 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         bool canEvict() const noexcept;
 
+        /// Try to activate the endpoint.
+        void activate();
+
         /// Initiate a shutdown process. The endpoint will have pending work until a shutdown or error event will be
         /// received. After which it can be evicted from the initiator.
         void shutdown();
 
-        /// Try to activate the endpoint.
-        void activate();
-
-        // Consume a completion that was posted to the associated completion queue
-        void consume(Completion);
         void postTransfer(LocalRegionGroup const& localRegion, uint64_t index);
 
-    private: /// The idle state. In this state the endpoint waits to be activated.
+    private:
+        /// The idle state. In this state the endpoint waits to be activated.
         struct Idle
         {};
 
-        // Remote endpoint was added to the address vector, in this state we can write to the remote endpoint.
+        /// Remote endpoint was added to the address vector, in this state we can write to the remote endpoint.
         struct Added
         {
-            ::fi_addr_t fiAddr;  // Address index in address vector
-            std::size_t pending; /// The number of currently pending write requests.
+            ::fi_addr_t fiAddr; // Address index in address vector
         };
 
+        /// The endpoint is done and can be evicted from the initiator.
         struct Done
         {};
 
         using State = std::variant<Idle, Added, Done>;
-
-        void handleCompletionError(Completion::Error); /// Handles a completion error event.
-        void handleCompletionData(Completion::Data);   /// Handle a completion data event.
 
         State _state;
         std::shared_ptr<Endpoint> _ep;
@@ -94,19 +86,25 @@ namespace mxl::lib::fabrics::ofi
         /// Poll the completion queue and process the events until the queue is empty.
         void pollCQ();
 
+        /// Attempt to consolidate the state
+        void consolidateState();
         /// Try to activate any idle endpoints.
         void activateIdleEndpoints();
-
         /// Evict any dead endpoints that are no longer used.
         void evictDeadEndpoints();
 
-        void consolidateState();
+        /// Consume a completion entry
+        void consume(Completion);
+        void handleCompletionError(Completion::Error); /// Handles a completion error event.
+        void handleCompletionData(Completion::Data);   /// Handle a completion data event.
 
         std::shared_ptr<Endpoint> _endpoint;
 
         std::vector<RegisteredRegionGroup> _registeredRegions;
         std::vector<LocalRegionGroup> _localRegions;
 
-        std::map<Endpoint::Id, RDMInitiatorEndpoint> _targets{};
+        std::map<Endpoint::Id, RDMInitiatorEndpoint> _targets;
+
+        size_t pending{0};
     };
 }

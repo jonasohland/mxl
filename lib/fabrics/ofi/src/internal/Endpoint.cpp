@@ -1,5 +1,4 @@
 #include "Endpoint.hpp"
-#include <cerrno>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -324,9 +323,6 @@ namespace mxl::lib::fabrics::ofi
     void Endpoint::write(LocalRegionGroup const& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr,
         std::optional<uint64_t> immData)
     {
-        auto remoteReg = remoteGroup.view().front();
-        MXL_INFO("Remote addr={} len={} rkey={:x} fiAddr={}", remoteReg.addr, remoteReg.len, remoteReg.rkey, destAddr);
-
         uint64_t data = immData.value_or(0);
         uint64_t flags = FI_TRANSMIT_COMPLETE | FI_COMMIT_COMPLETE;
         flags |= immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
@@ -341,27 +337,12 @@ namespace mxl::lib::fabrics::ofi
             .context = _raw,
             .data = data,
         };
-        MXL_INFO("About to call fi_writemsg");
-        // fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
-        for (;;)
-        {
-            auto ret = ::fi_writemsg(_raw, &msg, flags);
-            MXL_INFO("fi_writemsg result {}", ret);
-            if (ret == FI_SUCCESS)
-            {
-                return;
-            }
-            if (ret == -EAGAIN)
-            {
-                continue;
-            }
-            throw FIException::make(ret, "Failed to push rma write to work queue");
-        }
+
+        fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
     }
 
     void Endpoint::recv(LocalRegion region)
     {
-        // TODO: this should use fi_recvmsg and fi_msg so we can also pass the local endpoint in the context
         auto iovec = region.toIov();
         fiCall(::fi_recv, "Failed to push recv to work queue", _raw, iovec.iov_base, iovec.iov_len, nullptr, FI_ADDR_UNSPEC, nullptr);
     }

@@ -1,4 +1,5 @@
 #include "mxl/fabrics.h"
+#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -584,20 +585,25 @@ namespace
 
             return MXL_STATUS_OK;
         }
-        catch (ofi::Exception& e)
+        catch (ofi::FIException& e)
         {
-            MXL_ERROR("Failed to remove target from initiator: {}", e.what());
+            if (e.fiErrno() == -EAGAIN)
+            {
+                return MXL_ERR_NOT_READY;
+            }
+
+            MXL_ERROR("Failed to transfer grain: {}", e.what());
 
             return e.status();
         }
         catch (std::exception& e)
         {
-            MXL_ERROR("Failed to remove target from initiator : {}", e.what());
+            MXL_ERROR("Failed to transfer grain: {}", e.what());
             return MXL_ERR_UNKNOWN;
         }
         catch (...)
         {
-            MXL_ERROR("Failed to remove target from initiator");
+            MXL_ERROR("Failed to trnasfer  grain");
             return MXL_ERR_UNKNOWN;
         }
     }

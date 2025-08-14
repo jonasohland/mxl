@@ -87,6 +87,7 @@ namespace mxl::lib::fabrics::ofi
 
     CompletionQueue::CompletionQueue(CompletionQueue&& other) noexcept
         : _raw(other._raw)
+        , _domain(std::move(other._domain))
     {
         other._raw = nullptr;
     }
@@ -97,6 +98,8 @@ namespace mxl::lib::fabrics::ofi
 
         _raw = other._raw;
         other._raw = nullptr;
+
+        _domain = std::move(other._domain);
 
         return *this;
     }

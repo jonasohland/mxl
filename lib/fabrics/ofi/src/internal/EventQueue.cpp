@@ -87,6 +87,7 @@ namespace mxl::lib::fabrics::ofi
 
     EventQueue::EventQueue(EventQueue&& other) noexcept
         : _raw(other._raw)
+        , _fabric(std::move(other._fabric))
     {
         other._raw = nullptr;
     }
@@ -97,6 +98,8 @@ namespace mxl::lib::fabrics::ofi
 
         _raw = other._raw;
         other._raw = nullptr;
+
+        _fabric = std::move(other._fabric);
 
         return *this;
     }

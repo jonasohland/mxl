@@ -43,16 +43,10 @@ namespace mxl::lib::fabrics::ofi
 
     fi_addr_t AddressVector::insert(FabricAddress const& addr)
     {
-        ::fi_addr_t fiAddr{FI_ADDR_UNSPEC};
+        ::fi_addr_t fiAddr = FI_ADDR_UNSPEC;
 
-        std::string s;
-        char ss[1024];
-        size_t addrlen;
-        fi_av_straddr(_raw, addr.raw(), ss, &addrlen);
-
-        s.resize(addrlen + 1);
-        fi_av_straddr(_raw, addr.raw(), s.data(), &addrlen);
-        MXL_INFO("Attempt to insert address: {}", s);
+        auto addrstr = addrToString(addr);
+        MXL_INFO("About to insert addr '{}'", addrstr);
 
         if (auto ret = ::fi_av_insert(_raw, addr.raw(), 1, &fiAddr, 0, nullptr); ret != 1)
         {
@@ -70,7 +64,7 @@ namespace mxl::lib::fabrics::ofi
     std::string AddressVector::addrToString(FabricAddress const& addr) const
     {
         std::string s;
-        size_t len;
+        size_t len = 0;
 
         ::fi_av_straddr(_raw, addr.raw(), nullptr, &len);
         s.resize(len);
@@ -96,6 +90,7 @@ namespace mxl::lib::fabrics::ofi
 
     AddressVector::AddressVector(AddressVector&& other) noexcept
         : _raw(other._raw)
+        , _domain(std::move(other._domain))
     {
         other._raw = nullptr;
     }
@@ -106,11 +101,10 @@ namespace mxl::lib::fabrics::ofi
 
         _raw = other._raw;
         other._raw = nullptr;
+        _domain = std::move(other._domain);
 
         return *this;
     }
-
-    // TODO: review move constructors
 
     void AddressVector::close()
     {
