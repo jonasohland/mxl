@@ -17,9 +17,7 @@
 #include <mxl/mxl.h>
 #include <mxl/time.h>
 #include <sys/stat.h>
-#include "DiscreteFlowData.hpp"
 #include "Flow.hpp"
-#include "FlowData.hpp"
 #include "FlowManager.hpp"
 #include "Logging.hpp"
 #include "PathUtils.hpp"
@@ -57,6 +55,15 @@ namespace mxl::lib
         if (_flowData)
         {
             return *_flowData->flowInfo();
+        }
+        throw std::runtime_error("No open flow.");
+    }
+
+    FlowData& PosixDiscreteFlowReader::getFlowData()
+    {
+        if (_flowData)
+        {
+            return *_flowData;
         }
         throw std::runtime_error("No open flow.");
     }
@@ -179,11 +186,6 @@ namespace mxl::lib
             return (st.st_ino == flowInfo->common.inode);
         }
         return false;
-    }
-
-    DiscreteFlowData* PosixDiscreteFlowReader::flowData() const noexcept
-    {
-        return _flowData.get();
     }
 
 } // namespace mxl::lib

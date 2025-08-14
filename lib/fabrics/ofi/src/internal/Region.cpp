@@ -45,26 +45,26 @@ namespace mxl::lib::fabrics::ofi
         return iovecs;
     }
 
-    RegionGroups RegionGroups::fromFlow(FlowData* flow)
+    RegionGroups RegionGroups::fromFlow(FlowData& flow)
     {
         static_assert(sizeof(GrainHeader) == 8192,
             "GrainHeader type size changed! The Fabrics API makes assumptions on the memory layout of a flow, please review the code below if the "
             "change is intended!");
 
-        if (!mxlIsDiscreteDataFormat(flow->flowInfo()->common.format))
+        if (!mxlIsDiscreteDataFormat(flow.flowInfo()->common.format))
         {
             throw Exception::make(MXL_ERR_UNKNOWN, "Non-discrete flows not supported for now");
         }
 
-        auto discreteFlow = static_cast<DiscreteFlowData*>(flow);
+        auto& discreteFlow = static_cast<DiscreteFlowData&>(flow);
 
         std::vector<RegionGroup> regionGroups;
 
-        for (std::size_t i = 0; i < discreteFlow->grainCount(); ++i)
+        for (std::size_t i = 0; i < discreteFlow.grainCount(); ++i)
         {
-            auto grain = discreteFlow->grainAt(i);
+            auto grain = discreteFlow.grainAt(i);
 
-            auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow->grainAt(i));
+            auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow.grainAt(i));
             auto grainInfoSize = sizeof(GrainHeader);
             auto grainPayloadSize = grain->header.info.grainSize;
 

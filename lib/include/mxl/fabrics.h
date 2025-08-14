@@ -70,14 +70,24 @@ extern "C"
     typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
 
     /**
-     * Convert the flow data of a reader or writer to a collection of memory regions.
-     * The regions will be used to register the shared memory of the reader or writer as source or target of data transfer operations.
+     * Get the backing memory regions of a flow associated with a flow reader.
+     * The regions will be used to register the shared memory of the reader as source of data transfer operations.
      * The returned object must be freed with mxlFabricsRegionsFree(). The object can be freed after the target or initiator has been created.
      * \param in_flowData Obtained from a flow reader or writer.
      * \param out_regions A pointer to a memory location where the address of the returned collection of memory regions will be written.
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsRegionsFromFlow(mxlFlowData const in_flowData, mxlRegions* out_regions);
+    mxlStatus mxlFabricsRegionsForFlowReader(mxlFlowReader in_reader, mxlRegions* out_regions);
+
+    /**
+     * Get the backing memory regions of a flow associated with a flow writer.
+     * The regions will be used to register the shared memory of the writer as the target of data transfer operations.
+     * The returned object must be freed with mxlFabricsRegionsFree(). The object can be freed after the target or initiator has been created.
+     * \param in_flowData Obtained from a flow reader or writer.
+     * \param out_regions A pointer to a memory location where the address of the returned collection of memory regions will be written.
+     */
+    MXL_EXPORT
+    mxlStatus mxlFabricsRegionsForFlowWriter(mxlFlowWriter in_writer, mxlRegions* out_regions);
 
     /**
      * Free a regions object previously allocated by mxlFabricsRegionsFromFlow.
