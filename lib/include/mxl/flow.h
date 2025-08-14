@@ -143,7 +143,6 @@ extern "C"
 
     typedef struct mxlFlowReader_t* mxlFlowReader;
     typedef struct mxlFlowWriter_t* mxlFlowWriter;
-    typedef void* mxlFlowData;
 
     ///
     /// Create a flow using a json flow definition
@@ -200,11 +199,6 @@ extern "C"
     MXL_EXPORT
     mxlStatus mxlReleaseFlowWriter(mxlInstance instance, mxlFlowWriter writer);
 
-    MXL_EXPORT
-    mxlStatus mxlFlowWriterGetFlowData(mxlFlowWriter writer, mxlFlowData* out_flowData);
-
-    MXL_EXPORT
-    mxlStatus mxlFlowReaderGetFlowData(mxlFlowReader reader, mxlFlowData* out_flowData);
     /**
      * Get a copy of the current descriptive header of a Flow
      *
