@@ -143,8 +143,7 @@ extern "C"
      * \return The result code. \see mxlStatus
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsTargetSetup(mxlFabricsInstance in_fabricsInstance, mxlFabricsTarget in_target, mxlTargetConfig* in_config,
-        mxlTargetInfo* out_info);
+    mxlStatus mxlFabricsTargetSetup(mxlFabricsTarget in_target, mxlTargetConfig* in_config, mxlTargetInfo* out_info);
 
     /**
      * Non-blocking accessor for a flow grain at a specific index.

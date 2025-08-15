@@ -4,7 +4,6 @@
 #include <rdma/fabric.h>
 #include <TargetInfo.hpp>
 #include "mxl/mxl.h"
-#include "Fabric.hpp"
 
 TEST_CASE("Fabrics : Test", "[fabrics]")
 {
@@ -29,7 +28,7 @@ TEST_CASE("Fabrics : Test", "[fabrics]")
     };
     // clang-format on
 
-    REQUIRE(mxlFabricsTargetSetup(fabrics, target, &config, &targetInfo) == MXL_STATUS_OK);
+    REQUIRE(mxlFabricsTargetSetup(target, &config, &targetInfo) == MXL_STATUS_OK);
 
     REQUIRE(mxlFabricsDestroyTarget(fabrics, target) == MXL_STATUS_OK);
 
