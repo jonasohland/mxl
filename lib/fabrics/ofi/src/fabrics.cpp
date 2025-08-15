@@ -277,10 +277,9 @@ namespace
     }
 
     extern "C" MXL_EXPORT
-    mxlStatus mxlFabricsTargetSetup(mxlFabricsInstance in_fabricsInstance, mxlFabricsTarget in_target, mxlTargetConfig* in_config,
-        mxlTargetInfo* out_info)
+    mxlStatus mxlFabricsTargetSetup(mxlFabricsTarget in_target, mxlTargetConfig* in_config, mxlTargetInfo* out_info)
     {
-        if (in_fabricsInstance == nullptr || in_target == nullptr || in_config == nullptr || out_info == nullptr)
+        if (in_target == nullptr || in_config == nullptr || out_info == nullptr)
         {
             return MXL_ERR_INVALID_ARG;
         }

@@ -401,7 +401,7 @@ public:
             .provider = _config.provider,
             .regions = memoryRegions,
         };
-        status = mxlFabricsTargetSetup(_fabricsInstance, _target, &targetConfig, &_targetInfo);
+        status = mxlFabricsTargetSetup(_target, &targetConfig, &_targetInfo);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to setup fabrics target with status '{}'", static_cast<int>(status));
