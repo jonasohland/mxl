@@ -9,58 +9,6 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    bool cmpPreferCapHMEM(FIInfoView const& lhs, FIInfoView const& rhs)
-    {
-        return !(lhs->caps & FI_HMEM) && (rhs->caps & FI_HMEM);
-    }
-
-    bool cmpPreferEFA(FIInfoView const& lhs, FIInfoView const& rhs)
-    {
-        return std::string_view{lhs->fabric_attr->prov_name} != "efa" && std::string_view{rhs->fabric_attr->prov_name} == "efa";
-    }
-
-    bool cmpPreferVerbs(FIInfoView const& lhs, FIInfoView const& rhs)
-    {
-        return std::string_view{lhs->fabric_attr->prov_name} != "verbs" && std::string_view{rhs->fabric_attr->prov_name} == "verbs";
-    }
-
-    bool cmpPreferSHM(FIInfoView const& lhs, FIInfoView const& rhs)
-    {
-        return std::string_view{lhs->fabric_attr->prov_name} != "shm" && std::string_view{rhs->fabric_attr->prov_name} == "shm";
-    }
-
-    bool cmpPreferAddrFmtSockaddr(FIInfoView const& lhs, FIInfoView const& rhs)
-    {
-        return lhs->addr_format != FI_SOCKADDR && rhs->addr_format == FI_SOCKADDR;
-    }
-
-    bool cmpPreferProgressAuto(FIInfoView const& lhs, FIInfoView const& rhs)
-    {
-        return lhs->domain_attr->progress != FI_PROGRESS_AUTO && rhs->domain_attr->progress == FI_PROGRESS_AUTO;
-    }
-
-    std::optional<FIInfoView> RCTarget::findBestFabric(FIInfoList const& available, mxlFabricsProvider)
-    {
-        namespace ranges = std::ranges;
-
-        std::vector<FIInfoView> candidates;
-
-        ranges::copy_if(
-            available, std::back_inserter(candidates), [](FIInfoView const& candidate) { return candidate->caps & (FI_RMA | FI_REMOTE_WRITE); });
-
-        ranges::stable_sort(candidates, cmpPreferProgressAuto);
-        ranges::stable_sort(candidates, cmpPreferCapHMEM);
-        ranges::stable_sort(candidates, cmpPreferSHM);
-        ranges::stable_sort(candidates, cmpPreferVerbs);
-        ranges::stable_sort(candidates, cmpPreferEFA);
-
-        if (candidates.empty())
-        {
-            return std::nullopt;
-        }
-
-        return candidates[0];
-    }
 
     LocalRegion RCTarget::ImmediateDataLocation::toLocalRegion() noexcept
     {
@@ -104,9 +52,7 @@ namespace mxl::lib::fabrics::ofi
         auto fabricInfoList = FIInfoList::get(
             config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_REMOTE_WRITE);
 
-        // Find the best fabric configuration for the provided parameters.
-        auto bestFabricInfo = RCTarget::findBestFabric(fabricInfoList, config.provider);
-        if (!bestFabricInfo)
+        if (fabricInfoList.begin() == fabricInfoList.end())
         {
             throw Exception::make(MXL_ERR_NO_FABRIC,
                 "No fabric available for provider {} at {}:{}",
@@ -118,7 +64,7 @@ namespace mxl::lib::fabrics::ofi
         // Open fabric and domain. These represent the context of the local network fabric adapter that will be used
         // to receive data.
         // See fi_domain(3) and fi_fabric(3) for more complete information about these concepts.
-        auto fabric = Fabric::open(*bestFabricInfo);
+        auto fabric = Fabric::open(*fabricInfoList.begin());
         auto domain = Domain::open(fabric);
 
         std::vector<RegisteredRegionGroup> localRegions;
@@ -183,12 +129,12 @@ namespace mxl::lib::fabrics::ofi
                     if (auto entry = state.pep.eventQueue()->readBlocking(timeout); entry && entry->isConnReq())
                     {
                         MXL_DEBUG("Connection request received, creating endpoint for remote address: {}", entry->info().raw()->dest_addr);
-                        auto endpoint = Endpoint::create(_domain.value(), entry->info());
+                        auto endpoint = Endpoint::create(_domain, entry->info());
 
-                        auto cq = CompletionQueue::open(_domain.value(), CompletionQueueAttr::defaults());
+                        auto cq = CompletionQueue::open(_domain, CompletionQueueAttr::defaults());
                         endpoint.bind(cq, FI_RECV);
 
-                        auto eq = EventQueue::open(_domain->get()->fabric(), EventQueueAttr::defaults());
+                        auto eq = EventQueue::open(_domain->fabric(), EventQueueAttr::defaults());
                         endpoint.bind(eq);
 
                         // we are now ready to accept the connection
@@ -205,11 +151,17 @@ namespace mxl::lib::fabrics::ofi
                 {
                     if (auto entry = state.ep.eventQueue()->readBlocking(timeout); entry && entry->isConnected())
                     {
-                        // Create a local memory region. The grain indices will be written here when a transfer arrives.
-                        auto dataRegion = std::make_unique<ImmediateDataLocation>();
+                        std::unique_ptr<ImmediateDataLocation> dataRegion;
 
-                        // Post a receive for the first incoming grain. Pass a region to receive the grain index.
-                        state.ep.recv(dataRegion->toLocalRegion());
+                        // Need to post a receive buffer to get immediate data.
+                        if (_domain->usingRecvBufForCqData())
+                        {
+                            // Create a local memory region. The grain indices will be written here when a transfer arrives.
+                            dataRegion = std::make_unique<ImmediateDataLocation>();
+
+                            // Post a receive for the first incoming grain. Pass a region to receive the grain index.
+                            state.ep.recv(dataRegion->toLocalRegion());
+                        }
 
                         MXL_INFO("Received connected event notification, now connected.");
 
@@ -235,9 +187,13 @@ namespace mxl::lib::fabrics::ofi
                             // from the completion queue.
                             result.grainAvailable = dataEntry->data();
 
-                            // Post another receive for the next incoming grain. When another transfer arrives,
-                            // the immmediate data (in our case the grain index), will be returned in the registered region.
-                            state.ep.recv(state.immData->toLocalRegion());
+                            // Need to post receive buffers for immediate data
+                            if (_domain->usingRecvBufForCqData())
+                            {
+                                // Post another receive for the next incoming grain. When another transfer arrives,
+                                // the immmediate data (in our case the grain index), will be returned in the registered region.
+                                state.ep.recv(state.immData->toLocalRegion());
+                            }
                         }
                         else
                         {

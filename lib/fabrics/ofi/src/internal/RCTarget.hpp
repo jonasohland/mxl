@@ -41,8 +41,6 @@ namespace mxl::lib::fabrics::ofi
         using State = std::variant<WaitForConnectionRequest, WaitForConnection, Connected>;
 
     public:
-        static std::optional<FIInfoView> findBestFabric(FIInfoList const& list, mxlFabricsProvider provider);
-
         static std::pair<std::unique_ptr<RCTarget>, std::unique_ptr<TargetInfo>> setup(mxlTargetConfig const&);
 
         Target::ReadResult read() final;
@@ -54,7 +52,7 @@ namespace mxl::lib::fabrics::ofi
         Target::ReadResult makeProgress();
         Target::ReadResult makeProgressBlocking(std::chrono::steady_clock::duration timeout);
 
-        std::optional<std::shared_ptr<Domain>> _domain;
+        std::shared_ptr<Domain> _domain;
         std::vector<RegisteredRegionGroup> _regRegions;
 
         State _state;
