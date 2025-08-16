@@ -77,7 +77,7 @@ namespace mxl::lib::fabrics::ofi
 
     bool Domain::usingRecvBufForCqData() const noexcept
     {
-        return (_fabric->info().raw()->domain_attr->mode & FI_RX_CQ_DATA) != 0;
+        return (_fabric->info().raw()->rx_attr->mode & FI_RX_CQ_DATA) != 0;
     }
 
 }
