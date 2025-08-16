@@ -5,7 +5,6 @@
 #include <rfl/json/write.hpp>
 #include "internal/Logging.hpp"
 #include "Exception.hpp"
-#include "RCTarget.hpp"
 #include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -258,15 +257,14 @@ namespace mxl::lib::fabrics::ofi
         auto fabricInfoList = FIInfoList::get(
             config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE | FI_REMOTE_WRITE);
 
-        auto bestFabricInfo = RCTarget::findBestFabric(fabricInfoList, config.provider);
-        if (!bestFabricInfo)
+        if (fabricInfoList.begin() == fabricInfoList.end())
         {
             throw Exception::make(MXL_ERR_NO_FABRIC, "No suitable fabric available");
         }
 
-        auto info = bestFabricInfo->owned();
+        auto info = (*fabricInfoList.begin()).owned();
 
-        auto fabric = Fabric::open(*bestFabricInfo);
+        auto fabric = Fabric::open(info.view());
         auto domain = Domain::open(fabric);
         auto eq = EventQueue::open(fabric);
         auto cq = CompletionQueue::open(domain);
