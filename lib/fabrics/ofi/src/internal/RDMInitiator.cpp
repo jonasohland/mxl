@@ -194,6 +194,10 @@ namespace mxl::lib::fabrics::ofi
         {
             blockOnCQ(remaining);
         }
+        else
+        {
+            pollCQ();
+        }
 
         return hasPendingWork();
     }
