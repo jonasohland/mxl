@@ -12,6 +12,14 @@ namespace mxl::lib::fabrics::ofi
 
     class Target
     {
+    protected:
+        struct ImmediateDataLocation
+        {
+            uint64_t data;
+
+            LocalRegion toLocalRegion() noexcept;
+        };
+
     public:
         struct ReadResult
         {

@@ -14,6 +14,7 @@ namespace mxl::lib::fabrics::ofi
     public:
         struct Attributes
         {
+            static Attributes defaults() noexcept;
             // Indicates the expected number of addresses that will be inserted into the AV. The provider uses this to optimize resource allocations.
             size_t count;
 
@@ -24,10 +25,10 @@ namespace mxl::lib::fabrics::ofi
             size_t epPerNode;
 
             [[nodiscard]]
-            ::fi_av_attr toFi() const noexcept;
+            ::fi_av_attr toRaw() const noexcept;
         };
 
-        static std::shared_ptr<AddressVector> open(std::shared_ptr<Domain> domain, Attributes attr = Attributes{.count = 4, .epPerNode = 0});
+        static std::shared_ptr<AddressVector> open(std::shared_ptr<Domain> domain, Attributes attr = Attributes::defaults());
 
         ~AddressVector();
 

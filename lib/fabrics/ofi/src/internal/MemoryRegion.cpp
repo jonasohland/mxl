@@ -1,6 +1,5 @@
 #include "MemoryRegion.hpp"
 #include <cstdint>
-#include <cstdio>
 #include <memory>
 #include <random>
 #include <bits/types/struct_iovec.h>

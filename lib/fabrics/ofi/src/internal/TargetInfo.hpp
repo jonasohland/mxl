@@ -46,10 +46,7 @@ namespace mxl::lib::fabrics::ofi
         static TargetInfoRfl from_class(TargetInfo const& ti)
         {
             rfl::Rename<"regions", std::vector<RemoteRegionGroup>> rflRegions;
-            for (auto const& reg : ti.remoteRegionGroups) // TODO: use std::ranges::transform instead:
-            {
-                rflRegions.value().emplace_back(reg);
-            }
+            std::ranges::transform(ti.remoteRegionGroups, std::back_inserter(rflRegions.value()), [&](auto const& reg) { return reg; });
 
             return TargetInfoRfl{
                 .fabricAddress = FabricAddressRfl::from_class(ti.fabricAddress), .regions = rflRegions, .identifier = fmt::to_string(ti.id)};

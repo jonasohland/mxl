@@ -1,26 +1,13 @@
 #include "RCTarget.hpp"
-#include <cstdint>
 #include <rdma/fabric.h>
 #include "internal/Logging.hpp"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
-#include "LocalRegion.hpp"
 #include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-
-    LocalRegion RCTarget::ImmediateDataLocation::toLocalRegion() noexcept
-    {
-        auto addr = &data;
-
-        return LocalRegion{
-            .addr = reinterpret_cast<uint64_t>(reinterpret_cast<std::uintptr_t>(addr)),
-            .len = sizeof(uint64_t),
-            .desc = nullptr,
-        };
-    }
 
     RCTarget::RCTarget(std::shared_ptr<Domain> domain, std::vector<RegisteredRegionGroup> regions, PassiveEndpoint ep)
         : _domain(std::move(domain))
@@ -68,24 +55,6 @@ namespace mxl::lib::fabrics::ofi
         auto fabric = Fabric::open(*fabricInfoList.begin());
         auto domain = Domain::open(fabric);
 
-        std::vector<RegisteredRegionGroup> localRegions;
-
-        // config.regions contains the local memory regions that the remote writer will write to.
-        auto localRegionGroups = RegionGroups::fromAPI(config.regions);
-
-        for (auto const& group : localRegionGroups->view())
-        {
-            // For each region group we will register memory and keep a copy inside this instance as a list of registered region groups.
-            // Registered regions can be converted to remote region groups or local region groups where needed.
-            std::vector<RegisteredRegion> registeredGroup;
-            for (auto const& region : group.view())
-            {
-                registeredGroup.emplace_back(MemoryRegion::reg(domain, region, FI_REMOTE_WRITE), region);
-            }
-
-            localRegions.emplace_back(registeredGroup);
-        }
-
         // Create a passive endpoint. A passive endpoint can be viewed like a bound TCP socket listening for
         // incoming connections
         auto pep = PassiveEndpoint::create(fabric);
@@ -105,11 +74,13 @@ namespace mxl::lib::fabrics::ofi
             {}
         };
 
+        auto localRegisteredRegions = RegionGroups::fromAPI(config.regions)->reg(domain, FI_REMOTE_WRITE);
+        auto remoteRegions = toRemote(localRegisteredRegions);
+
         auto localAddress = pep.localAddress();
-        auto remoteRegions = toRemote(localRegions);
 
         // Return the constructed RCTarget and associated TargetInfo for remote peers to connect.
-        return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(localRegions), std::move(pep)),
+        return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(localRegisteredRegions), std::move(pep)),
             std::make_unique<TargetInfo>(localAddress, std::move(remoteRegions))};
     }
 

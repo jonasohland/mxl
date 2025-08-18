@@ -35,6 +35,7 @@ namespace mxl::lib::fabrics::ofi
         /// received. After which it can be evicted from the initiator.
         void shutdown();
 
+        /// Post a data transfer request to this endpoint.
         void postTransfer(LocalRegionGroup const& localRegion, uint64_t index);
 
     private:
@@ -55,8 +56,9 @@ namespace mxl::lib::fabrics::ofi
         using State = std::variant<Idle, Added, Done>;
 
         State _state;
-        std::shared_ptr<Endpoint> _ep;
-        FabricAddress _addr;
+        std::shared_ptr<Endpoint> _ep; // The endpoint used to post transfer with. There is only one endpoint shared for all targets in constrast to
+                                       // the RCInitiator where each target will have their own endppint.
+        FabricAddress _addr;           // The remote fabric address to transfer payloads to
         std::vector<RemoteRegionGroup> _regions; /// Descriptions of the remote memory regions where we need to write our grains.
     };
 
@@ -105,6 +107,6 @@ namespace mxl::lib::fabrics::ofi
 
         std::map<Endpoint::Id, RDMInitiatorEndpoint> _targets;
 
-        size_t pending{0};
+        size_t pending{0}; // The number of outstanding transfer posted
     };
 }

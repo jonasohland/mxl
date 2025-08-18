@@ -10,7 +10,13 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    ::fi_av_attr AddressVector::Attributes::toFi() const noexcept
+
+    AddressVector::Attributes AddressVector::Attributes::defaults() noexcept
+    {
+        return AddressVector::Attributes{.count = 4, .epPerNode = 0};
+    }
+
+    ::fi_av_attr AddressVector::Attributes::toRaw() const noexcept
     {
         ::fi_av_attr attr{};
         attr.type = FI_AV_TABLE;
@@ -26,7 +32,7 @@ namespace mxl::lib::fabrics::ofi
     {
         fid_av* raw;
 
-        auto fiAttr = attr.toFi();
+        auto fiAttr = attr.toRaw();
 
         fiCall(::fi_av_open, "Failed to open address vector", domain->raw(), &fiAttr, &raw, nullptr);
 
@@ -43,15 +49,13 @@ namespace mxl::lib::fabrics::ofi
 
     fi_addr_t AddressVector::insert(FabricAddress const& addr)
     {
-        ::fi_addr_t fiAddr = FI_ADDR_UNSPEC;
-
-        auto addrstr = addrToString(addr);
-        MXL_INFO("About to insert addr '{}'", addrstr);
+        ::fi_addr_t fiAddr{FI_ADDR_UNSPEC};
 
         if (auto ret = ::fi_av_insert(_raw, addr.raw(), 1, &fiAddr, 0, nullptr); ret != 1)
         {
             throw Exception::internal("Failed to insert address into the address vector. {}", ::fi_strerror(ret));
         }
+        MXL_INFO("Remote endpoint address \"{}\" was added to the Address Vector with fi_addr \"{}\"", addrToString(addr), fiAddr);
 
         return fiAddr;
     }
@@ -110,7 +114,7 @@ namespace mxl::lib::fabrics::ofi
     {
         if (_raw)
         {
-            MXL_INFO("Closing address vector");
+            MXL_DEBUG("Closing address vector");
 
             fiCall(::fi_close, "Failed to close address vector", &_raw->fid);
             _raw = nullptr;

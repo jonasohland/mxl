@@ -1,14 +1,19 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 #include <uuid.h>
 #include <bits/types/struct_iovec.h>
 #include "internal/FlowData.hpp"
 #include "mxl/fabrics.h"
+#include "Domain.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
+    class RegisteredRegion;
+    class RegisteredRegionGroup;
+
     class Region
     {
     public:
@@ -19,6 +24,9 @@ namespace mxl::lib::fabrics::ofi
         {}
 
         virtual ~Region() = default;
+
+        [[nodiscard]]
+        RegisteredRegion reg(std::shared_ptr<Domain> domain, uint64_t access) const;
 
         std::uintptr_t base;
         size_t size;
@@ -47,6 +55,9 @@ namespace mxl::lib::fabrics::ofi
         {}
 
         [[nodiscard]]
+        RegisteredRegionGroup reg(std::shared_ptr<Domain> domain, uint64_t access) const;
+
+        [[nodiscard]]
         std::vector<Region> const& view() const noexcept;
 
         [[nodiscard]]
@@ -68,6 +79,9 @@ namespace mxl::lib::fabrics::ofi
         static RegionGroups* fromAPI(mxlRegions) noexcept;
         [[nodiscard]]
         mxlRegions toAPI() noexcept;
+
+        [[nodiscard]]
+        std::vector<RegisteredRegionGroup> reg(std::shared_ptr<Domain> domain, uint64_t access) const;
 
         [[nodiscard]]
         std::vector<RegionGroup> const& view() const noexcept;

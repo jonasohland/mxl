@@ -177,7 +177,7 @@ namespace mxl::lib::fabrics::ofi
 
         /// Construct the endpoint.
         Endpoint(::fid_ep* raw, FIInfoView info, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq = std::nullopt,
-            std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt);
+            std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt, std::optional<std::shared_ptr<AddressVector>> av = std::nullopt);
 
         ::fid_ep* _raw;                                      /// Raw resource reference
         FIInfo _info;                                        /// Info passed via Endpoint::create()

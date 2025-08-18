@@ -44,9 +44,7 @@ namespace mxl::lib::fabrics::ofi
             overloaded{
                 [&](Idle) -> State
                 {
-                    MXL_INFO("Inserting address in the address vector.");
                     auto fiAddr = _ep->addressVector()->insert(_addr);
-                    MXL_INFO("Remote endpoint added to address vector with index {}", fiAddr);
                     return Added{.fiAddr = fiAddr};
                 },
                 [](Added state) -> State { return state; },
@@ -96,11 +94,15 @@ namespace mxl::lib::fabrics::ofi
 
         auto fabricInfoList = FIInfoList::get(
             config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE | FI_REMOTE_WRITE, FI_EP_RDM);
+        if (fabricInfoList.begin() == fabricInfoList.end())
+        {
+            throw Exception::make(MXL_ERR_NO_FABRIC, "No suitable fabric available");
+        }
 
-        auto info = (*fabricInfoList.begin()).owned();
-        MXL_INFO("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
+        auto info = *fabricInfoList.begin();
+        MXL_DEBUG("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
 
-        auto fabric = Fabric::open(info.view());
+        auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
 
         auto endpoint = std::make_shared<Endpoint>(Endpoint::create(domain));
@@ -113,24 +115,8 @@ namespace mxl::lib::fabrics::ofi
 
         endpoint->enable();
 
-        // TODO : this logic is repeated in all initiator and target, DRY!
-        auto regionGroups = RegionGroups::fromAPI(config.regions);
+        auto localRegisteredRegions = RegionGroups::fromAPI(config.regions)->reg(domain, FI_WRITE);
 
-        std::vector<RegisteredRegionGroup> registeredRegions;
-
-        for (auto const& group : regionGroups->view())
-        {
-            std::vector<RegisteredRegion> regRegions;
-            for (auto const& region : group.view())
-            {
-                regRegions.emplace_back(MemoryRegion::reg(domain, region, FI_WRITE), region);
-            }
-
-            RegisteredRegionGroup regGroup{std::move(regRegions)};
-            registeredRegions.emplace_back(std::move(regGroup));
-        }
-
-        // TODO:
         struct MakeUniqueEnabler : RDMInitiator
         {
             MakeUniqueEnabler(std::shared_ptr<Endpoint> ep, std::vector<RegisteredRegionGroup> regions)
@@ -138,7 +124,7 @@ namespace mxl::lib::fabrics::ofi
             {}
         };
 
-        return std::make_unique<MakeUniqueEnabler>(std::move(endpoint), std::move(registeredRegions));
+        return std::make_unique<MakeUniqueEnabler>(std::move(endpoint), std::move(localRegisteredRegions));
     }
 
     void RDMInitiator::addTarget(TargetInfo const& targetInfo)
@@ -224,16 +210,9 @@ namespace mxl::lib::fabrics::ofi
             return;
         }
 
-        for (;;)
+        if (auto completion = _endpoint->completionQueue()->readBlocking(timeout); completion)
         {
-            auto completion = _endpoint->completionQueue()->readBlocking(timeout);
-            if (!completion)
-            {
-                return;
-            }
-
             consume(*completion);
-            return;
         }
     }
 

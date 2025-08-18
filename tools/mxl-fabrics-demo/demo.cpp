@@ -166,8 +166,6 @@ public:
         do
         {
             status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 250);
-            MXL_INFO("Make Progress 0 status={}", (int)status);
-
             if (status == MXL_ERR_INTERRUPTED)
             {
                 return MXL_STATUS_OK;
@@ -180,14 +178,11 @@ public:
         }
         while (status == MXL_ERR_NOT_READY);
 
-        MXL_INFO("Target added and ready to transfer!");
-
         return MXL_STATUS_OK;
     }
 
     mxlStatus run()
     { // Extract the FlowInfo structure.
-        MXL_INFO("Running initiator");
         FlowInfo flow_info;
         auto status = mxlFlowReaderGetInfo(_reader, &flow_info);
         if (status != MXL_STATUS_OK)

@@ -1,5 +1,4 @@
 #include "mxl/fabrics.h"
-#include <cerrno>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -603,7 +602,7 @@ namespace
         }
         catch (...)
         {
-            MXL_ERROR("Failed to trnasfer  grain");
+            MXL_ERROR("Failed to transfer grain");
             return MXL_ERR_UNKNOWN;
         }
     }

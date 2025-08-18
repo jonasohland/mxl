@@ -5,6 +5,7 @@
 #include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
 #include "internal/Logging.hpp"
+#include "Domain.hpp"
 #include "Exception.hpp"
 #include "VariantUtils.hpp"
 
@@ -263,28 +264,15 @@ namespace mxl::lib::fabrics::ofi
             throw Exception::make(MXL_ERR_NO_FABRIC, "No suitable fabric available");
         }
 
-        auto info = (*fabricInfoList.begin()).owned();
+        auto info = *fabricInfoList.begin();
+        MXL_DEBUG("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
 
-        auto fabric = Fabric::open(info.view());
+        auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
         auto eq = EventQueue::open(fabric);
         auto cq = CompletionQueue::open(domain);
 
-        auto regionGroups = RegionGroups::fromAPI(config.regions);
-
-        std::vector<RegisteredRegionGroup> registeredRegions;
-
-        for (auto const& group : regionGroups->view())
-        {
-            std::vector<RegisteredRegion> regRegions;
-            for (auto const& region : group.view())
-            {
-                regRegions.emplace_back(MemoryRegion::reg(domain, region, FI_WRITE), region);
-            }
-
-            RegisteredRegionGroup regGroup{std::move(regRegions)};
-            registeredRegions.emplace_back(std::move(regGroup));
-        }
+        auto localRegisteredRegions = RegionGroups::fromAPI(config.regions)->reg(domain, FI_WRITE);
 
         struct MakeUniqueEnabler : RCInitiator
         {
@@ -294,7 +282,7 @@ namespace mxl::lib::fabrics::ofi
             {}
         };
 
-        return std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(cq), std::move(eq), std::move(registeredRegions));
+        return std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(cq), std::move(eq), std::move(localRegisteredRegions));
     }
 
     RCInitiator::RCInitiator(std::shared_ptr<Domain> domain, std::shared_ptr<CompletionQueue> cq, std::shared_ptr<EventQueue> eq,

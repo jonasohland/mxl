@@ -4,7 +4,6 @@
 #include <variant>
 #include "mxl/fabrics.h"
 #include "Endpoint.hpp"
-#include "LocalRegion.hpp"
 #include "PassiveEndpoint.hpp"
 #include "RegisteredRegion.hpp"
 #include "Target.hpp"
@@ -15,13 +14,6 @@ namespace mxl::lib::fabrics::ofi
     class RCTarget : public Target
     {
     private:
-        struct ImmediateDataLocation
-        {
-            uint64_t data;
-
-            LocalRegion toLocalRegion() noexcept;
-        };
-
         struct WaitForConnectionRequest
         {
             PassiveEndpoint pep;

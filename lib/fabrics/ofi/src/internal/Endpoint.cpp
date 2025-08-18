@@ -90,17 +90,17 @@ namespace mxl::lib::fabrics::ofi
 
     Endpoint::~Endpoint()
     {
-        MXL_INFO("~Endpoint");
         close();
     }
 
     Endpoint::Endpoint(::fid_ep* raw, FIInfoView info, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq,
-        std::optional<std::shared_ptr<EventQueue>> eq)
+        std::optional<std::shared_ptr<EventQueue>> eq, std::optional<std::shared_ptr<AddressVector>> av)
         : _raw(raw)
         , _info(info.owned())
         , _domain(std::move(domain))
         , _cq(std::move(cq))
         , _eq(std::move(eq))
+        , _av(std::move(av))
     {
         MXL_INFO("Endpoint {} created", Endpoint::idFromFID(raw));
     }
@@ -125,14 +125,13 @@ namespace mxl::lib::fabrics::ofi
         , _domain(std::move(other._domain))
         , _cq(std::move(other._cq))
         , _eq(std::move(other._eq))
+        , _av(std::move(other._av))
     {
-        MXL_INFO("Endpoint move constructor");
         other._raw = nullptr;
     }
 
     Endpoint& Endpoint::operator=(Endpoint&& other)
     {
-        MXL_INFO("Endpoint move assignment");
         close();
 
         _raw = other._raw;
@@ -142,6 +141,7 @@ namespace mxl::lib::fabrics::ofi
         _domain = std::move(other._domain);
         _eq = std::move(other._eq);
         _cq = std::move(other._cq);
+        _av = std::move(other._av);
 
         return *this;
     }

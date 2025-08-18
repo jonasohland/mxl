@@ -1,14 +1,21 @@
 #include "Region.hpp"
 #include <cstdint>
 #include <algorithm>
+#include <memory>
 #include <bits/types/struct_iovec.h>
 #include "internal/DiscreteFlowData.hpp"
 #include "internal/Flow.hpp"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
+#include "MemoryRegion.hpp"
+#include "RegisteredRegion.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
+    RegisteredRegion Region::reg(std::shared_ptr<Domain> domain, uint64_t access) const
+    {
+        return RegisteredRegion{MemoryRegion::reg(std::move(domain), *this, access), *this};
+    }
 
     ::iovec const* Region::as_iovec() const noexcept
     {
@@ -26,7 +33,12 @@ namespace mxl::lib::fabrics::ofi
         return ::iovec{.iov_base = reinterpret_cast<void*>(base), .iov_len = size};
     }
 
-    // Region implementations
+    RegisteredRegionGroup RegionGroup::reg(std::shared_ptr<Domain> domain, uint64_t access) const
+    {
+        std::vector<RegisteredRegion> out;
+        std::ranges::transform(view(), std::back_inserter(out), [&](auto const& region) { return region.reg(domain, access); });
+        return RegisteredRegionGroup{out};
+    }
 
     std::vector<Region> const& RegionGroup::view() const noexcept
     {
@@ -86,6 +98,13 @@ namespace mxl::lib::fabrics::ofi
     mxlRegions RegionGroups::toAPI() noexcept
     {
         return reinterpret_cast<mxlRegions>(this);
+    }
+
+    std::vector<RegisteredRegionGroup> RegionGroups::reg(std::shared_ptr<Domain> domain, uint64_t access) const
+    {
+        std::vector<RegisteredRegionGroup> out;
+        std::ranges::transform(view(), std::back_inserter(out), [&](auto const& group) { return group.reg(domain, access); });
+        return out;
     }
 
     std::vector<RegionGroup> const& RegionGroups::view() const noexcept
