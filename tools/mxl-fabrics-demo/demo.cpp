@@ -1,6 +1,8 @@
 #include <csignal>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <uuid.h>
@@ -38,27 +40,28 @@ struct Config
     std::string domain;
 
     // flow configuration
-    std::string flowID;
+    mxl::lib::FlowParser descriptor;
 
     // endpoint configuration
     std::optional<std::string> node;
     std::optional<std::string> service;
     mxlFabricsProvider provider;
 
+    bool requiresDeviceSupport;
     bool useCuda;
     int cudaDeviceId{0};
 };
 
-mxlStatus allocateCudaMemory(void** cudaBuf, mxlRegions* out_regions, int cudaDeviceId)
+mxlStatus allocateCudaMemory(void** cudaBuf, mxlRegions* out_regions, int cudaDeviceId, size_t size)
 {
-    if (cudaMalloc(cudaBuf, 64 * 1024) != cudaSuccess)
+    if (cudaMalloc(cudaBuf, size) != cudaSuccess)
     {
         MXL_ERROR("Failed to allocate CUDA memory");
     }
 
     mxlFabricsMemoryRegion region{
         reinterpret_cast<std::uintptr_t>(*cudaBuf),
-        64 * 1024,
+        size,
         {MXL_MEMORY_REGION_TYPE_CUDA, static_cast<uint32_t>(cudaDeviceId)},
     };
 
@@ -130,7 +133,7 @@ public:
 
     mxlStatus allocateCudaMemory(mxlRegions* out_regions)
     {
-        return ::allocateCudaMemory(&_cudaBuf, out_regions, _config.cudaDeviceId);
+        return ::allocateCudaMemory(&_cudaBuf, out_regions, _config.cudaDeviceId, _config.descriptor.getPayloadSize());
     }
 
     mxlStatus setup(std::string targetInfoStr)
@@ -150,7 +153,7 @@ public:
         }
 
         // Create a flow reader for the given flow id.
-        status = mxlCreateFlowReader(_instance, _config.flowID.c_str(), "", &_reader);
+        status = mxlCreateFlowReader(_instance, uuids::to_string(_config.descriptor.getId()).c_str(), "", &_reader);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to create flow reader with status '{}'", static_cast<int>(status));
@@ -185,13 +188,19 @@ public:
                 return status;
             }
         }
+        status = mxlFabricsTargetInfoFromString(targetInfoStr.c_str(), &_targetInfo);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to parse target info string with status '{}'", static_cast<int>(status));
+            return status;
+        }
 
         mxlInitiatorConfig initiatorConfig = {
             .endpointAddress = {.node = _config.node ? _config.node.value().c_str() : nullptr,
                                 .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = regions,
-            .deviceSupport = _config.useCuda
+            .deviceSupport = _config.requiresDeviceSupport,
         };
 
         status = mxlFabricsInitiatorSetup(_initiator, &initiatorConfig);
@@ -207,13 +216,6 @@ public:
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to free regions with status '{}'", static_cast<int>(status));
-            return status;
-        }
-
-        status = mxlFabricsTargetInfoFromString(targetInfoStr.c_str(), &_targetInfo);
-        if (status != MXL_STATUS_OK)
-        {
-            MXL_ERROR("Failed to parse target info string with status '{}'", static_cast<int>(status));
             return status;
         }
 
@@ -411,7 +413,7 @@ public:
 
         if (_flowExits)
         {
-            if (status = mxlDestroyFlow(_instance, _config.flowID.c_str()); status != MXL_STATUS_OK)
+            if (status = mxlDestroyFlow(_instance, uuids::to_string(_config.descriptor.getId()).c_str()); status != MXL_STATUS_OK)
             {
                 MXL_ERROR("Failed to destroy flow with status '{}'", static_cast<int>(status));
             }
@@ -428,7 +430,7 @@ public:
 
     mxlStatus allocateCudaMemory(mxlRegions* out_regions)
     {
-        return ::allocateCudaMemory(&_cudaBuf, out_regions, _config.cudaDeviceId);
+        return ::allocateCudaMemory(&_cudaBuf, out_regions, _config.cudaDeviceId, _config.descriptor.getPayloadSize());
     }
 
     mxlStatus setup(std::string const& flowDescriptor)
@@ -457,7 +459,7 @@ public:
         _flowExits = true;
 
         // Create a flow writer for the given flow id.
-        status = mxlCreateFlowWriter(_instance, _config.flowID.c_str(), "", &_writer);
+        status = mxlCreateFlowWriter(_instance, uuids::to_string(_config.descriptor.getId()).c_str(), "", &_writer);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to create flow writer with status '{}'", static_cast<int>(status));
@@ -496,7 +498,7 @@ public:
                                 .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = memoryRegions,
-            .deviceSupport = _config.useCuda,
+            .deviceSupport = _config.requiresDeviceSupport,
         };
         status = mxlFabricsTargetSetup(_target, &targetConfig, &_targetInfo);
         if (status != MXL_STATUS_OK)
@@ -649,9 +651,16 @@ int main(int argc, char** argv)
         "The target information. This is used when configured as an initiator . This is the target information to send to."
         "You first start the target and it will print the targetInfo that you paste to this argument");
 
+    bool requiresDeviceSupport;
+    auto requiresDeviceSupportOpt = app.add_flag("--device-support",
+        requiresDeviceSupport,
+        "This flag is used to specify that transfers will require device support (either local or remote memory involved in the transfer will "
+        "be on the device.");
+    requiresDeviceSupportOpt->default_val(false);
+
     bool useCuda;
     auto useCudaOpt = app.add_flag(
-        "--use-cuda", useCuda, "Use cuda memory (temporary for testing until the Flow API supports GPU memory representation");
+        "--use-cuda", useCuda, "Use cuda memory for local buffers. This will override requiresDeviceSupport option to true.");
     useCudaOpt->default_val(false);
 
     int cudaDeviceId;
@@ -659,6 +668,9 @@ int main(int argc, char** argv)
     cudaDeviceIdOpt->default_val(0);
 
     CLI11_PARSE(app, argc, argv);
+
+    // Using CUDA for local memory requires device support!
+    requiresDeviceSupport |= useCuda;
 
     mxlFabricsProvider mxlProvider;
     auto status = mxlFabricsProviderFromString(provider.c_str(), &mxlProvider);
@@ -671,14 +683,25 @@ int main(int argc, char** argv)
     if (runAsInitiator)
     {
         MXL_INFO("Running as initiator");
+        auto flowJsonPath = std::filesystem::path(domain) / (flowConf + ".mxl-flow/.json");
+
+        std::ifstream file(flowJsonPath, std::ios::in | std::ios::binary);
+        if (!file)
+        {
+            MXL_ERROR("Failed to open file: '{}'", std::string(flowJsonPath));
+            return MXL_ERR_INVALID_ARG;
+        }
+        std::string flowDescriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+        mxl::lib::FlowParser descriptorParser{flowDescriptor};
 
         auto app = AppInitator{
             Config{
                    .domain = domain,
-                   .flowID = flowConf,
+                   .descriptor = descriptorParser,
                    .node = node,
                    .service = service,
                    .provider = mxlProvider,
+                   .requiresDeviceSupport = requiresDeviceSupport,
                    .useCuda = useCuda,
                    .cudaDeviceId = cudaDeviceId,
                    },
@@ -714,10 +737,11 @@ int main(int argc, char** argv)
         auto app = AppTarget{
             Config{
                    .domain = domain,
-                   .flowID = flowId,
+                   .descriptor = descriptorParser,
                    .node = node,
                    .service = service,
                    .provider = mxlProvider,
+                   .requiresDeviceSupport = requiresDeviceSupport,
                    .useCuda = useCuda,
                    .cudaDeviceId = cudaDeviceId,
                    },

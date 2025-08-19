@@ -155,6 +155,8 @@ namespace mxl::lib::fabrics::ofi
         ::fi_info* info;
         auto hints = FIInfo::empty();
 
+        uint64_t flags = epType == ::fi_ep_type::FI_EP_RDM ? FI_SOURCE : 0;
+
         hints->domain_attr->mr_mode = FI_MR_LOCAL | FI_MR_VIRT_ADDR | FI_MR_ALLOCATED | FI_MR_PROV_KEY | FI_MR_HMEM;
 
         hints->mode = 0;
@@ -164,7 +166,7 @@ namespace mxl::lib::fabrics::ofi
 
         // hints: add condition to append FI_HMEM capability if needed!
 
-        fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), FI_SOURCE, hints.raw(), &info);
+        fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), flags, hints.raw(), &info);
 
         return FIInfoList{info};
     }

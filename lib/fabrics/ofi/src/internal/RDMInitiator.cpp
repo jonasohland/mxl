@@ -92,15 +92,17 @@ namespace mxl::lib::fabrics::ofi
             throw Exception::make(MXL_ERR_NO_FABRIC, "No provider available.");
         }
 
-        auto fabricInfoList = FIInfoList::get(
-            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE | FI_REMOTE_WRITE, FI_EP_RDM);
+        auto caps = FI_RMA | FI_WRITE | FI_REMOTE_WRITE;
+        caps |= config.deviceSupport ? FI_HMEM : 0;
+
+        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value(), caps, FI_EP_RDM);
         if (fabricInfoList.begin() == fabricInfoList.end())
         {
             throw Exception::make(MXL_ERR_NO_FABRIC, "No suitable fabric available");
         }
 
         auto info = *fabricInfoList.begin();
-        MXL_DEBUG("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
+        MXL_INFO("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
 
         auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
