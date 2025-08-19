@@ -85,22 +85,6 @@ namespace mxl::lib::fabrics::ofi
         close();
     }
 
-    CompletionQueue::CompletionQueue(CompletionQueue&& other) noexcept
-        : _raw(other._raw)
-    {
-        other._raw = nullptr;
-    }
-
-    CompletionQueue& CompletionQueue::operator=(CompletionQueue&& other)
-    {
-        close();
-
-        _raw = other._raw;
-        other._raw = nullptr;
-
-        return *this;
-    }
-
     ::fid_cq* CompletionQueue::raw() noexcept
     {
         return _raw;
