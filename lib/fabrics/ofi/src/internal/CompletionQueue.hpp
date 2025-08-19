@@ -35,16 +35,11 @@ namespace mxl::lib::fabrics::ofi
 
         ~CompletionQueue();
 
-        // No copying
+        // No copying, no moving
         CompletionQueue(CompletionQueue const&) = delete;
         void operator=(CompletionQueue const&) = delete;
-
-        /// Move-constructor. A moved-from completion queue can no longer be used.
-        CompletionQueue(CompletionQueue&&) noexcept;
-
-        /// Move-assignment operator. Moving into an existing completion queue will release all of is resources
-        /// and take ownership of the resources of the moved-from completion queue.
-        CompletionQueue& operator=(CompletionQueue&&);
+        CompletionQueue(CompletionQueue&&) = delete;
+        CompletionQueue& operator=(CompletionQueue&&) = delete;
 
         ::fid_cq* raw() noexcept;
         [[nodiscard]]

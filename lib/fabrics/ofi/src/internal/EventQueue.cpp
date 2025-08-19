@@ -85,22 +85,6 @@ namespace mxl::lib::fabrics::ofi
         close();
     }
 
-    EventQueue::EventQueue(EventQueue&& other) noexcept
-        : _raw(other._raw)
-    {
-        other._raw = nullptr;
-    }
-
-    EventQueue& EventQueue::operator=(EventQueue&& other)
-    {
-        close();
-
-        _raw = other._raw;
-        other._raw = nullptr;
-
-        return *this;
-    }
-
     ::fid_eq* EventQueue::raw() noexcept
     {
         return _raw;

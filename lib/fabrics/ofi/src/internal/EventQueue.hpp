@@ -31,16 +31,11 @@ namespace mxl::lib::fabrics::ofi
 
         ~EventQueue();
 
-        // No copying
+        // No copying, no moving
         EventQueue(EventQueue const&) = delete;
         void operator=(EventQueue const&) = delete;
-
-        /// Move constructor. A moved-from event queue can no longer be used.
-        EventQueue(EventQueue&&) noexcept;
-
-        /// Move-assigment operator. A moved-into event queue takes ownership of all resources of the
-        /// moved-from event queue. The moved-from queue can no longer be used.
-        EventQueue& operator=(EventQueue&&);
+        EventQueue(EventQueue&&) = delete;
+        EventQueue& operator=(EventQueue&&) = delete;
 
         /// Returns a raw handle to the event queue.
         ::fid_eq* raw() noexcept;
