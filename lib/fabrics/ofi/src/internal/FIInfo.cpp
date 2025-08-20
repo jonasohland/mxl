@@ -4,7 +4,6 @@
 
 #include "FIInfo.hpp"
 #include <cstdint>
-#include <cstring>
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
 #include "Exception.hpp"
@@ -155,7 +154,7 @@ namespace mxl::lib::fabrics::ofi
         return FIInfo::clone(_raw);
     }
 
-    FIInfoList FIInfoList::get(std::string node, std::string service, Provider provider, uint64_t caps)
+    FIInfoList FIInfoList::get(std::string node, std::string service, Provider provider, uint64_t caps, ::fi_ep_type epType)
     {
         ::fi_info* info;
         auto hints = FIInfo::empty();
@@ -164,14 +163,12 @@ namespace mxl::lib::fabrics::ofi
 
         hints->mode = 0;
         hints->caps = caps;
-        hints->ep_attr->type = FI_EP_MSG;
+        hints->ep_attr->type = epType;
         hints->fabric_attr->prov_name = strdup(fmt::to_string(provider).c_str());
 
         // hints: add condition to append FI_HMEM capability if needed!
 
-        fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), 0, hints.raw(), &info);
-
-        // fi_freeinfo(hints); // TODO: understand why this makes a crash.. according to the documentation hints shoud be freed after use.
+        fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), FI_SOURCE, hints.raw(), &info);
 
         return FIInfoList{info};
     }

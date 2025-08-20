@@ -50,6 +50,7 @@ namespace mxl::lib::fabrics::ofi
         /**
          * Byte-length of the raw address data.
          */
+        [[nodiscard]]
         std::size_t size() const noexcept;
 
     private:

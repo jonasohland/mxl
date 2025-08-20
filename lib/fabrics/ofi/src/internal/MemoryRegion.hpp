@@ -5,7 +5,6 @@
 #pragma once
 
 #include <cstdint>
-#include <memory>
 #include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
@@ -18,7 +17,7 @@ namespace mxl::lib::fabrics::ofi
     class MemoryRegion
     {
     public:
-        static std::shared_ptr<MemoryRegion> reg(std::shared_ptr<Domain> domain, Region const& region, uint64_t access);
+        static MemoryRegion reg(Domain& domain, Region const& region, uint64_t access);
 
         ~MemoryRegion();
 
@@ -43,9 +42,8 @@ namespace mxl::lib::fabrics::ofi
 
         void close();
 
-        MemoryRegion(::fid_mr* raw, std::shared_ptr<Domain> domain);
+        MemoryRegion(::fid_mr* raw);
 
         ::fid_mr* _raw;
-        std::shared_ptr<Domain> _domain;
     };
 }

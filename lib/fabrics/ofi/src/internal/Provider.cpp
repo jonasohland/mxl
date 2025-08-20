@@ -4,6 +4,8 @@
 
 #include "Provider.hpp"
 #include <map>
+#include <optional>
+#include "mxl/fabrics.h"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -11,7 +13,8 @@ namespace mxl::lib::fabrics::ofi
     static std::map<std::string_view, Provider> const providerStringMap = {
         {"tcp",   Provider::TCP  },
         {"verbs", Provider::VERBS},
-        {"efa",   Provider::EFA  }
+        {"efa",   Provider::EFA  },
+        {"shm",   Provider::SHM  },
     };
 
     mxlFabricsProvider providerToAPI(Provider provider) noexcept
@@ -21,8 +24,10 @@ namespace mxl::lib::fabrics::ofi
             case Provider::TCP:   return MXL_SHARING_PROVIDER_TCP;
             case Provider::VERBS: return MXL_SHARING_PROVIDER_VERBS;
             case Provider::EFA:   return MXL_SHARING_PROVIDER_EFA;
-            default:              return MXL_SHARING_PROVIDER_AUTO;
+            case Provider::SHM:   return MXL_SHARING_PROVIDER_SHM;
         }
+
+        return MXL_SHARING_PROVIDER_AUTO;
     }
 
     std::optional<Provider> providerFromAPI(mxlFabricsProvider api) noexcept
@@ -33,8 +38,10 @@ namespace mxl::lib::fabrics::ofi
             case MXL_SHARING_PROVIDER_TCP:   return Provider::TCP;
             case MXL_SHARING_PROVIDER_VERBS: return Provider::VERBS;
             case MXL_SHARING_PROVIDER_EFA:   return Provider::EFA;
-            default:                         return std::nullopt;
+            case MXL_SHARING_PROVIDER_SHM:   return Provider::SHM;
         }
+
+        return std::nullopt;
     }
 
     std::optional<Provider> providerFromString(std::string const& s) noexcept

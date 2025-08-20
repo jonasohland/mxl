@@ -4,8 +4,6 @@
 
 #include "MemoryRegion.hpp"
 #include <cstdint>
-#include <cstdio>
-#include <memory>
 #include <random>
 #include <bits/types/struct_iovec.h>
 #include <rdma/fabric.h>
@@ -19,7 +17,7 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    std::shared_ptr<MemoryRegion> MemoryRegion::reg(std::shared_ptr<Domain> domain, Region const& region, uint64_t access)
+    MemoryRegion MemoryRegion::reg(Domain& domain, Region const& region, uint64_t access)
     {
         ::fid_mr* raw;
         std::random_device rd;
@@ -45,19 +43,19 @@ namespace mxl::lib::fabrics::ofi
 
         fiCall(fi_mr_regattr,
             "Failed to register memory region",
-            domain->raw(),
+            domain.raw(),
             &attr,
             0, // flags: this will need to be modified when we will add HMEM support
             &raw);
 
         struct MakeSharedEnabler : public MemoryRegion
         {
-            MakeSharedEnabler(::fid_mr* raw, std::shared_ptr<Domain> domain)
-                : MemoryRegion(raw, std::move(domain))
+            MakeSharedEnabler(::fid_mr* raw)
+                : MemoryRegion(raw)
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(raw, std::move(domain));
+        return {raw};
     }
 
     MemoryRegion::~MemoryRegion()
@@ -67,7 +65,6 @@ namespace mxl::lib::fabrics::ofi
 
     MemoryRegion::MemoryRegion(MemoryRegion&& other) noexcept
         : _raw(other._raw)
-        , _domain(std::move(other._domain))
     {
         other._raw = nullptr;
     }
@@ -78,8 +75,6 @@ namespace mxl::lib::fabrics::ofi
 
         _raw = other._raw;
         other._raw = nullptr;
-
-        _domain = std::move(other._domain);
 
         return *this;
     }
@@ -94,9 +89,8 @@ namespace mxl::lib::fabrics::ofi
         return fi_mr_key(_raw);
     }
 
-    MemoryRegion::MemoryRegion(::fid_mr* raw, std::shared_ptr<Domain> domain)
+    MemoryRegion::MemoryRegion(::fid_mr* raw)
         : _raw(raw)
-        , _domain(std::move(domain))
     {}
 
     void MemoryRegion::close()

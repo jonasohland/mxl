@@ -30,8 +30,6 @@ namespace mxl::lib::fabrics::ofi
         return ::iovec{.iov_base = reinterpret_cast<void*>(base), .iov_len = size};
     }
 
-    // Region implementations
-
     std::vector<Region> const& RegionGroup::view() const noexcept
     {
         return _inner;
