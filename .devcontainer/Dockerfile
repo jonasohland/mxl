@@ -50,9 +50,9 @@ RUN apt-get install -y --no-install-recommends \
     ninja-build
 
 # Install CUDA toolkit only (do not update the driver, this comes from the host)
-RUN wget https://developer.download.nvidia.com/compute/cuda/12.2.0/local_installers/cuda_12.2.0_535.54.03_linux.run \
-  && chmod +x cuda_12.2.0_535.54.03_linux.run \
-  && ./cuda_12.2.0_535.54.03_linux.run --silent --toolkit
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.9.0/local_installers/cuda_12.9.0_575.51.03_linux.run \
+  && chmod +x cuda_12.9.0_575.51.03_linux.run \
+  && ./cuda_12.9.0_575.51.03_linux.run --silent --toolkit
 
 # Make the selected clang version the default alternative
 COPY register-clang-version.sh ./register-clang-version.sh 

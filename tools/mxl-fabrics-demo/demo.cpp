@@ -57,6 +57,7 @@ mxlStatus allocateCudaMemory(void** cudaBuf, mxlRegions* out_regions, int cudaDe
     if (cudaMalloc(cudaBuf, size) != cudaSuccess)
     {
         MXL_ERROR("Failed to allocate CUDA memory");
+        return MXL_ERR_UNKNOWN;
     }
 
     mxlFabricsMemoryRegion region{
@@ -133,7 +134,7 @@ public:
 
     mxlStatus allocateCudaMemory(mxlRegions* out_regions)
     {
-        return ::allocateCudaMemory(&_cudaBuf, out_regions, _config.cudaDeviceId, _config.descriptor.getPayloadSize());
+        return ::allocateCudaMemory(&_cudaBuf, out_regions, _config.cudaDeviceId, _config.descriptor.getPayloadSize() + 8192);
     }
 
     mxlStatus setup(std::string targetInfoStr)
@@ -178,7 +179,6 @@ public:
                 return status;
             }
         }
-
         else
         {
             status = mxlFabricsRegionsForFlowReader(_reader, &regions);
@@ -187,12 +187,6 @@ public:
                 MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
                 return status;
             }
-        }
-        status = mxlFabricsTargetInfoFromString(targetInfoStr.c_str(), &_targetInfo);
-        if (status != MXL_STATUS_OK)
-        {
-            MXL_ERROR("Failed to parse target info string with status '{}'", static_cast<int>(status));
-            return status;
         }
 
         mxlInitiatorConfig initiatorConfig = {
@@ -216,6 +210,13 @@ public:
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to free regions with status '{}'", static_cast<int>(status));
+            return status;
+        }
+
+        status = mxlFabricsTargetInfoFromString(targetInfoStr.c_str(), &_targetInfo);
+        if (status != MXL_STATUS_OK)
+        {
+            MXL_ERROR("Failed to parse target info string with status '{}'", static_cast<int>(status));
             return status;
         }
 
@@ -430,7 +431,7 @@ public:
 
     mxlStatus allocateCudaMemory(mxlRegions* out_regions)
     {
-        return ::allocateCudaMemory(&_cudaBuf, out_regions, _config.cudaDeviceId, _config.descriptor.getPayloadSize());
+        return ::allocateCudaMemory(&_cudaBuf, out_regions, _config.cudaDeviceId, _config.descriptor.getPayloadSize() + 8192);
     }
 
     mxlStatus setup(std::string const& flowDescriptor)

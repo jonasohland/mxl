@@ -23,7 +23,7 @@ namespace mxl::lib::fabrics::ofi
         MXL_DEBUG("Registering memory region with address {:x} size {} and type {}", region.base, region.size, region.loc.toString());
 
         uint64_t flags = 0;
-        flags |= region.loc.isHost() ? FI_HMEM_DEVICE_ONLY : 0;
+        flags |= region.loc.isHost() ? 0 : FI_HMEM_DEVICE_ONLY;
 
         ::fi_mr_attr attr{};
         attr.mr_iov = region.as_iovec();

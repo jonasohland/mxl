@@ -31,7 +31,7 @@ namespace mxl::lib::fabrics::ofi
         }
 
         auto info = *fabricInfoList.begin();
-        MXL_INFO("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
+        MXL_DEBUG("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
 
         auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);

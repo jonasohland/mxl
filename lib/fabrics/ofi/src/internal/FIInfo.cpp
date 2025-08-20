@@ -164,8 +164,6 @@ namespace mxl::lib::fabrics::ofi
         hints->ep_attr->type = epType;
         hints->fabric_attr->prov_name = strdup(fmt::to_string(provider).c_str());
 
-        // hints: add condition to append FI_HMEM capability if needed!
-
         fiCall(::fi_getinfo, "Failed to get provider information", fiVersion(), node.c_str(), service.c_str(), flags, hints.raw(), &info);
 
         return FIInfoList{info};
