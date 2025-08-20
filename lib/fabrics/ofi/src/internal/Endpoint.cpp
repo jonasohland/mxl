@@ -12,6 +12,7 @@
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_endpoint.h>
+#include <rdma/fi_errno.h>
 #include <rdma/fi_rma.h>
 #include "internal/Logging.hpp"
 #include "Address.hpp"
@@ -97,12 +98,13 @@ namespace mxl::lib::fabrics::ofi
     }
 
     Endpoint::Endpoint(::fid_ep* raw, FIInfoView info, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq,
-        std::optional<std::shared_ptr<EventQueue>> eq)
+        std::optional<std::shared_ptr<EventQueue>> eq, std::optional<std::shared_ptr<AddressVector>> av)
         : _raw(raw)
         , _info(info.owned())
         , _domain(std::move(domain))
         , _cq(std::move(cq))
         , _eq(std::move(eq))
+        , _av(std::move(av))
     {
         MXL_INFO("Endpoint {} created", Endpoint::idFromFID(raw));
     }
@@ -127,6 +129,7 @@ namespace mxl::lib::fabrics::ofi
         , _domain(std::move(other._domain))
         , _cq(std::move(other._cq))
         , _eq(std::move(other._eq))
+        , _av(std::move(other._av))
     {
         other._raw = nullptr;
     }
@@ -142,6 +145,7 @@ namespace mxl::lib::fabrics::ofi
         _domain = std::move(other._domain);
         _eq = std::move(other._eq);
         _cq = std::move(other._cq);
+        _av = std::move(other._av);
 
         return *this;
     }
@@ -158,6 +162,13 @@ namespace mxl::lib::fabrics::ofi
         fiCall(::fi_ep_bind, "Failed to bind completion queue to endpoint", _raw, &cq->raw()->fid, flags);
 
         _cq = cq;
+    }
+
+    void Endpoint::bind(std::shared_ptr<AddressVector> av)
+    {
+        fiCall(::fi_ep_bind, "Failed to bind address vector to endpoint", _raw, &av->raw()->fid, 0);
+
+        _av = av;
     }
 
     void Endpoint::enable()
@@ -190,7 +201,7 @@ namespace mxl::lib::fabrics::ofi
     {
         if (!_cq)
         {
-            throw std::runtime_error("no Completion queue is bound to the endpoint"); // Is this the right throw??
+            throw Exception::internal("no Completion queue is bound to the endpoint"); // Is this the right throw??
         }
 
         return *_cq;
@@ -200,10 +211,19 @@ namespace mxl::lib::fabrics::ofi
     {
         if (!_eq)
         {
-            throw std::runtime_error("No event queue bound to the endpoint"); // Is this the right throw??
+            throw Exception::internal("No event queue bound to the endpoint"); // Is this the right throw??
         }
 
         return *_eq;
+    }
+
+    std::shared_ptr<AddressVector> Endpoint::addressVector() const
+    {
+        if (!_av)
+        {
+            throw Exception::internal("No address vector bound to the endpoint!");
+        }
+        return *_av;
     }
 
     std::pair<std::optional<Completion>, std::optional<Event>> Endpoint::readQueues()
@@ -327,7 +347,6 @@ namespace mxl::lib::fabrics::ofi
 
     void Endpoint::recv(LocalRegion region)
     {
-        // TODO: this should use fi_recvmsg and fi_msg so we can also pass the local endpoint in the context
         auto iovec = region.toIov();
         fiCall(::fi_recv, "Failed to push recv to work queue", _raw, iovec.iov_base, iovec.iov_len, nullptr, FI_ADDR_UNSPEC, nullptr);
     }

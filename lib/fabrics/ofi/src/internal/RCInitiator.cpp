@@ -6,9 +6,12 @@
 #include <chrono>
 #include <algorithm>
 #include <uuid.h>
+#include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
 #include "internal/Logging.hpp"
+#include "Domain.hpp"
 #include "Exception.hpp"
+#include "Region.hpp"
 #include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -259,54 +262,38 @@ namespace mxl::lib::fabrics::ofi
         }
 
         auto fabricInfoList = FIInfoList::get(
-            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE | FI_REMOTE_WRITE);
+            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_WRITE | FI_REMOTE_WRITE, FI_EP_MSG);
 
         if (fabricInfoList.begin() == fabricInfoList.end())
         {
             throw Exception::make(MXL_ERR_NO_FABRIC, "No suitable fabric available");
         }
 
-        auto info = (*fabricInfoList.begin()).owned();
+        auto info = *fabricInfoList.begin();
+        MXL_DEBUG("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
 
-        auto fabric = Fabric::open(info.view());
+        auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
+        domain->registerRegionGroups(*RegionGroups::fromAPI(config.regions), FI_WRITE);
+
         auto eq = EventQueue::open(fabric);
         auto cq = CompletionQueue::open(domain);
 
-        auto regionGroups = RegionGroups::fromAPI(config.regions);
-
-        std::vector<RegisteredRegionGroup> registeredRegions;
-
-        for (auto const& group : regionGroups->view())
-        {
-            std::vector<RegisteredRegion> regRegions;
-            for (auto const& region : group.view())
-            {
-                regRegions.emplace_back(MemoryRegion::reg(domain, region, FI_WRITE), region);
-            }
-
-            RegisteredRegionGroup regGroup{std::move(regRegions)};
-            registeredRegions.emplace_back(std::move(regGroup));
-        }
-
         struct MakeUniqueEnabler : RCInitiator
         {
-            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::shared_ptr<CompletionQueue> cq, std::shared_ptr<EventQueue> eq,
-                std::vector<RegisteredRegionGroup> registeredRegions)
-                : RCInitiator(std::move(domain), std::move(cq), std::move(eq), std::move(registeredRegions))
+            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::shared_ptr<CompletionQueue> cq, std::shared_ptr<EventQueue> eq)
+                : RCInitiator(std::move(domain), std::move(cq), std::move(eq))
             {}
         };
 
-        return std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(cq), std::move(eq), std::move(registeredRegions));
+        return std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(cq), std::move(eq));
     }
 
-    RCInitiator::RCInitiator(std::shared_ptr<Domain> domain, std::shared_ptr<CompletionQueue> cq, std::shared_ptr<EventQueue> eq,
-        std::vector<RegisteredRegionGroup> regions)
+    RCInitiator::RCInitiator(std::shared_ptr<Domain> domain, std::shared_ptr<CompletionQueue> cq, std::shared_ptr<EventQueue> eq)
         : _domain(std::move(domain))
         , _cq(std::move(cq))
         , _eq(std::move(eq))
-        , _registeredRegions(regions)
-        , _localRegions(toLocal(regions))
+        , _localRegions(_domain->localRegionGroups())
     {}
 
     void RCInitiator::addTarget(TargetInfo const& targetInfo)

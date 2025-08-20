@@ -3,31 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "RCTarget.hpp"
-#include <cstdint>
+#include <rdma/fabric.h>
 #include "internal/Logging.hpp"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
-#include "LocalRegion.hpp"
+#include "Region.hpp"
 #include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
 
-    LocalRegion RCTarget::ImmediateDataLocation::toLocalRegion() noexcept
-    {
-        auto addr = &data;
-
-        return LocalRegion{
-            .addr = reinterpret_cast<uint64_t>(reinterpret_cast<std::uintptr_t>(addr)),
-            .len = sizeof(uint64_t),
-            .desc = nullptr,
-        };
-    }
-
-    RCTarget::RCTarget(std::shared_ptr<Domain> domain, std::vector<RegisteredRegionGroup> regions, PassiveEndpoint ep)
+    RCTarget::RCTarget(std::shared_ptr<Domain> domain, PassiveEndpoint ep)
         : _domain(std::move(domain))
-        , _regRegions(std::move(regions))
         , _state(WaitForConnectionRequest{std::move(ep)})
     {}
 
@@ -54,7 +42,7 @@ namespace mxl::lib::fabrics::ofi
 
         // Get a list of available fabric configurations available on this machine.
         auto fabricInfoList = FIInfoList::get(
-            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_REMOTE_WRITE);
+            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_REMOTE_WRITE, FI_EP_MSG);
 
         if (fabricInfoList.begin() == fabricInfoList.end())
         {
@@ -70,24 +58,7 @@ namespace mxl::lib::fabrics::ofi
         // See fi_domain(3) and fi_fabric(3) for more complete information about these concepts.
         auto fabric = Fabric::open(*fabricInfoList.begin());
         auto domain = Domain::open(fabric);
-
-        std::vector<RegisteredRegionGroup> localRegions;
-
-        // config.regions contains the local memory regions that the remote writer will write to.
-        auto localRegionGroups = RegionGroups::fromAPI(config.regions);
-
-        for (auto const& group : localRegionGroups->view())
-        {
-            // For each region group we will register memory and keep a copy inside this instance as a list of registered region groups.
-            // Registered regions can be converted to remote region groups or local region groups where needed.
-            std::vector<RegisteredRegion> registeredGroup;
-            for (auto const& region : group.view())
-            {
-                registeredGroup.emplace_back(MemoryRegion::reg(domain, region, FI_REMOTE_WRITE), region);
-            }
-
-            localRegions.emplace_back(registeredGroup);
-        }
+        domain->registerRegionGroups(*RegionGroups::fromAPI(config.regions), FI_REMOTE_WRITE);
 
         // Create a passive endpoint. A passive endpoint can be viewed like a bound TCP socket listening for
         // incoming connections
@@ -103,17 +74,17 @@ namespace mxl::lib::fabrics::ofi
         // Helper struct to enable the std::make_unique function to access the private constructor of this class
         struct MakeUniqueEnabler : RCTarget
         {
-            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::vector<RegisteredRegionGroup> regions, PassiveEndpoint pep)
-                : RCTarget(std::move(domain), std::move(regions), std::move(pep))
+            MakeUniqueEnabler(std::shared_ptr<Domain> domain, PassiveEndpoint pep)
+                : RCTarget(std::move(domain), std::move(pep))
             {}
         };
 
         auto localAddress = pep.localAddress();
-        auto remoteRegions = toRemote(localRegions);
+        auto remoteRegionGroups = domain->RemoteRegionGroups();
 
         // Return the constructed RCTarget and associated TargetInfo for remote peers to connect.
-        return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(localRegions), std::move(pep)),
-            std::make_unique<TargetInfo>(localAddress, std::move(remoteRegions))};
+        return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(pep)),
+            std::make_unique<TargetInfo>(std::move(localAddress), std::move(remoteRegionGroups))};
     }
 
     Target::ReadResult RCTarget::makeProgress()
