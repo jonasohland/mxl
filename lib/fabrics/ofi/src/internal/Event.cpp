@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Contributors to the Media eXchange Layer project.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 #include "Event.hpp"
 #include <rdma/fabric.h>
 #include "EventQueue.hpp"
