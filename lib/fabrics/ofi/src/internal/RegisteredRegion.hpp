@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <bits/types/struct_iovec.h>
+#include "Domain.hpp"
 #include "LocalRegion.hpp"
 #include "MemoryRegion.hpp"
 #include "Region.hpp"
@@ -16,20 +17,20 @@ namespace mxl::lib::fabrics::ofi
     class RegisteredRegion
     {
     public:
-        explicit RegisteredRegion(std::shared_ptr<MemoryRegion> memoryRegion, Region const& reg)
-            : mr(std::move(memoryRegion))
-            , region(reg)
+        explicit RegisteredRegion(MemoryRegion memoryRegion, Region reg)
+            : _mr(std::move(memoryRegion))
+            , _region(std::move(reg))
         {}
 
         [[nodiscard]]
-        RemoteRegion toRemote() const noexcept;
+        RemoteRegion toRemote(bool useVirtualAddress) const noexcept;
 
         [[nodiscard]]
         LocalRegion toLocal() const noexcept;
 
     private:
-        std::shared_ptr<MemoryRegion> mr;
-        Region region;
+        MemoryRegion _mr;
+        Region _region;
     };
 
     class RegisteredRegionGroup
@@ -40,7 +41,7 @@ namespace mxl::lib::fabrics::ofi
         {}
 
         [[nodiscard]]
-        RemoteRegionGroup toRemote() const noexcept;
+        RemoteRegionGroup toRemote(bool useVirtualAddress) const noexcept;
 
         [[nodiscard]]
         LocalRegionGroup toLocal() const noexcept;
@@ -49,6 +50,6 @@ namespace mxl::lib::fabrics::ofi
         std::vector<RegisteredRegion> _inner;
     };
 
-    std::vector<RemoteRegionGroup> toRemote(std::vector<RegisteredRegionGroup> const& groups) noexcept;
+    std::vector<RemoteRegionGroup> toRemote(std::vector<RegisteredRegionGroup> const& groups, bool useVirtualAddress) noexcept;
     std::vector<LocalRegionGroup> toLocal(std::vector<RegisteredRegionGroup> const& groups) noexcept;
 }
