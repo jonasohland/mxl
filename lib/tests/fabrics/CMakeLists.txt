@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Contributors to the Media eXchange Layer project.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 if (NOT TARGET Catch2::Catch2WithMain)
     find_package(Catch2 REQUIRED)
 endif()
