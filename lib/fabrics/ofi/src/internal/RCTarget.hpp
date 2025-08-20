@@ -8,7 +8,6 @@
 #include <variant>
 #include "mxl/fabrics.h"
 #include "Endpoint.hpp"
-#include "LocalRegion.hpp"
 #include "PassiveEndpoint.hpp"
 #include "RegisteredRegion.hpp"
 #include "Target.hpp"
@@ -19,13 +18,6 @@ namespace mxl::lib::fabrics::ofi
     class RCTarget : public Target
     {
     private:
-        struct ImmediateDataLocation
-        {
-            uint64_t data;
-
-            LocalRegion toLocalRegion() noexcept;
-        };
-
         struct WaitForConnectionRequest
         {
             PassiveEndpoint pep;
@@ -51,7 +43,7 @@ namespace mxl::lib::fabrics::ofi
         Target::ReadResult readBlocking(std::chrono::steady_clock::duration timeout) final;
 
     private:
-        RCTarget(std::shared_ptr<Domain> domain, std::vector<RegisteredRegionGroup> regions, PassiveEndpoint pep);
+        RCTarget(std::shared_ptr<Domain> domain, PassiveEndpoint pep);
 
         Target::ReadResult makeProgress();
         Target::ReadResult makeProgressBlocking(std::chrono::steady_clock::duration timeout);

@@ -11,6 +11,7 @@
 #include <rdma/fabric.h>
 #include <rdma/fi_endpoint.h>
 #include "Address.hpp"
+#include "AddressVector.hpp"
 #include "Completion.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"
@@ -83,6 +84,10 @@ namespace mxl::lib::fabrics::ofi
         /// an instance of the shared pointer, so the queue can not be destroyed before the endpoint.
         void bind(std::shared_ptr<CompletionQueue> cq, uint64_t flags);
 
+        /// Bind the endpoint to an address vector. The endpoint can be bound to an address vector only once. The Endpoint object will take ownership
+        /// of an instance of the shared pointer, so the address vector can not be destroyed before the endpoint.
+        void bind(std::shared_ptr<AddressVector> av);
+
         /// This  call  transitions  the  endpoint into an enabled state.  An endpoint must be enabled before it may be used to perform data
         /// transfers. Enabling an endpoint typically results in hardware resources being assigned to it.
         /// Endpoints making use of completion queues, event queues, and/or address vectors must be bound to them before being enabled.
@@ -119,6 +124,11 @@ namespace mxl::lib::fabrics::ofi
         /// associated with this endpoint.
         [[nodiscard]]
         std::shared_ptr<EventQueue> eventQueue() const;
+
+        /// If an address vector is associated with this endpoint. Get the AV. Throws an exception if no address vector is
+        /// associated with this endpoint
+        [[nodiscard]]
+        std::shared_ptr<AddressVector> addressVector() const;
 
         /// Do a non-blocking read of both the event and completion queue associated with this endpoint.
         std::pair<std::optional<Completion>, std::optional<Event>> readQueues();
@@ -171,7 +181,7 @@ namespace mxl::lib::fabrics::ofi
 
         /// Construct the endpoint.
         Endpoint(::fid_ep* raw, FIInfoView info, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq = std::nullopt,
-            std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt);
+            std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt, std::optional<std::shared_ptr<AddressVector>> av = std::nullopt);
 
         ::fid_ep* _raw;                                      /// Raw resource reference
         FIInfo _info;                                        /// Info passed via Endpoint::create()
@@ -179,5 +189,6 @@ namespace mxl::lib::fabrics::ofi
 
         std::optional<std::shared_ptr<CompletionQueue>> _cq; /// Completion queue lives here after Endpoint::bind()
         std::optional<std::shared_ptr<EventQueue>> _eq;      /// Event queue lives here after Endpoint::bind()
+        std::optional<std::shared_ptr<AddressVector>> _av;   /// Address vector lives here after Endpoint::bind()
     };
 }
