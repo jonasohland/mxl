@@ -5,6 +5,7 @@
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
 #include <string>
 #include <uuid.h>
 #include <CLI/CLI.hpp>
@@ -31,14 +32,14 @@ std::sig_atomic_t volatile g_exit_requested = 0;
 
 struct Config
 {
-    std::string const& domain;
+    std::string domain;
 
     // flow configuration
-    std::string const& flowID;
+    std::string flowID;
 
     // endpoint configuration
-    std::string const& node;
-    std::string const& service;
+    std::optional<std::string> node;
+    std::optional<std::string> service;
     mxlFabricsProvider provider;
 };
 
@@ -139,7 +140,8 @@ public:
         }
 
         mxlInitiatorConfig initiatorConfig = {
-            .endpointAddress = {.node = _config.node.c_str(), .service = _config.service.c_str()},
+            .endpointAddress = {.node = _config.node ? _config.node.value().c_str() : nullptr,
+                                .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = regions,
         };
@@ -228,6 +230,10 @@ public:
 
             // Okay the grain is ready, we can transfer it to the targets.
             ret = mxlFabricsInitiatorTransferGrain(_initiator, grainIndex);
+            if (ret == MXL_ERR_NOT_READY)
+            {
+                continue;
+            }
             if (ret != MXL_STATUS_OK)
             {
                 MXL_ERROR("Failed to transfer grain with status '{}'", static_cast<int>(ret));
@@ -401,7 +407,8 @@ public:
         }
 
         mxlTargetConfig targetConfig = {
-            .endpointAddress = {.node = _config.node.c_str(), .service = _config.service.c_str()},
+            .endpointAddress = {.node = _config.node ? _config.node.value().c_str() : nullptr,
+                                .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = memoryRegions,
         };
@@ -532,18 +539,18 @@ int main(int argc, char** argv)
         "Run as an initiator (flow reader + fabrics initiator). If not set, run as a receiver (fabrics target + flow writer).");
     runAsInitiatorOpt->default_val(false);
 
-    std::string node;
+    std::optional<std::string> node;
     auto nodeOpt = app.add_option("-n,--node",
         node,
         "This corresponds to the interface identifier of the fabrics endpoint, it can also be a logical address. This can be seen as the bind "
         "address when using sockets.");
-    nodeOpt->default_val("localhost");
+    nodeOpt->default_val(std::nullopt);
 
-    std::string service;
+    std::optional<std::string> service;
     auto serviceOpt = app.add_option("--service",
         service,
         "This corresponds to a service identifier for the fabrics endpoint. This can be seen as the bind port when using sockets.");
-    serviceOpt->default_val("1234");
+    serviceOpt->default_val(std::nullopt);
 
     std::string provider;
     auto providerOpt = app.add_option("-p,--provider", provider, "The fabrics provider. One of (tcp, verbs or efa). Default is 'tcp'.");

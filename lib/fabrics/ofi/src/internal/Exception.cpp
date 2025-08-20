@@ -4,6 +4,7 @@
 
 #include "Exception.hpp"
 #include <rdma/fi_errno.h>
+#include "mxl/mxl.h"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -34,11 +35,11 @@ namespace mxl::lib::fabrics::ofi
 
     mxlStatus mxlStatusFromFiErrno(int fiErrno)
     {
-        if (fiErrno == FI_EINTR)
+        switch (fiErrno)
         {
-            return MXL_ERR_INTERRUPTED;
+            case -FI_EINTR:  return MXL_ERR_INTERRUPTED;
+            case -FI_EAGAIN: return MXL_ERR_NOT_READY;
+            default:         return MXL_ERR_UNKNOWN;
         }
-
-        return MXL_ERR_UNKNOWN;
     }
 }

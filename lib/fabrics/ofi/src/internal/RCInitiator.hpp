@@ -89,8 +89,6 @@ namespace mxl::lib::fabrics::ofi
 
         void handleCompletionError(Completion::Error); /// Handles a completion error event.
         void handleCompletionData(Completion::Data);   /// Handle a completion data event.
-        void handleConnected();                        /// Handles a Event::Connected event.
-        void handleShutdown();                         /// Handles an Event::Shutdown event.
 
         /// Restarts the endpoint. Produces a new Idle state from any previous state.
         Idle restart(Endpoint const&);
@@ -143,7 +141,7 @@ namespace mxl::lib::fabrics::ofi
         /// When makeing progress using blocking queue reads, this is the minimum interval at which the event queue will be read.
         constexpr static auto EQPollInterval = std::chrono::milliseconds(100);
 
-        RCInitiator(std::shared_ptr<Domain>, std::shared_ptr<CompletionQueue>, std::shared_ptr<EventQueue>, std::vector<RegisteredRegionGroup>);
+        RCInitiator(std::shared_ptr<Domain>, std::shared_ptr<CompletionQueue>, std::shared_ptr<EventQueue>);
 
         /// Block on the completion queue with a timeout.
         void blockOnCQ(std::chrono::steady_clock::duration);
