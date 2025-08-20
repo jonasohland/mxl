@@ -9,23 +9,23 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    RemoteRegion RegisteredRegion::toRemote() const noexcept
+    RemoteRegion RegisteredRegion::toRemote(bool useVirtualAddress) const noexcept
     {
-        auto addr = mr->_domain->usingVirtualAddresses() ? region.base : 0;
+        auto addr = useVirtualAddress ? _region.base : 0;
 
-        return RemoteRegion{.addr = addr, .len = region.size, .rkey = mr->rkey()};
+        return RemoteRegion{.addr = addr, .len = _region.size, .rkey = _mr.rkey()};
     }
 
     LocalRegion RegisteredRegion::toLocal() const noexcept
     {
-        return LocalRegion{.addr = region.base, .len = region.size, .desc = mr->desc()};
+        return LocalRegion{.addr = _region.base, .len = _region.size, .desc = _mr.desc()};
     }
 
-    RemoteRegionGroup RegisteredRegionGroup::toRemote() const noexcept
+    RemoteRegionGroup RegisteredRegionGroup::toRemote(bool useVirtualAddress) const noexcept
     {
         std::vector<RemoteRegion> group;
 
-        std::ranges::transform(_inner, std::back_inserter(group), [](RegisteredRegion const& reg) { return reg.toRemote(); });
+        std::ranges::transform(_inner, std::back_inserter(group), [&](RegisteredRegion const& reg) { return reg.toRemote(useVirtualAddress); });
 
         return RemoteRegionGroup{group};
     }
@@ -39,10 +39,11 @@ namespace mxl::lib::fabrics::ofi
         return LocalRegionGroup{group};
     }
 
-    std::vector<RemoteRegionGroup> toRemote(std::vector<RegisteredRegionGroup> const& groups) noexcept
+    std::vector<RemoteRegionGroup> toRemote(std::vector<RegisteredRegionGroup> const& groups, bool useVirtualAddress) noexcept
     {
         std::vector<RemoteRegionGroup> remoteGroups;
-        std::ranges::transform(groups, std::back_inserter(remoteGroups), [](RegisteredRegionGroup const& reg) { return reg.toRemote(); });
+        std::ranges::transform(
+            groups, std::back_inserter(remoteGroups), [&](RegisteredRegionGroup const& reg) { return reg.toRemote(useVirtualAddress); });
         return remoteGroups;
     }
 
