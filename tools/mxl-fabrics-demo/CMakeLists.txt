@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Contributors to the Media eXchange Layer project.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 find_package(CLI11 CONFIG REQUIRED)
 find_package(stduuid CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
