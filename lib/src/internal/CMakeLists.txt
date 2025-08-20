@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Contributors to the Media eXchange Layer project.
+#
+# SPDX-License-Identifier: Apache-2.0
+
 add_library(mxl-internal STATIC)
 target_compile_features(mxl-internal
         PRIVATE
