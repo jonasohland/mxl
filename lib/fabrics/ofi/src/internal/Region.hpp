@@ -5,9 +5,11 @@
 #pragma once
 
 #include <cstdint>
+#include <variant>
 #include <vector>
 #include <uuid.h>
 #include <bits/types/struct_iovec.h>
+#include <rdma/fi_domain.h>
 #include "internal/FlowData.hpp"
 #include "mxl/fabrics.h"
 
@@ -16,9 +18,55 @@ namespace mxl::lib::fabrics::ofi
     class Region
     {
     public:
-        explicit Region(std::uintptr_t base, size_t size)
+        class Location
+        {
+        public:
+            static Location host() noexcept;
+            static Location cuda(int deviceId) noexcept;
+            static Location fromAPI(mxlFabricsMemoryRegionLocation loc) noexcept;
+
+            /// Return the device id. For host location 0 is returned.
+            [[nodiscard]]
+            uint64_t id() const noexcept;
+
+            /// Convert the current location to libfabric "iface" representation
+            [[nodiscard]]
+            ::fi_hmem_iface iface() const noexcept;
+
+            [[nodiscard]]
+            std::string toString() const noexcept;
+
+            /// Return true if the memory location is on host.
+            [[nodiscard]]
+            bool isHost() const noexcept;
+
+        private:
+            class Host
+            {};
+
+            class Cuda
+            {
+                Cuda(int deviceId)
+                    : _deviceId(deviceId)
+                {}
+                friend class Location;
+
+                int _deviceId;
+            };
+
+            using Inner = std::variant<Host, Cuda>;
+
+            Location(Inner inner)
+                : _inner(inner)
+            {}
+
+            Inner _inner;
+        };
+
+        explicit Region(std::uintptr_t base, size_t size, Location loc = Location::host())
             : base(base)
             , size(size)
+            , loc(loc)
             , _iovec(iovecFromRegion(base, size))
         {}
 
@@ -26,6 +74,7 @@ namespace mxl::lib::fabrics::ofi
 
         std::uintptr_t base;
         size_t size;
+        Location loc;
 
         [[nodiscard]]
         ::iovec const* as_iovec() const noexcept;
@@ -68,6 +117,7 @@ namespace mxl::lib::fabrics::ofi
     {
     public:
         static RegionGroups fromFlow(FlowData& flow);
+        static RegionGroups fromGroups(mxlFabricsMemoryRegionGroup const* groups, size_t count);
 
         static RegionGroups* fromAPI(mxlRegions) noexcept;
         [[nodiscard]]
