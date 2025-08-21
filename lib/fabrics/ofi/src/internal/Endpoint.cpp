@@ -328,7 +328,7 @@ namespace mxl::lib::fabrics::ofi
         std::optional<uint64_t> immData)
     {
         uint64_t data = immData.value_or(0);
-        uint64_t flags = FI_TRANSMIT_COMPLETE | FI_COMMIT_COMPLETE;
+        uint64_t flags = FI_DELIVERY_COMPLETE;
         flags |= immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
 
         ::fi_msg_rma msg = {
