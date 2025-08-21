@@ -90,29 +90,61 @@ namespace mxl::lib::fabrics::ofi
             std::make_unique<TargetInfo>(std::move(localAddress), std::move(remoteRegionGroups))};
     }
 
-    Target::ReadResult RCTarget::makeProgress()
+    template<bool Block>
+    std::pair<std::optional<Completion>, std::optional<Event>> readEndpointQueues(Endpoint& ep, std::chrono::steady_clock::duration timeout)
     {
-        throw Exception::internal("Not implemented");
+        std::pair<std::optional<Completion>, std::optional<Event>> result;
+        if constexpr (Block)
+        {
+            result = ep.readQueuesBlocking(timeout);
+        }
+        else
+        {
+            result = ep.readQueues();
+        }
+
+        return result;
     }
 
-    Target::ReadResult RCTarget::makeProgressBlocking(std::chrono::steady_clock::duration timeout)
+    template<bool Block>
+    std::optional<Event> readEventQueue(EventQueue& eq, std::chrono::steady_clock::duration timeout)
+    {
+        std::optional<Event> event;
+
+        if constexpr (Block)
+        {
+            event = eq.readBlocking(timeout);
+        }
+        else
+        {
+            event = eq.read();
+        }
+
+        return event;
+    }
+
+    template<bool Block>
+    Target::ReadResult makeProgressInternal(RCTarget& target, std::chrono::steady_clock::duration timeout)
     {
         Target::ReadResult result;
 
-        _state = std::visit(
-            overloaded{[](std::monostate) -> State { throw Exception::invalidState("Target is in an invalid state an can no longer make progress"); },
-                [&](WaitForConnectionRequest state) -> State
+        target._state = std::visit(
+            overloaded{[](std::monostate) -> RCTarget::State
+                { throw Exception::invalidState("Target is in an invalid state an can no longer make progress"); },
+                [&](RCTarget::WaitForConnectionRequest state) -> RCTarget::State
                 {
-                    // Check if the entry is available and is a connection request
-                    if (auto entry = state.pep.eventQueue()->readBlocking(timeout); entry && entry->isConnReq())
-                    {
-                        MXL_DEBUG("Connection request received, creating endpoint for remote address: {}", entry->info().raw()->dest_addr);
-                        auto endpoint = Endpoint::create(_domain, entry->info());
+                    auto event = readEventQueue<Block>(*state.pep.eventQueue(), timeout);
 
-                        auto cq = CompletionQueue::open(_domain, CompletionQueueAttr::defaults());
+                    // Check if the entry is available and is a connection request
+                    if (event && event->isConnReq())
+                    {
+                        MXL_DEBUG("Connection request received, creating endpoint for remote address: {}", event->info().raw()->dest_addr);
+                        auto endpoint = Endpoint::create(target._domain, event->info());
+
+                        auto cq = CompletionQueue::open(target._domain, CompletionQueueAttr::defaults());
                         endpoint.bind(cq, FI_RECV);
 
-                        auto eq = EventQueue::open(_domain->fabric(), EventQueueAttr::defaults());
+                        auto eq = EventQueue::open(target._domain->fabric(), EventQueueAttr::defaults());
                         endpoint.bind(eq);
 
                         // we are now ready to accept the connection
@@ -120,22 +152,24 @@ namespace mxl::lib::fabrics::ofi
                         MXL_DEBUG("Accepted the connection waiting for connected event notification.");
 
                         // Return the new state as the variant type
-                        return WaitForConnection{std::move(endpoint)};
+                        return RCTarget::WaitForConnection{std::move(endpoint)};
                     }
 
                     return state;
                 },
-                [&](WaitForConnection state) -> State
+                [&](RCTarget::WaitForConnection state) -> RCTarget::State
                 {
-                    if (auto entry = state.ep.eventQueue()->readBlocking(timeout); entry && entry->isConnected())
+                    auto event = readEventQueue<Block>(*state.ep.eventQueue(), timeout);
+
+                    if (event && event->isConnected())
                     {
-                        std::unique_ptr<ImmediateDataLocation> dataRegion;
+                        std::unique_ptr<RCTarget::ImmediateDataLocation> dataRegion;
 
                         // Need to post a receive buffer to get immediate data.
-                        if (_domain->usingRecvBufForCqData())
+                        if (target._domain->usingRecvBufForCqData())
                         {
                             // Create a local memory region. The grain indices will be written here when a transfer arrives.
-                            dataRegion = std::make_unique<ImmediateDataLocation>();
+                            dataRegion = std::make_unique<RCTarget::ImmediateDataLocation>();
 
                             // Post a receive for the first incoming grain. Pass a region to receive the grain index.
                             state.ep.recv(dataRegion->toLocalRegion());
@@ -144,14 +178,15 @@ namespace mxl::lib::fabrics::ofi
                         MXL_INFO("Received connected event notification, now connected.");
 
                         // We have a connected event, so we can transition to the connected state
-                        return Connected{.ep = std::move(state.ep), .immData = std::move(dataRegion)};
+                        return RCTarget::Connected{.ep = std::move(state.ep), .immData = std::move(dataRegion)};
                     }
 
                     return state;
                 },
-                [&](Connected state) -> State
+                [&](RCTarget::Connected state) -> RCTarget::State
                 {
-                    auto [completion, event] = state.ep.readQueuesBlocking(timeout);
+                    auto [completion, event] = readEndpointQueues<Block>(state.ep, timeout);
+
                     if (event && event.value().isShutdown())
                     {
                         throw Exception::interrupted("Target received a shutdown event.");
@@ -166,7 +201,7 @@ namespace mxl::lib::fabrics::ofi
                             result.grainAvailable = dataEntry->data();
 
                             // Need to post receive buffers for immediate data
-                            if (_domain->usingRecvBufForCqData())
+                            if (target._domain->usingRecvBufForCqData())
                             {
                                 // Post another receive for the next incoming grain. When another transfer arrives,
                                 // the immmediate data (in our case the grain index), will be returned in the registered region.
@@ -181,8 +216,18 @@ namespace mxl::lib::fabrics::ofi
 
                     return state;
                 }},
-            std::move(_state));
+            std::move(target._state));
 
         return result;
+    }
+
+    Target::ReadResult RCTarget::makeProgress()
+    {
+        return makeProgressInternal<false>(*this, {});
+    }
+
+    Target::ReadResult RCTarget::makeProgressBlocking(std::chrono::steady_clock::duration timeout)
+    {
+        return makeProgressInternal<false>(*this, timeout);
     }
 }

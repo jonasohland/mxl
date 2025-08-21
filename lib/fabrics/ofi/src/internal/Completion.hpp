@@ -59,8 +59,10 @@ namespace mxl::lib::fabrics::ofi
         explicit Completion(Data entry);
         explicit Completion(Error entry);
 
-        Data data();
-        Error err();
+        [[nodiscard]]
+        Data data() const;
+        [[nodiscard]]
+        Error err() const;
 
         [[nodiscard]]
         std::optional<Data> tryData() const noexcept;
