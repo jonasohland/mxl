@@ -54,7 +54,12 @@ COPY register-clang-version.sh ./register-clang-version.sh
 RUN ./register-clang-version.sh "${CLANG_VERSION}" 100 \
  && rm ./register-clang-version.sh
 
-RUN apt-get install -y --no-install-recommends \
+# Install CUDA toolkit only (do not update the driver, this comes from the host)
+RUN wget https://developer.download.nvidia.com/compute/cuda/12.9.0/local_installers/cuda_12.9.0_575.51.03_linux.run \
+  && chmod +x cuda_12.9.0_575.51.03_linux.run \
+  && ./cuda_12.9.0_575.51.03_linux.run --silent --toolkit
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libgstreamer1.0-dev \
     libgstreamer-plugins-base1.0-dev \
     gstreamer1.0-plugins-good \
@@ -68,7 +73,7 @@ RUN apt-get install -y --no-install-recommends \
 RUN git clone -b v2.2.0 https://github.com/ofiwg/libfabric.git \
   && cd libfabric \
   && ./autogen.sh \
-  && ./configure --prefix=/usr \
+  && ./configure --prefix=/usr --with-cuda=/usr/local/cuda --enable-cuda-dlopen \
   && make install -j
   
 
