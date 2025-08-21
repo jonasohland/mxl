@@ -441,15 +441,6 @@ namespace
     }
 
     extern "C" MXL_EXPORT
-    mxlStatus mxlFabricsTargetSetCompletionCallback(mxlFabricsTarget in_target, mxlFabricsCompletionCallback_t callbackFn)
-    {
-        MXL_FABRICS_UNUSED(in_target);
-        MXL_FABRICS_UNUSED(callbackFn);
-
-        return MXL_ERR_INTERNAL;
-    }
-
-    extern "C" MXL_EXPORT
     mxlStatus mxlFabricsCreateInitiator(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator* out_initiator)
     {
         if (in_fabricsInstance == nullptr || out_initiator == nullptr)
