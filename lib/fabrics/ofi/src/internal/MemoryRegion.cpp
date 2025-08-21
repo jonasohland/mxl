@@ -17,6 +17,23 @@
 namespace mxl::lib::fabrics::ofi
 {
 
+    void setDeviceId(::fi_mr_attr& attr, Region::Location loc)
+    {
+        switch (loc.iface())
+        {
+            case FI_HMEM_CUDA: {
+                attr.device.cuda = loc.id();
+                return;
+            }
+
+            case FI_HMEM_SYSTEM:
+            case FI_HMEM_ROCR:
+            case FI_HMEM_ZE:
+            case FI_HMEM_NEURON:
+            case FI_HMEM_SYNAPSEAI: return;
+        }
+    }
+
     MemoryRegion MemoryRegion::reg(Domain& domain, Region const& region, uint64_t access)
     {
         ::fid_mr* raw;
@@ -24,9 +41,17 @@ namespace mxl::lib::fabrics::ofi
         std::mt19937_64 gen(rd());
         std::uniform_int_distribution<uint64_t> dist(0, UINT64_MAX);
 
-        MXL_DEBUG("Registering memory region with address 0x{} and size {}", reinterpret_cast<void*>(region.base), region.size);
+        MXL_DEBUG("Registering memory region with address 0x{}, size {} and location {}",
+            reinterpret_cast<void*>(region.base),
+            region.size,
+            region.loc.toString());
+
+        uint64_t flags = 0;
+        flags |= region.loc.isHost() ? 0 : FI_HMEM_DEVICE_ONLY;
 
         ::fi_mr_attr attr{};
+        setDeviceId(attr, region.loc);
+
         attr.mr_iov = region.as_iovec();
         attr.iov_count = 1;
         attr.access = access;
@@ -35,18 +60,13 @@ namespace mxl::lib::fabrics::ofi
         attr.context = nullptr;         // not used
         attr.auth_key_size = 0;
         attr.auth_key = nullptr;
-        attr.iface = FI_HMEM_SYSTEM;
+        attr.iface = region.loc.iface();
         attr.hmem_data = nullptr;
         attr.page_size = 4096;  // not used'
         attr.base_mr = nullptr; // not used
         attr.sub_mr_cnt = 0;    // not used
 
-        fiCall(fi_mr_regattr,
-            "Failed to register memory region",
-            domain.raw(),
-            &attr,
-            0, // flags: this will need to be modified when we will add HMEM support
-            &raw);
+        fiCall(fi_mr_regattr, "Failed to register memory region", domain.raw(), &attr, flags, &raw);
 
         struct MakeSharedEnabler : public MemoryRegion
         {
