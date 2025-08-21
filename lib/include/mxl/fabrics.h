@@ -97,9 +97,6 @@ extern "C"
         size_t count;
     } mxlFabricsMemoryRegionGroup;
 
-    /// A callback that can be passed to a target that will be called when a grain has been written.
-    typedef void (*mxlFabricsCompletionCallback_t)(uint64_t in_index, void* in_userData);
-
     /**
      * Get the backing memory regions of a flow associated with a flow reader.
      * The regions will be used to register the shared memory of the reader as source of data transfer operations.
@@ -205,17 +202,6 @@ extern "C"
      */
     MXL_EXPORT
     mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint64_t* out_index, uint16_t in_timeoutMs);
-
-    /**
-     * Set a callback function to be called everytime a new grain is available. This function will spawn a background thread in
-     * which the callback function will be executed when a grain is available. The behaviour of the other grain accessor functions
-     * for the target is undefined when a callback has been set.
-     * \param in_target A valid fabrics target
-     * \param in_callback A callback function to be called when a new grain is available.
-     * \return The result code. \see mxlStatus
-     */
-    MXL_EXPORT
-    mxlStatus mxlFabricsTargetSetCompletionCallback(mxlFabricsTarget in_target, mxlFabricsCompletionCallback_t callbackFn);
 
     /**
      * Create a fabrics initiator instance.
