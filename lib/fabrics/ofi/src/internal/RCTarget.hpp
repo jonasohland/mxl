@@ -45,6 +45,9 @@ namespace mxl::lib::fabrics::ofi
     private:
         RCTarget(std::shared_ptr<Domain> domain, PassiveEndpoint pep);
 
+        template<bool Block>
+        friend Target::ReadResult makeProgressInternal(RCTarget&, std::chrono::steady_clock::duration timeout);
+
         Target::ReadResult makeProgress();
         Target::ReadResult makeProgressBlocking(std::chrono::steady_clock::duration timeout);
 
