@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "RCTarget.hpp"
+#include <cstdint>
 #include <rdma/fabric.h>
 #include "internal/Logging.hpp"
 #include "mxl/mxl.h"
@@ -40,9 +41,11 @@ namespace mxl::lib::fabrics::ofi
             throw Exception::invalidArgument("Invalid provider passed");
         }
 
+        uint64_t caps = FI_RMA | FI_REMOTE_WRITE;
+        caps |= config.deviceSupport ? FI_HMEM : 0;
+
         // Get a list of available fabric configurations available on this machine.
-        auto fabricInfoList = FIInfoList::get(
-            config.endpointAddress.node, config.endpointAddress.service, provider.value(), FI_RMA | FI_REMOTE_WRITE, FI_EP_MSG);
+        auto fabricInfoList = FIInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value(), caps, FI_EP_MSG);
 
         if (fabricInfoList.begin() == fabricInfoList.end())
         {
