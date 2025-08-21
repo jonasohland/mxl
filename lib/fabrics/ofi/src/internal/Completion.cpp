@@ -51,7 +51,7 @@ namespace mxl::lib::fabrics::ofi
         return reinterpret_cast<::fid_ep*>(_raw.op_context);
     }
 
-    Completion::Data Completion::data()
+    Completion::Data Completion::data() const
     {
         if (auto data = std::get_if<Completion::Data>(&_inner); data)
         {
@@ -74,7 +74,7 @@ namespace mxl::lib::fabrics::ofi
         : _inner(entry)
     {}
 
-    Completion::Error Completion::err()
+    Completion::Error Completion::err() const
     {
         if (auto error = std::get_if<Error>(&_inner); error)
         {
