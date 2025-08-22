@@ -76,37 +76,27 @@ namespace mxl::lib::fabrics::ofi
             std::make_unique<TargetInfo>(std::move(localAddress), domain->RemoteRegionGroups())};
     }
 
-    Target::ReadResult RDMTarget::read()
-    {
-        return makeProgress();
-    }
-
-    Target::ReadResult RDMTarget::readBlocking(std::chrono::steady_clock::duration timeout)
-    {
-        return makeProgressBlocking(timeout);
-    }
-
     RDMTarget::RDMTarget(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData)
         : _endpoint(std::move(endpoint))
         , _immData(std::move(immData))
     {}
 
-    Target::ReadResult RDMTarget::makeProgress()
+    Target::ReadResult RDMTarget::read()
     {
-        return makeProgressImpl([&]() { return _endpoint.readQueues(); });
+        return makeProgress<QueueReadMode::NonBlocking>({});
     }
 
-    Target::ReadResult RDMTarget::makeProgressBlocking(std::chrono::steady_clock::duration timeout)
+    Target::ReadResult RDMTarget::readBlocking(std::chrono::steady_clock::duration timeout)
     {
-        return makeProgressImpl([&]() { return _endpoint.readQueuesBlocking(timeout); });
+        return makeProgress<QueueReadMode::Blocking>(timeout);
     }
 
-    template<typename ProgressFunc>
-    Target::ReadResult RDMTarget::makeProgressImpl(ProgressFunc progress)
+    template<QueueReadMode queueReadMode>
+    Target::ReadResult RDMTarget::makeProgress(std::chrono::steady_clock::duration timeout)
     {
         Target::ReadResult result;
 
-        auto [completion, _] = progress();
+        auto completion = readCompletionQueue<queueReadMode>(*_endpoint.completionQueue(), timeout);
         if (completion)
         {
             if (auto dataEntry = completion.value().tryData(); dataEntry)
@@ -126,5 +116,4 @@ namespace mxl::lib::fabrics::ofi
         }
         return result;
     }
-
 }
