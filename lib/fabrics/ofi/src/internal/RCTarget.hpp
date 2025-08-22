@@ -9,6 +9,7 @@
 #include "mxl/fabrics.h"
 #include "Endpoint.hpp"
 #include "PassiveEndpoint.hpp"
+#include "QueueHelpers.hpp"
 #include "RegisteredRegion.hpp"
 #include "Target.hpp"
 
@@ -45,11 +46,8 @@ namespace mxl::lib::fabrics::ofi
     private:
         RCTarget(std::shared_ptr<Domain> domain, PassiveEndpoint pep);
 
-        template<bool Block>
-        friend Target::ReadResult makeProgressImpl(RCTarget&, std::chrono::steady_clock::duration timeout);
-
-        Target::ReadResult makeProgress();
-        Target::ReadResult makeProgressBlocking(std::chrono::steady_clock::duration timeout);
+        template<QueueReadMode>
+        Target::ReadResult makeProgress(std::chrono::steady_clock::duration timeout);
 
         std::shared_ptr<Domain> _domain;
         std::vector<RegisteredRegionGroup> _regRegions;
