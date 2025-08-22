@@ -124,7 +124,7 @@ namespace mxl::lib::fabrics::ofi
     }
 
     template<bool Block>
-    Target::ReadResult makeProgressInternal(RCTarget& target, std::chrono::steady_clock::duration timeout)
+    Target::ReadResult makeProgressImpl(RCTarget& target, std::chrono::steady_clock::duration timeout)
     {
         Target::ReadResult result;
 
@@ -223,11 +223,11 @@ namespace mxl::lib::fabrics::ofi
 
     Target::ReadResult RCTarget::makeProgress()
     {
-        return makeProgressInternal<false>(*this, {});
+        return makeProgressImpl<false>(*this, {});
     }
 
     Target::ReadResult RCTarget::makeProgressBlocking(std::chrono::steady_clock::duration timeout)
     {
-        return makeProgressInternal<false>(*this, timeout);
+        return makeProgressImpl<true>(*this, timeout);
     }
 }
