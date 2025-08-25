@@ -136,7 +136,7 @@ namespace mxl::lib::fabrics::ofi
             auto grainInfoSize = sizeof(GrainHeader);
             auto grainPayloadSize = grain->header.info.grainSize;
 
-            if (grain->header.info.payloadLocation != PAYLOAD_LOCATION_HOST_MEMORY)
+            if (grain->header.info.payloadLocation != MXL_PAYLOAD_LOCATION_HOST_MEMORY)
             {
                 throw Exception::make(MXL_ERR_UNKNOWN,
                     "GPU memory is not currently supported in the Flow API of MXL. Edit the code below when it is supported");
