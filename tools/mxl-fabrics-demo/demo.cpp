@@ -144,6 +144,7 @@ public:
                                 .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = regions,
+            .deviceSupport = false,
         };
 
         status = mxlFabricsInitiatorSetup(_initiator, &initiatorConfig);
@@ -411,6 +412,7 @@ public:
                                 .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = memoryRegions,
+            .deviceSupport = false,
         };
         status = mxlFabricsTargetSetup(_target, &targetConfig, &_targetInfo);
         if (status != MXL_STATUS_OK)
