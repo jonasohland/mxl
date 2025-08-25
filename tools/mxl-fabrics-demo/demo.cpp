@@ -144,6 +144,7 @@ public:
                                 .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = regions,
+            .deviceSupport = false,
         };
 
         status = mxlFabricsInitiatorSetup(_initiator, &initiatorConfig);
@@ -187,7 +188,7 @@ public:
 
     mxlStatus run()
     { // Extract the FlowInfo structure.
-        FlowInfo flow_info;
+        mxlFlowInfo flow_info;
         auto status = mxlFlowReaderGetInfo(_reader, &flow_info);
         if (status != MXL_STATUS_OK)
         {
@@ -195,7 +196,7 @@ public:
             return status;
         }
 
-        GrainInfo grainInfo;
+        mxlGrainInfo grainInfo;
         uint8_t* payload;
 
         // uint64_t grainIndex = flow_info.discrete.headIndex + 1;
@@ -374,7 +375,7 @@ public:
             return status;
         }
 
-        FlowInfo flowInfo;
+        mxlFlowInfo flowInfo;
         status = mxlCreateFlow(_instance, flowDescriptor.c_str(), nullptr, &flowInfo);
         if (status != MXL_STATUS_OK)
         {
@@ -411,6 +412,7 @@ public:
                                 .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = memoryRegions,
+            .deviceSupport = false,
         };
         status = mxlFabricsTargetSetup(_target, &targetConfig, &_targetInfo);
         if (status != MXL_STATUS_OK)
@@ -456,7 +458,7 @@ public:
 
     mxlStatus run()
     {
-        GrainInfo dummyGrainInfo;
+        mxlGrainInfo dummyGrainInfo;
         uint64_t grainIndex = 0;
         uint8_t* dummyPayload;
         mxlStatus status;
