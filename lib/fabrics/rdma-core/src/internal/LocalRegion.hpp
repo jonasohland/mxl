@@ -15,7 +15,7 @@ namespace mxl::lib::fabrics::rdma_core
     struct LocalRegion
     {
         std::uint64_t addr;
-        std::uint32_t len;
+        std::size_t len;
         std::uint32_t lkey;
 
         [[nodiscard]]

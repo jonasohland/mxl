@@ -16,18 +16,18 @@
 namespace mxl::lib::fabrics::rdma_core
 {
 
-    MemoryRegion MemoryRegion::reg(Endpoint& ep, Region const& region)
+    MemoryRegion MemoryRegion::reg(Endpoint& ep, Region const& region, uint64_t access)
     {
         MXL_DEBUG("Registering memory region with address 0x{}, size {} and location {}",
             reinterpret_cast<void*>(region.base),
             region.size,
             region.loc.toString());
 
-        auto mr = rdma_reg_write(ep.raw(), reinterpret_cast<void*>(region.base), region.size);
+        auto mr = ibv_reg_mr(ep.raw()->pd, reinterpret_cast<void*>(region.base), region.size, access);
         if (mr == nullptr)
         {
             throw std::runtime_error(
-                fmt::format("failed to register buffer for remote write operation: {}", strerror(errno))); // TODO: make a proper Exception class
+                fmt::format("failed to register buffer for remote write operation: {}", strerror(errno))); // TODO: replace with internal exception
         }
 
         struct MakeSharedEnabler : public MemoryRegion
@@ -81,9 +81,9 @@ namespace mxl::lib::fabrics::rdma_core
         {
             MXL_DEBUG("Closing memory region with rkey={:x} lkey:{:x}", rkey(), lkey());
 
-            if (rdma_dereg_mr(_raw) != 0)
+            if (ibv_dereg_mr(_raw) != 0)
             {
-                throw std::runtime_error(fmt::format("failed to de-register buffer: {}", strerror(errno))); // TODO: make a proper Exception class
+                throw std::runtime_error(fmt::format("failed to de-register buffer: {}", strerror(errno))); // TODO: replace internal exception
             }
             _raw = nullptr;
         }

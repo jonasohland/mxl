@@ -1,22 +1,58 @@
 #pragma once
 
 #include <rdma/rdma_cma.h>
+#include "Address.hpp"
+#include "CompletionQueue.hpp"
+#include "ConnectionManagement.hpp"
+#include "LocalRegion.hpp"
+#include "QueuePair.hpp"
+#include "RemoteRegion.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
 {
-    class Endpoint
+    class PassiveEndpoint;
+
+    class ActiveEndpoint final
     {
     public:
-        static Endpoint create();
+        // Verbs ops
+        void write(LocalRegion& localRegion, RemoteRegion& remoteRegion);
+        void send(LocalRegion& localRegion);
+        void recv(LocalRegion& localRegion);
 
-        ::rdma_cm_id* raw() noexcept;
-        [[nodiscard]]
-        ::rdma_cm_id const* raw() const noexcept;
+        // Completions
+        std::optional<Completion> readCq();
+        std::optional<Completion> readCqBlocking();
 
     private:
-        Endpoint(::rdma_cm_id* id);
+        ActiveEndpoint(ConnectionManagement cm);
+        ActiveEndpoint(PassiveEndpoint&& pep);
+
+        void close();
 
     private:
-        ::rdma_cm_id* _id;
+        friend class PassiveEndpoint;
+
+    private:
+        ConnectionManagement _cm;
+    };
+
+    class PassiveEndpoint final
+    {
+    public:
+        static PassiveEndpoint create(Address& bindAddr, QueuePairAttr qpAttr = QueuePairAttr::defaults());
+
+        void listen();
+        ActiveEndpoint waitConnectionRequest();
+        ActiveEndpoint connect(Address& dstAddr);
+
+    private:
+        PassiveEndpoint(ConnectionManagement cm);
+
+    private:
+        friend class ActiveEndpoint;
+
+    private:
+        ConnectionManagement _cm;
     };
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <rdma/rdma_verbs.h>
 #include "Endpoint.hpp"
 #include "Region.hpp"
@@ -9,7 +10,7 @@ namespace mxl::lib::fabrics::rdma_core
     class MemoryRegion
     {
     public:
-        static MemoryRegion reg(Endpoint& ep, Region const& region);
+        static MemoryRegion reg(Endpoint& ep, Region const& region, uint64_t access);
 
         ~MemoryRegion();
 
