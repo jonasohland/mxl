@@ -27,6 +27,11 @@ namespace mxl::lib::fabrics::rdma_core
         return _raw.opcode;
     }
 
+    std::uint64_t Completion::wrId() const noexcept
+    {
+        return _raw.wr_id;
+    }
+
     std::string Completion::errToString() const
     {
         if (!isErr())
@@ -85,7 +90,7 @@ namespace mxl::lib::fabrics::rdma_core
 
     std::optional<Completion> CompletionQueue::readBlocking()
     {
-        throw std::runtime_error("Not implemented yet!");
+        return read();
     }
 
     void CompletionQueue::close()
@@ -96,6 +101,8 @@ namespace mxl::lib::fabrics::rdma_core
             {
                 throw std::runtime_error(fmt::format("Failed to destroy completion queue: {}", strerror(errno)));
             }
+
+            _raw = nullptr;
         }
     }
 }

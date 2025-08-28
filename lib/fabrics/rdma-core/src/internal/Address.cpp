@@ -95,7 +95,7 @@ namespace mxl::lib::fabrics::rdma_core
         }
 
         auto node = s.substr(0, pos);
-        auto service = s.substr(pos, s.size());
+        auto service = s.substr(pos + 1, s.size());
 
         return {node, service};
     }

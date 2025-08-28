@@ -348,6 +348,7 @@ namespace
                 *out_index = res.grainAvailable.value();
                 return MXL_STATUS_OK;
             }
+            MXL_INFO("About to return timeout");
 
             return MXL_ERR_TIMEOUT;
         }

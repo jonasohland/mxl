@@ -2,6 +2,7 @@
 #include <chrono>
 #include <stdexcept>
 #include <variant>
+#include <infiniband/verbs.h>
 #include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "Address.hpp"
@@ -23,6 +24,14 @@ namespace mxl::lib::fabrics::rdma_core
         pep.connectionManagement().protectionDomain().registerRegionGroups(*RegionGroups::fromAPI(config.regions),
             0); // Local read access is always enabled for the MR.
 
+        MXL_INFO("Success to register memory");
+
+        auto localRegions = pep.connectionManagement().protectionDomain().localRegionGroups();
+        for (auto const& region : localRegions)
+        {
+            MXL_INFO("LocalRegion -> addr=0x{:x} len={} lkey=0x{:x} ", region.sgl()->addr, region.sgl()->length, region.sgl()->lkey);
+        }
+
         // Helper struct to enable the std::make_unique function to access the private constructor of this class
         struct MakeUniqueEnabler : RCInitiator
         {
@@ -31,7 +40,7 @@ namespace mxl::lib::fabrics::rdma_core
             {}
         };
 
-        return std::make_unique<MakeUniqueEnabler>(Uninitialized{}, std::vector<LocalRegionGroup>{});
+        return std::make_unique<MakeUniqueEnabler>(Idle{std::move(pep)}, localRegions);
     }
 
     void RCInitiator::addTarget(TargetInfo const& targetInfo)
@@ -44,7 +53,12 @@ namespace mxl::lib::fabrics::rdma_core
                 [&](Idle state) -> State
                 {
                     auto dstAddr = targetInfo.addr;
-                    return Connected{.ep = state.pep.connect(dstAddr), .addr = dstAddr, .regions = targetInfo.remoteRegions};
+
+                    MXL_INFO("About to connect");
+                    auto aep = state.pep.connect(dstAddr);
+                    MXL_INFO("Connected!");
+
+                    return Connected{.ep = std::move(aep), .addr = dstAddr, .regions = targetInfo.remoteRegions};
                 },
                 [](Connected) -> State { throw std::runtime_error("Currently the implementation does not support more than 1 target at a time."); },
             },

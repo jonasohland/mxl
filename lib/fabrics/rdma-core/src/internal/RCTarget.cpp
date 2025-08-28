@@ -26,6 +26,12 @@ namespace mxl::lib::fabrics::rdma_core
         pep.connectionManagement().protectionDomain().registerRegionGroups(*RegionGroups::fromAPI(config.regions),
             IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
 
+        auto remoteRegions = pep.connectionManagement().protectionDomain().remoteRegions();
+        for (auto const& region : remoteRegions)
+        {
+            MXL_INFO("RemoteRegion -> addr=0x{:x} rkey={:x}", region.addr, region.rkey);
+        }
+
         // Helper struct to enable the std::make_unique function to access the private constructor of this class
         struct MakeUniqueEnabler : RCTarget
         {
@@ -64,11 +70,20 @@ namespace mxl::lib::fabrics::rdma_core
                 [](WaitForConnectionRequest state) -> State
                 {
                     state.pep.listen();
+                    auto aep = state.pep.waitConnectionRequest();
+                    MXL_INFO("Connected!");
 
-                    return Connected{state.pep.waitConnectionRequest()};
+                    auto immData = ImmediateDataLocation(aep.connectionManagement().protectionDomain());
+                    MXL_INFO("Created immData");
+                    auto immRegion = immData.toLocalRegion();
+                    aep.recv(immRegion);
+                    MXL_INFO("Posted imm data recv");
+
+                    return Connected{.ep = std::move(aep), ._immData = std::move(immData)};
                 },
                 [&](Connected state) -> State
                 {
+                    MXL_INFO("Polling the completion queue");
                     auto completion = readCompletionQueue<qrm>(state.ep, timeout);
                     if (completion)
                     {
@@ -78,9 +93,15 @@ namespace mxl::lib::fabrics::rdma_core
                         }
                         else
                         {
-                            result.grainAvailable = completion.value().immData();
+                            result.grainAvailable = completion.value().wrId();
+                            auto immRegion = state._immData.toLocalRegion();
+                            state.ep.recv(immRegion);
+                            MXL_INFO("Posted imm data recv");
                         }
                     }
+
+                    MXL_INFO("Done polling");
+
                     return std::move(state);
                 },
             },

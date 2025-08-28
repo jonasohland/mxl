@@ -12,14 +12,14 @@ namespace mxl::lib::fabrics::rdma_core
 
     RemoteRegion RegisteredRegion::toRemote() const noexcept
     {
-        return RemoteRegion{.addr = _region.base, .rkey = _mr.rkey()};
+        return RemoteRegion{.addr = reinterpret_cast<std::uintptr_t>(_mr._raw->addr), .rkey = _mr.rkey()};
     }
 
     LocalRegion RegisteredRegion::toLocal() noexcept
     {
         return LocalRegion{
-            .addr = _region.base,
-            .len = static_cast<std::uint32_t>(_region.size),
+            .addr = reinterpret_cast<std::uintptr_t>(_mr._raw->addr),
+            .len = static_cast<std::uint32_t>(_mr._raw->length),
             .lkey = _mr.lkey(),
         };
     }

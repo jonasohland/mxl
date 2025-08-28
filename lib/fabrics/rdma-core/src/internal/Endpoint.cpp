@@ -25,6 +25,7 @@ namespace mxl::lib::fabrics::rdma_core
     ActiveEndpoint PassiveEndpoint::connect(Address& dstAddr)
     {
         _cm.connect(dstAddr);
+        MXL_INFO("Connected!");
         return std::move(*this);
     }
 
@@ -34,19 +35,42 @@ namespace mxl::lib::fabrics::rdma_core
 
         auto sge = localRegion.toSge();
 
+        MXL_INFO("LocalRegion -> addr=0x{:x}, len={} lkey={:x}", sge.addr, sge.length, sge.lkey);
+        MXL_INFO("RemoteRegion -> addr=0x{:x}, rkey={:x}", remoteRegion.addr, remoteRegion.rkey);
+
         wr.wr_id = id;
-        wr.next = nullptr;
         wr.sg_list = &sge;
         wr.num_sge = 1;
         wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
-        wr.send_flags = IBV_SEND_SOLICITED; // TODO: check if this is correct..
-        wr.imm_data = id;
+        wr.send_flags = IBV_SEND_SIGNALED; // TODO: check if this is correct..
+        wr.imm_data = 0;
         wr.wr.rdma.remote_addr = remoteRegion.addr;
         wr.wr.rdma.rkey = remoteRegion.rkey;
 
         if (ibv_post_send(_cm.raw()->qp, &wr, &badWr))
         {
             throw std::runtime_error(fmt::format("Failed to post remote write operation: {}", strerror(errno)));
+        }
+    }
+
+    void ActiveEndpoint::recv(LocalRegion& localRegion)
+    {
+        ::ibv_recv_wr recvWr, *badWr;
+
+        auto sge = localRegion.toSge();
+
+        recvWr.next = nullptr;
+        recvWr.num_sge = 1;
+        recvWr.sg_list = &sge;
+        recvWr.wr_id = 0xDEADBEEFA110BABE;
+
+        MXL_INFO("About to post recv!");
+
+        if (ibv_post_recv(_cm.raw()->qp, &recvWr, &badWr))
+        {
+            MXL_ERROR("Failed to post recv operation: {}", strerror(errno));
+
+            throw std::runtime_error(fmt::format("Failed to post recv operation: {}", strerror(errno)));
         }
     }
 
@@ -57,18 +81,7 @@ namespace mxl::lib::fabrics::rdma_core
 
     std::optional<Completion> ActiveEndpoint::readCqBlocking()
     {
-        ::ibv_wc wc;
-        auto ret = rdma_get_send_comp(_cm.raw(), &wc);
-        if (ret == 1)
-        {
-            return Completion{std::move(wc)};
-        }
-        if (ret < 0)
-        {
-            throw std::runtime_error(fmt::format("Failed to read completion queue: {}", strerror(errno)));
-        }
-
-        return std::nullopt;
+        return _cm.completionQueue().readBlocking();
     }
 
     ConnectionManagement& ActiveEndpoint::connectionManagement() noexcept

@@ -83,6 +83,8 @@ namespace mxl::lib::fabrics::rdma_core
             {
                 throw std::runtime_error(fmt::format("Failed to deallocate protection domain: {}", strerror(errno)));
             }
+
+            _raw = nullptr;
         }
     }
 }

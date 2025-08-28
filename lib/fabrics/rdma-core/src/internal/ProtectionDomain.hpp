@@ -28,7 +28,8 @@ namespace mxl::lib::fabrics::rdma_core
         ProtectionDomain& operator=(ProtectionDomain&&);
         /// Register a list of memory region group to this domain. The domain will own the registered groups.
         void registerRegionGroups(RegionGroups const& regionGroups, uint64_t access);
-
+        RegisteredRegion registerRegion(Region const& region, uint64_t access);
+        RegisteredRegionGroup registerRegionGroup(RegionGroup const& regionGroup, uint64_t access);
         /// Get the local groups associated with the registered groups to this domain.
         [[nodiscard]]
         std::vector<LocalRegionGroup> localRegionGroups() noexcept;
@@ -41,9 +42,6 @@ namespace mxl::lib::fabrics::rdma_core
 
     private:
         ProtectionDomain(ConnectionManagement& cm);
-
-        RegisteredRegion registerRegion(Region const& region, uint64_t access);
-        RegisteredRegionGroup registerRegionGroup(RegionGroup const& regionGroup, uint64_t access);
 
         void close();
 

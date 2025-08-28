@@ -27,6 +27,9 @@ namespace mxl::lib::fabrics::rdma_core
         ::ibv_wc_opcode opCode() const noexcept;
 
         [[nodiscard]]
+        std::uint64_t wrId() const noexcept;
+
+        [[nodiscard]]
         std::string errToString() const;
 
     private:

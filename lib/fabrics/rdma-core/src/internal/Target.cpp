@@ -14,6 +14,10 @@
 
 namespace mxl::lib::fabrics::rdma_core
 {
+    LocalRegion Target::ImmediateDataLocation::toLocalRegion() noexcept
+    {
+        return region.toLocal();
+    }
 
     TargetWrapper* TargetWrapper::fromAPI(mxlFabricsTarget api) noexcept
     {

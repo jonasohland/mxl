@@ -20,6 +20,7 @@ namespace mxl::lib::fabrics::rdma_core
         struct Connected
         {
             ActiveEndpoint ep;
+            Target::ImmediateDataLocation _immData;
         };
 
         using State = std::variant<WaitForConnectionRequest, Connected>;

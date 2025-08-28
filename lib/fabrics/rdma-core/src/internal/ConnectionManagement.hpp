@@ -40,16 +40,18 @@ namespace mxl::lib::fabrics::rdma_core
         ::rdma_cm_id* raw() noexcept;
 
     private:
-        ConnectionManagement(::rdma_cm_id*);
+        ConnectionManagement(::rdma_cm_id*, ::rdma_event_channel*, std::optional<AddressInfo> = std::nullopt,
+            std::optional<ProtectionDomain> = std::nullopt, std::optional<CompletionQueue> = std::nullopt);
 
         void close();
 
     private:
         ::rdma_cm_id* _raw;
+        ::rdma_event_channel* _ec;
+
         std::optional<AddressInfo> _srcAddr;
 
         std::optional<ProtectionDomain> _pd;
         std::optional<CompletionQueue> _cq;
-        std::optional<QueuePair> _qp;
     };
 }

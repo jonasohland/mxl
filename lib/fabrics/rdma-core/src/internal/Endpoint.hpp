@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ConnectionManagement.hpp"
+#include "LocalRegion.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
 {
@@ -11,6 +12,7 @@ namespace mxl::lib::fabrics::rdma_core
     public:
         // Verbs ops
         void write(std::uint64_t id, LocalRegion& localRegion, RemoteRegion& remoteRegion);
+        void recv(LocalRegion& localRegion);
 
         // Completions
         std::optional<Completion> readCq();
