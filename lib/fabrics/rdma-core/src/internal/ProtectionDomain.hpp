@@ -1,11 +1,18 @@
 #pragma once
 
+#include <cstdint>
+#include <vector>
 #include <infiniband/verbs.h>
+#include "LocalRegion.hpp"
+#include "Region.hpp"
+#include "RemoteRegion.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
 {
 
     class ConnectionManagement;
+    class RegisteredRegionGroup;
+    class RegisteredRegion;
 
     class ProtectionDomain
     {
@@ -19,11 +26,24 @@ namespace mxl::lib::fabrics::rdma_core
         ProtectionDomain(ProtectionDomain&&) noexcept;
         // Move-assigning an endpoint to another releases all resources from the moved-into endpoint and
         ProtectionDomain& operator=(ProtectionDomain&&);
+        /// Register a list of memory region group to this domain. The domain will own the registered groups.
+        void registerRegionGroups(RegionGroups const& regionGroups, uint64_t access);
+
+        /// Get the local groups associated with the registered groups to this domain.
+        [[nodiscard]]
+        std::vector<LocalRegionGroup> localRegionGroups() noexcept;
+
+        /// Get the remote groups associated with the registered groups to this domain.
+        [[nodiscard]]
+        std::vector<RemoteRegion> remoteRegions() const noexcept;
 
         ::ibv_pd* raw() noexcept;
 
     private:
         ProtectionDomain(ConnectionManagement& cm);
+
+        RegisteredRegion registerRegion(Region const& region, uint64_t access);
+        RegisteredRegionGroup registerRegionGroup(RegionGroup const& regionGroup, uint64_t access);
 
         void close();
 
@@ -32,5 +52,6 @@ namespace mxl::lib::fabrics::rdma_core
 
     private:
         ibv_pd* _raw;
+        std::vector<RegisteredRegionGroup> _registeredRegionGroups;
     };
 }

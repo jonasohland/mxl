@@ -7,10 +7,6 @@ include(GNUInstallDirs)
 find_package(PkgConfig)
 find_package(reflectcpp CONFIG REQUIRED)
 
-
-
-pkg_check_modules(libfabric REQUIRED IMPORTED_TARGET libfabric)
-
 add_library(mxl-fabrics SHARED)
 add_library(mxl-fabrics-static STATIC)
 
@@ -58,28 +54,44 @@ target_include_directories(mxl-fabrics-static
 
 target_link_libraries(mxl-fabrics
     PRIVATE
-        PkgConfig::libfabric
         stduuid
         spdlog::spdlog
         fmt::fmt
         picojson::picojson
         reflectcpp::reflectcpp
+        rdmacm
+        ibverbs
 )
 
 target_link_libraries(mxl-fabrics-static
     PRIVATE
-        PkgConfig::libfabric
         stduuid
         spdlog::spdlog
         fmt::fmt
         picojson::picojson
         reflectcpp::reflectcpp
+        rdmacm
+        ibverbs
 )
 
 set(mxl_fabrics_sources
         src/fabrics.cpp
+        src/internal/Address.cpp
+        src/internal/CompletionQueue.cpp
+        src/internal/ConnectionManagement.cpp
         src/internal/Endpoint.cpp
-        src/internal/EventChannel.cpp
+        src/internal/FabricsInstance.cpp
+        src/internal/Initiator.cpp
+        src/internal/LocalRegion.cpp
+        src/internal/MemoryRegion.cpp
+        src/internal/ProtectionDomain.cpp
+        src/internal/QueuePair.cpp
+        src/internal/RCInitiator.cpp
+        src/internal/RCTarget.cpp
+        src/internal/Region.cpp
+        src/internal/RegisteredRegion.cpp
+        src/internal/RemoteRegion.cpp
+        src/internal/Target.cpp
         src/internal/TargetInfo.cpp
        )
 

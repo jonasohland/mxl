@@ -12,15 +12,36 @@ namespace mxl::lib::fabrics::rdma_core
 
     AddressInfo::~AddressInfo()
     {
-        if (_raw)
-        {
-            rdma_freeaddrinfo(_raw);
-        }
+        close();
+    }
+
+    AddressInfo::AddressInfo(AddressInfo&& other) noexcept
+        : _raw(other._raw)
+    {
+        other._raw = nullptr;
+    }
+
+    AddressInfo& AddressInfo::operator=(AddressInfo&& other)
+    {
+        close();
+
+        _raw = other._raw;
+        other._raw = nullptr;
+
+        return *this;
     }
 
     ::rdma_addrinfo* AddressInfo::raw() noexcept
     {
         return _raw;
+    }
+
+    void AddressInfo::close()
+    {
+        if (_raw)
+        {
+            rdma_freeaddrinfo(_raw);
+        }
     }
 
     Address::Address(std::string const& node, std::string const& service)
@@ -59,4 +80,23 @@ namespace mxl::lib::fabrics::rdma_core
         return {ai};
     }
 
+    std::string Address::toString() const noexcept
+    {
+        return fmt::format("{}:{}", _node, _service);
+    }
+
+    Address Address::fromString(std::string const& s)
+    {
+        auto pos = s.find(":");
+        if (pos > s.size())
+        {
+            throw std::runtime_error(
+                fmt::format("Failed to convert string \"{}\" into Address, no ':' found. Expecting a string of format <node>:<service> ", s));
+        }
+
+        auto node = s.substr(0, pos);
+        auto service = s.substr(pos, s.size());
+
+        return {node, service};
+    }
 }

@@ -25,7 +25,7 @@ namespace mxl::lib::fabrics::rdma_core
         RemoteRegion toRemote() const noexcept;
 
         [[nodiscard]]
-        LocalRegion toLocal() const noexcept;
+        LocalRegion toLocal() noexcept;
 
     private:
         MemoryRegion _mr;
@@ -43,12 +43,12 @@ namespace mxl::lib::fabrics::rdma_core
         RemoteRegion toRemote() const noexcept;
 
         [[nodiscard]]
-        LocalRegionGroup toLocal() const noexcept;
+        LocalRegionGroup toLocal() noexcept;
 
     private:
         std::vector<RegisteredRegion> _inner;
     };
 
     std::vector<RemoteRegion> toRemote(std::vector<RegisteredRegionGroup> const& groups) noexcept;
-    std::vector<LocalRegionGroup> toLocal(std::vector<RegisteredRegionGroup> const& groups) noexcept;
+    std::vector<LocalRegionGroup> toLocal(std::vector<RegisteredRegionGroup>& groups) noexcept;
 }

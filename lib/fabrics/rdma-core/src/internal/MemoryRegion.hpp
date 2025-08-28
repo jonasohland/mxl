@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <rdma/rdma_verbs.h>
-#include "Endpoint.hpp"
+#include "ProtectionDomain.hpp"
 #include "Region.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
@@ -10,7 +10,7 @@ namespace mxl::lib::fabrics::rdma_core
     class MemoryRegion
     {
     public:
-        static MemoryRegion reg(Endpoint& ep, Region const& region, uint64_t access);
+        static MemoryRegion reg(ProtectionDomain& pd, Region const& region, uint64_t access);
 
         ~MemoryRegion();
 
@@ -21,8 +21,6 @@ namespace mxl::lib::fabrics::rdma_core
         MemoryRegion& operator=(MemoryRegion&&) noexcept;
 
         ::ibv_mr* raw() noexcept;
-        [[nodiscard]]
-        ::ibv_mr const* raw() const noexcept;
 
         [[nodiscard]]
         std::uint32_t lkey() const noexcept;

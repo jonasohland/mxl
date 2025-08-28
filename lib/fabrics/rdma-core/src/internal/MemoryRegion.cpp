@@ -10,20 +10,20 @@
 #include <rdma/rdma_verbs.h>
 #include "internal/Logging.hpp"
 // #include "Exception.hpp"
-#include "Endpoint.hpp"
+#include "ProtectionDomain.hpp"
 #include "Region.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
 {
 
-    MemoryRegion MemoryRegion::reg(Endpoint& ep, Region const& region, uint64_t access)
+    MemoryRegion MemoryRegion::reg(ProtectionDomain& pd, Region const& region, uint64_t access)
     {
         MXL_DEBUG("Registering memory region with address 0x{}, size {} and location {}",
             reinterpret_cast<void*>(region.base),
             region.size,
             region.loc.toString());
 
-        auto mr = ibv_reg_mr(ep.raw()->pd, reinterpret_cast<void*>(region.base), region.size, access);
+        auto mr = ibv_reg_mr(pd.raw(), reinterpret_cast<void*>(region.base), region.size, access);
         if (mr == nullptr)
         {
             throw std::runtime_error(
@@ -59,6 +59,11 @@ namespace mxl::lib::fabrics::rdma_core
         other._raw = nullptr;
 
         return *this;
+    }
+
+    ::ibv_mr* MemoryRegion::raw() noexcept
+    {
+        return _raw;
     }
 
     std::uint32_t MemoryRegion::lkey() const noexcept

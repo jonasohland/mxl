@@ -4,6 +4,6 @@
 add_subdirectory(mxl-info)
 add_subdirectory(mxl-gst)
 
-if (MXL_FABRICS_OFI)
+if (MXL_FABRICS_NATIVE)
     add_subdirectory(mxl-fabrics-demo)
 endif()

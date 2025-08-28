@@ -15,9 +15,13 @@ namespace mxl::lib::fabrics::rdma_core
         return RemoteRegion{.addr = _region.base, .rkey = _mr.rkey()};
     }
 
-    LocalRegion RegisteredRegion::toLocal() const noexcept
+    LocalRegion RegisteredRegion::toLocal() noexcept
     {
-        return LocalRegion{.addr = _region.base, .len = static_cast<std::uint32_t>(_region.size), .lkey = _mr.lkey()};
+        return LocalRegion{
+            .addr = _region.base,
+            .len = static_cast<std::uint32_t>(_region.size),
+            .lkey = _mr.lkey(),
+        };
     }
 
     RemoteRegion RegisteredRegionGroup::toRemote() const noexcept
@@ -32,11 +36,11 @@ namespace mxl::lib::fabrics::rdma_core
         return _inner.front().toRemote();
     }
 
-    LocalRegionGroup RegisteredRegionGroup::toLocal() const noexcept
+    LocalRegionGroup RegisteredRegionGroup::toLocal() noexcept
     {
         std::vector<LocalRegion> group;
 
-        std::ranges::transform(_inner, std::back_inserter(group), [](RegisteredRegion const& reg) { return reg.toLocal(); });
+        std::ranges::transform(_inner, std::back_inserter(group), [](RegisteredRegion& reg) { return reg.toLocal(); });
 
         return LocalRegionGroup{group};
     }
@@ -48,10 +52,10 @@ namespace mxl::lib::fabrics::rdma_core
         return remoteGroups;
     }
 
-    std::vector<LocalRegionGroup> toLocal(std::vector<RegisteredRegionGroup> const& groups) noexcept
+    std::vector<LocalRegionGroup> toLocal(std::vector<RegisteredRegionGroup>& groups) noexcept
     {
         std::vector<LocalRegionGroup> localGroups;
-        std::ranges::transform(groups, std::back_inserter(localGroups), [](RegisteredRegionGroup const& reg) { return reg.toLocal(); });
+        std::ranges::transform(groups, std::back_inserter(localGroups), [](RegisteredRegionGroup& reg) { return reg.toLocal(); });
         return localGroups;
     }
 

@@ -1,5 +1,6 @@
 #include "CompletionQueue.hpp"
 #include <cerrno>
+#include <cstdint>
 #include <cstring>
 #include <optional>
 #include <stdexcept>
@@ -14,6 +15,16 @@ namespace mxl::lib::fabrics::rdma_core
     bool Completion::isErr() const noexcept
     {
         return _raw.status != IBV_WC_SUCCESS;
+    }
+
+    std::uint32_t Completion::immData() const noexcept
+    {
+        return _raw.imm_data;
+    }
+
+    ::ibv_wc_opcode Completion::opCode() const noexcept
+    {
+        return _raw.opcode;
     }
 
     std::string Completion::errToString() const

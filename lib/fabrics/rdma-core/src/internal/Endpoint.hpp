@@ -1,12 +1,6 @@
 #pragma once
 
-#include <rdma/rdma_cma.h>
-#include "Address.hpp"
-#include "CompletionQueue.hpp"
 #include "ConnectionManagement.hpp"
-#include "LocalRegion.hpp"
-#include "QueuePair.hpp"
-#include "RemoteRegion.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
 {
@@ -16,13 +10,13 @@ namespace mxl::lib::fabrics::rdma_core
     {
     public:
         // Verbs ops
-        void write(LocalRegion& localRegion, RemoteRegion& remoteRegion);
-        void send(LocalRegion& localRegion);
-        void recv(LocalRegion& localRegion);
+        void write(std::uint64_t id, LocalRegion& localRegion, RemoteRegion& remoteRegion);
 
         // Completions
         std::optional<Completion> readCq();
         std::optional<Completion> readCqBlocking();
+
+        ConnectionManagement& connectionManagement() noexcept;
 
     private:
         ActiveEndpoint(ConnectionManagement cm);
@@ -45,6 +39,8 @@ namespace mxl::lib::fabrics::rdma_core
         void listen();
         ActiveEndpoint waitConnectionRequest();
         ActiveEndpoint connect(Address& dstAddr);
+
+        ConnectionManagement& connectionManagement() noexcept;
 
     private:
         PassiveEndpoint(ConnectionManagement cm);

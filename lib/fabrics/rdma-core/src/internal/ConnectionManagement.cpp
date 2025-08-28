@@ -1,4 +1,5 @@
 #include "ConnectionManagement.hpp"
+#include <cerrno>
 #include <cstring>
 #include <stdexcept>
 #include <fmt/format.h>
@@ -115,8 +116,11 @@ namespace mxl::lib::fabrics::rdma_core
         {
             createProtectionDomain();
         }
-
-        _qp = QueuePair{*_pd, std::move(attr)};
+        auto attrRaw = attr.toIbv();
+        if (rdma_create_qp(_raw, _pd->raw(), &attrRaw))
+        {
+            throw std::runtime_error(fmt::format("Failed to create Queue Pair: ", strerror(errno)));
+        }
     }
 
     ProtectionDomain& ConnectionManagement::protectionDomain()
@@ -154,6 +158,11 @@ namespace mxl::lib::fabrics::rdma_core
     ConnectionManagement::ConnectionManagement(::rdma_cm_id* raw)
         : _raw(raw)
     {}
+
+    ::rdma_cm_id* ConnectionManagement::raw() noexcept
+    {
+        return _raw;
+    }
 
     void ConnectionManagement::close()
     {

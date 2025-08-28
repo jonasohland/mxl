@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <infiniband/verbs.h>
@@ -18,6 +19,12 @@ namespace mxl::lib::fabrics::rdma_core
 
         [[nodiscard]]
         bool isErr() const noexcept;
+
+        [[nodiscard]]
+        std::uint32_t immData() const noexcept;
+
+        [[nodiscard]]
+        ::ibv_wc_opcode opCode() const noexcept;
 
         [[nodiscard]]
         std::string errToString() const;

@@ -7,6 +7,8 @@
 #include <infiniband/verbs.h>
 #include <rdma/rdma_cma.h>
 #include <rdma/rdma_verbs.h>
+#include <spdlog/common.h>
+#include "internal/Logging.hpp"
 #include "Address.hpp"
 #include "ConnectionManagement.hpp"
 #include "LocalRegion.hpp"
@@ -20,50 +22,31 @@ namespace mxl::lib::fabrics::rdma_core
         : _cm(std::move(cm))
     {}
 
-    ActiveEndpoint::ActiveEndpoint(PassiveEndpoint&& pep)
-        : _cm{std::move(pep._cm)}
-    {}
-
-    ActiveEndpoint PassiveEndpoint::waitConnectionRequest()
-    {
-        return {_cm.waitConnectionRequest()};
-    }
-
     ActiveEndpoint PassiveEndpoint::connect(Address& dstAddr)
     {
         _cm.connect(dstAddr);
         return std::move(*this);
     }
 
-    void ActiveEndpoint::write(LocalRegion& localRegion, RemoteRegion& remoteRegion)
+    void ActiveEndpoint::write(std::uint64_t id, LocalRegion& localRegion, RemoteRegion& remoteRegion)
     {
-        if (rdma_post_write(_cm.raw(),
-                nullptr,
-                reinterpret_cast<void*>(localRegion.addr),
-                localRegion.len,
-                nullptr, // TODO: ibv_mr should be carried in localRegion
-                IBV_SEND_SOLICITED,
-                remoteRegion.addr,
-                remoteRegion.rkey))
+        ::ibv_send_wr wr, *badWr;
+
+        auto sge = localRegion.toSge();
+
+        wr.wr_id = id;
+        wr.next = nullptr;
+        wr.sg_list = &sge;
+        wr.num_sge = 1;
+        wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+        wr.send_flags = IBV_SEND_SOLICITED; // TODO: check if this is correct..
+        wr.imm_data = id;
+        wr.wr.rdma.remote_addr = remoteRegion.addr;
+        wr.wr.rdma.rkey = remoteRegion.rkey;
+
+        if (ibv_post_send(_cm.raw()->qp, &wr, &badWr))
         {
             throw std::runtime_error(fmt::format("Failed to post remote write operation: {}", strerror(errno)));
-        }
-    }
-
-    void ActiveEndpoint::send(LocalRegion& localRegion)
-    {
-        if (rdma_post_send(_cm.raw(), nullptr, reinterpret_cast<void*>(localRegion.addr), localRegion.len, nullptr, 0)) // TODO: ibv_mr should be
-                                                                                                                        // carried in localRegion
-        {
-            throw std::runtime_error(fmt::format("Failed to post send operation: {}", strerror(errno)));
-        }
-    }
-
-    void ActiveEndpoint::recv(LocalRegion& localRegion)
-    {
-        if (rdma_post_recv(_cm.raw(), nullptr, reinterpret_cast<void*>(localRegion.addr), localRegion.len, nullptr))
-        {
-            throw std::runtime_error(fmt::format("Failed to post recv operation: {}", strerror(errno)));
         }
     }
 
@@ -88,14 +71,30 @@ namespace mxl::lib::fabrics::rdma_core
         return std::nullopt;
     }
 
+    ConnectionManagement& ActiveEndpoint::connectionManagement() noexcept
+    {
+        return _cm;
+    }
+
     PassiveEndpoint PassiveEndpoint::create(Address& bindAddr, QueuePairAttr qpAttr)
     {
         auto cm = ConnectionManagement::create();
 
         cm.bind(bindAddr);
+
+        MXL_INFO("addr binded");
+
         cm.createProtectionDomain();
+
+        MXL_INFO("Created protection domain");
+
         cm.createCompletionQueue();
+
+        MXL_INFO("Created Completion Queue");
+
         cm.createQueuePair(std::move(qpAttr));
+
+        MXL_INFO("Created QueuePair");
 
         return {std::move(cm)};
     }
@@ -104,5 +103,23 @@ namespace mxl::lib::fabrics::rdma_core
     {
         _cm.listen();
     }
+
+    ActiveEndpoint::ActiveEndpoint(PassiveEndpoint&& pep)
+        : _cm{std::move(pep._cm)}
+    {}
+
+    ActiveEndpoint PassiveEndpoint::waitConnectionRequest()
+    {
+        return {_cm.waitConnectionRequest()};
+    }
+
+    ConnectionManagement& PassiveEndpoint::connectionManagement() noexcept
+    {
+        return _cm;
+    }
+
+    PassiveEndpoint::PassiveEndpoint(ConnectionManagement cm)
+        : _cm(std::move(cm))
+    {}
 
 }

@@ -35,14 +35,16 @@ namespace mxl::lib::fabrics::rdma_core
 
         ::ibv_sge* sgl() noexcept;
 
+        LocalRegion& front() noexcept;
+
         [[nodiscard]]
         size_t count() const noexcept;
 
     private:
         static std::vector<::ibv_sge> sglFromGroup(std::vector<LocalRegion> group) noexcept;
 
+    private:
         std::vector<LocalRegion> _inner;
-
         std::vector<::ibv_sge> _sgl;
     };
 
