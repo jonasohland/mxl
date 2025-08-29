@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -51,7 +52,7 @@ namespace mxl::lib::fabrics::rdma_core
         CompletionQueue& operator=(CompletionQueue&&);
 
         std::optional<Completion> read();
-        std::optional<Completion> readBlocking();
+        std::optional<Completion> readBlocking(std::chrono::milliseconds);
 
         ::ibv_cq* raw() noexcept;
 

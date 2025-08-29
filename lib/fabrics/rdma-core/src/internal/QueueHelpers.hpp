@@ -15,13 +15,13 @@ namespace mxl::lib::fabrics::rdma_core
     };
 
     template<QueueReadMode qrm>
-    std::optional<Completion> readCompletionQueue(ConnectionManagement& cm, std::chrono::steady_clock::duration)
+    std::optional<Completion> readCompletionQueue(ConnectionManagement& cm, std::chrono::steady_clock::duration timeout)
     {
         std::optional<Completion> completion;
 
         if constexpr (qrm == QueueReadMode::Blocking)
         {
-            completion = cm.readCqBlocking(); // TODO: find a way to enforce duration
+            completion = cm.readCqBlocking(timeout);
         }
         else if constexpr (qrm == QueueReadMode::NonBlocking)
         {

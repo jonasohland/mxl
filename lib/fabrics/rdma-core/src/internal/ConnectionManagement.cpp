@@ -228,11 +228,17 @@ namespace mxl::lib::fabrics::rdma_core
         return std::nullopt;
     }
 
-    std::optional<Completion> ConnectionManagement::readCqBlocking()
+    std::optional<Completion> ConnectionManagement::readCqBlocking(std::chrono::steady_clock::duration timeout)
     {
+        auto timeoutMs = std::chrono::duration_cast<std::chrono::milliseconds>(timeout);
+        if (timeoutMs.count() == 0)
+        {
+            return readCq();
+        }
+
         if (_cq)
         {
-            return _cq->readBlocking();
+            return _cq->readBlocking(timeoutMs);
         }
         return std::nullopt;
     }

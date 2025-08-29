@@ -1,5 +1,6 @@
 #include "CompletionQueue.hpp"
 #include <cerrno>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -103,9 +104,9 @@ namespace mxl::lib::fabrics::rdma_core
         return std::nullopt;
     }
 
-    std::optional<Completion> CompletionQueue::readBlocking()
+    std::optional<Completion> CompletionQueue::readBlocking(std::chrono::milliseconds timeout)
     {
-        if (auto event = _cc.get(_raw); event)
+        if (auto event = _cc.get(_raw, timeout); event)
         {
             return read();
         }

@@ -105,11 +105,11 @@ namespace mxl::lib::fabrics::rdma_core
         return false;
     }
 
-    bool RCInitiator::makeProgressBlocking(std::chrono::steady_clock::duration)
+    bool RCInitiator::makeProgressBlocking(std::chrono::steady_clock::duration timeout)
     {
         if (auto state = std::get_if<Connected>(&_state); state && pendingTransfer > 0)
         {
-            if (auto completion = state->cm.readCqBlocking(); completion)
+            if (auto completion = state->cm.readCqBlocking(timeout); completion)
             {
                 pendingTransfer--;
                 return true;

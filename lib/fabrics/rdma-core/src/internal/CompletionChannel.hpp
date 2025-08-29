@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <optional>
 #include <infiniband/verbs.h>
 #include <rdma/rdma_cma.h>
@@ -35,15 +36,16 @@ namespace mxl::lib::fabrics::rdma_core
         CompletionChannel(CompletionChannel&&) noexcept;
         CompletionChannel& operator=(CompletionChannel&&);
 
-        std::optional<Event> get(ibv_cq* cq);
+        std::optional<Event> get(ibv_cq* cq, std::chrono::milliseconds timeout);
 
         ::ibv_comp_channel* raw() noexcept;
 
     private:
-        CompletionChannel(::ibv_comp_channel*);
+        CompletionChannel(::ibv_comp_channel*, int);
         void close();
 
     private:
         ::ibv_comp_channel* _raw;
+        int _epollFd = {0};
     };
 }

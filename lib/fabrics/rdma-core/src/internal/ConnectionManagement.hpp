@@ -50,7 +50,7 @@ namespace mxl::lib::fabrics::rdma_core
 
         // Client Completions
         std::optional<Completion> readCq();
-        std::optional<Completion> readCqBlocking();
+        std::optional<Completion> readCqBlocking(std::chrono::steady_clock::duration timeout);
 
         ::rdma_cm_id* raw() noexcept;
 
