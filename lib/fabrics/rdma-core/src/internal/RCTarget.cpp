@@ -98,7 +98,7 @@ namespace mxl::lib::fabrics::rdma_core
                         }
                         else
                         {
-                            result.grainAvailable = completion.value().wrId();
+                            result.grainAvailable = ntohl(completion.value().immData());
 
                             auto immRegion = state.immData->toLocalRegion();
                             state.cm.recv(immRegion);

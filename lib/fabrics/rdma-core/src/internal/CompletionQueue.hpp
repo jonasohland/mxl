@@ -59,6 +59,8 @@ namespace mxl::lib::fabrics::rdma_core
     private:
         void close();
 
+        std::optional<Completion> poll();
+
     private:
         friend class ConnectionManagement;
 

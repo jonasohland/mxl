@@ -8,7 +8,6 @@
 #include <fmt/format.h>
 #include <infiniband/verbs.h>
 #include <rdma/rdma_verbs.h>
-#include "internal/Logging.hpp"
 #include "CompletionChannel.hpp"
 #include "ConnectionManagement.hpp"
 #include "Exception.hpp"
@@ -89,18 +88,11 @@ namespace mxl::lib::fabrics::rdma_core
 
     std::optional<Completion> CompletionQueue::read()
     {
-        ::ibv_wc wc;
+        if (auto event = _cc.get(_raw, std::chrono::milliseconds::zero()))
+        {
+            return poll();
+        }
 
-        auto ret = ibv_poll_cq(_raw, 1, &wc);
-        if (ret < 0)
-        {
-            MXL_ERROR("Failed to poll completion queue: {}", strerror(errno));
-            throw std::runtime_error(fmt::format("Failed to poll completion queue: {}", strerror(errno)));
-        }
-        if (ret == 1)
-        {
-            return Completion{std::move(wc)};
-        }
         return std::nullopt;
     }
 
@@ -108,7 +100,7 @@ namespace mxl::lib::fabrics::rdma_core
     {
         if (auto event = _cc.get(_raw, timeout); event)
         {
-            return read();
+            return poll();
         }
 
         return std::nullopt;
@@ -122,4 +114,21 @@ namespace mxl::lib::fabrics::rdma_core
             _raw = nullptr;
         }
     }
+
+    std::optional<Completion> CompletionQueue::poll()
+    {
+        ::ibv_wc wc;
+
+        auto ret = ibv_poll_cq(_raw, 1, &wc);
+        if (ret < 0)
+        {
+            throw Exception::internal("Failed to poll completion queue: {}", strerror(errno));
+        }
+        if (ret == 1)
+        {
+            return Completion{std::move(wc)};
+        }
+        return std::nullopt;
+    }
+
 }

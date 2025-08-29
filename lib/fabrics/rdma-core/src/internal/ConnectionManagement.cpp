@@ -194,7 +194,7 @@ namespace mxl::lib::fabrics::rdma_core
         wr.num_sge = 1;
         wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
         wr.send_flags = IBV_SEND_SIGNALED;
-        wr.imm_data = 0;
+        wr.imm_data = htonl(static_cast<std::uint32_t>(id)); // Only keep the 32 lsb
         wr.wr.rdma.remote_addr = remoteRegion.addr;
         wr.wr.rdma.rkey = remoteRegion.rkey;
         rdmaCall(ibv_post_send, "Failed to post remote write operation", _raw->qp, &wr, &badWr);
