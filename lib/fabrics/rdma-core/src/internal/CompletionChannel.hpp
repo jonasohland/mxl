@@ -17,7 +17,6 @@ namespace mxl::lib::fabrics::rdma_core
         {
         public:
             Event(ibv_cq* cq);
-            ~Event();
             Event(Event const&) = delete;
             void operator=(Event const&) = delete;
             Event(Event&&) = default;
@@ -46,6 +45,6 @@ namespace mxl::lib::fabrics::rdma_core
 
     private:
         ::ibv_comp_channel* _raw;
-        int _epollFd = {0};
+        int _epollFd = 0;
     };
 }

@@ -1,6 +1,9 @@
 #include "EventChannel.hpp"
+#include <chrono>
 #include <memory>
+#include <optional>
 #include <rdma/rdma_cma.h>
+#include <sys/epoll.h>
 #include "Exception.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
@@ -13,10 +16,23 @@ namespace mxl::lib::fabrics::rdma_core
 
     Event::~Event()
     {
-        if (_raw)
-        {
-            ::rdma_ack_cm_event(_raw);
-        }
+        close();
+    }
+
+    Event::Event(Event&& other) noexcept
+        : _raw(other._raw)
+    {
+        other._raw = nullptr;
+    }
+
+    Event& Event::operator=(Event&& other)
+    {
+        close();
+
+        _raw = other._raw;
+        other._raw = nullptr;
+
+        return *this;
     }
 
     bool Event::isSuccess() const noexcept
@@ -44,6 +60,11 @@ namespace mxl::lib::fabrics::rdma_core
         return _raw->event == RDMA_CM_EVENT_ESTABLISHED;
     }
 
+    bool Event::isDisconnected() const noexcept
+    {
+        return _raw->event == RDMA_CM_EVENT_DISCONNECTED;
+    }
+
     std::string Event::toString() const noexcept
     {
         return rdma_event_str(_raw->event);
@@ -59,22 +80,48 @@ namespace mxl::lib::fabrics::rdma_core
         return _raw->listen_id;
     }
 
+    void Event::close()
+    {
+        if (_raw)
+        {
+            ::rdma_ack_cm_event(_raw);
+
+            _raw = nullptr;
+        }
+    }
+
     std::shared_ptr<EventChannel> EventChannel::create()
     {
         auto raw = rdma_create_event_channel();
+
         if (!raw)
         {
             throw Exception::internal("Failed to create event channel");
         }
 
+        auto epollFd = epoll_create(1);
+        if (epollFd == -1)
+        {
+            throw Exception::internal("Failed to create epoll file descriptor: {}", strerror(errno));
+        }
+
+        // Register completion channel file descriptor to epoll
+        ::epoll_event ev = {};
+        ev.events = EPOLLIN;
+        ev.data.fd = raw->fd;
+        if (epoll_ctl(epollFd, EPOLL_CTL_ADD, raw->fd, &ev) == -1)
+        {
+            throw Exception::internal("Failed to register event channel file descriptor to epoll: {}", strerror(errno));
+        }
+
         struct MakeSharedEnabler : public EventChannel
         {
-            MakeSharedEnabler(::rdma_event_channel* raw)
-                : EventChannel(raw)
+            MakeSharedEnabler(::rdma_event_channel* raw, int epollFd)
+                : EventChannel(raw, epollFd)
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(raw);
+        return std::make_shared<MakeSharedEnabler>(raw, epollFd);
     }
 
     EventChannel::~EventChannel()
@@ -82,16 +129,23 @@ namespace mxl::lib::fabrics::rdma_core
         close();
     }
 
-    Event EventChannel::get()
+    std::optional<Event> EventChannel::get(std::chrono::milliseconds timeout)
     {
-        ::rdma_cm_event* event;
-
-        if (rdma_get_cm_event(_raw, &event))
+        ::epoll_event events;
+        auto ret = epoll_wait(_epollFd, &events, 1, timeout.count());
+        if (ret == -1)
         {
-            throw Exception::internal("Faield to get CM event.");
+            throw Exception::internal("Failed to wait with epoll: {}", strerror(errno));
         }
 
-        return {event};
+        if (ret == 1)
+        {
+            ::rdma_cm_event* event;
+            rdmaCall(rdma_get_cm_event, "Failed to get CM Event", _raw, &event);
+            return {event};
+        }
+
+        return std::nullopt;
     }
 
     ::rdma_event_channel* EventChannel::raw() noexcept
@@ -99,8 +153,9 @@ namespace mxl::lib::fabrics::rdma_core
         return _raw;
     }
 
-    EventChannel::EventChannel(::rdma_event_channel* ec)
+    EventChannel::EventChannel(::rdma_event_channel* ec, int pollFd)
         : _raw(ec)
+        , _epollFd(pollFd)
     {}
 
     void EventChannel::close()

@@ -3,10 +3,12 @@
 #include <memory>
 #include <utility>
 #include <infiniband/verbs.h>
+#include <rdma/rdma_cma.h>
 #include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "Address.hpp"
 #include "ConnectionManagement.hpp"
+#include "Exception.hpp"
 #include "QueueHelpers.hpp"
 #include "QueuePair.hpp"
 #include "Region.hpp"
@@ -70,27 +72,42 @@ namespace mxl::lib::fabrics::rdma_core
         _state = std::visit(
             overloaded{
                 [](std::monostate) -> State { throw std::runtime_error("Target is in an invalid state and can no longer make progress"); },
-                [](WaitForConnectionRequest state) -> State
+                [&](WaitForConnectionRequest state) -> State
                 {
                     state.cm.listen();
-                    auto clientCm = state.cm.waitConnectionRequest();
+                    auto clientCm = state.cm.waitConnectionRequest(timeout);
                     clientCm.createCompletionQueue();
                     clientCm.createQueuePair(QueuePairAttr::defaults());
-                    clientCm.accept();
-
-                    MXL_INFO("Connected!");
 
                     auto immData = std::make_unique<ImmediateDataLocation>(clientCm.pd());
-
                     auto immRegion = immData->toLocalRegion();
                     clientCm.recv(immRegion);
 
-                    return Connected{.cm = std::move(clientCm), .immData = std::move(immData)};
+                    clientCm.accept();
+
+                    return WaitForConnected{.cm = std::move(clientCm), .immData = std::move(immData)};
+                },
+                [&](RCTarget::WaitForConnected state) -> State
+                {
+                    if (auto event = readEventQueue<qrm>(state.cm, timeout);
+                        event && event.value().isSuccess() && event.value().isConnectionEstablished())
+                    {
+                        MXL_INFO("Connected!");
+                        return Connected{.cm = std::move(state.cm), .immData = std::move(state.immData)};
+                    }
+                    return state;
                 },
                 [&](RCTarget::Connected state) -> State
                 {
-                    auto completion = readCompletionQueue<qrm>(state.cm, timeout);
-                    if (completion)
+                    if (auto event = readEventQueue<QueueReadMode::NonBlocking>(state.cm, timeout); event && event.value().isSuccess())
+                    {
+                        if (event.value().isDisconnected())
+                        {
+                            throw Exception::interrupted("Peer disconnected, exiting");
+                        }
+                    }
+
+                    if (auto completion = readCompletionQueue<qrm>(state.cm, timeout); completion)
                     {
                         if (completion.value().isErr())
                         {

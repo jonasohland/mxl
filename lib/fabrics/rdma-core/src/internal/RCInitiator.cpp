@@ -2,12 +2,14 @@
 #include <chrono>
 #include <variant>
 #include <infiniband/verbs.h>
+#include <rdma/rdma_cma.h>
 #include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "Address.hpp"
 #include "ConnectionManagement.hpp"
 #include "Exception.hpp"
 #include "LocalRegion.hpp"
+#include "QueueHelpers.hpp"
 #include "QueuePair.hpp"
 #include "TargetInfo.hpp"
 #include "VariantUtils.hpp"
@@ -47,33 +49,33 @@ namespace mxl::lib::fabrics::rdma_core
     void RCInitiator::addTarget(TargetInfo const& targetInfo)
     {
         MXL_INFO("Add Target {}", targetInfo.addr.toString());
-        _state = std::visit(
-            overloaded{
-                [](Uninitialized) -> State
-                { throw Exception::internal("Initiator needs to be initialized by calling the setup function before trying to add targets."); },
-                [&](Idle state) -> State
-                {
-                    auto dstAddr = targetInfo.addr;
 
-                    // Prepare connection
-                    state.cm.resolveAddr(dstAddr, std::chrono::seconds(2));
-                    state.cm.resolveRoute(std::chrono::seconds(2));
-                    state.cm.createCompletionQueue();
-                    state.cm.createQueuePair(QueuePairAttr::defaults());
+        if (auto state = std::get_if<Idle>(&_state); state)
+        {
+            auto dstAddr = targetInfo.addr;
 
-                    state.cm.connect();
+            // Prepare connection
+            state->cm.resolveAddr(dstAddr, std::chrono::seconds(2));
 
-                    return Connected{.cm = std::move(state.cm), .regions = targetInfo.remoteRegions};
-                },
-                [](Connected) -> State { throw Exception::internal("Currently the implementation does not support more than 1 target at a time."); },
-            },
-            std::move(_state));
+            _state = WaitForAddrResolved{.cm = std::move(state->cm), .regions = targetInfo.remoteRegions};
+        }
+        else
+        {
+            throw Exception::internal("Attempt to add a target when not in Idle state.");
+        }
     }
 
     void RCInitiator::removeTarget(TargetInfo const&)
     {
-        // NOP
-        MXL_WARN("Currently the implementation does not support removing a target, create a new initiator instead.");
+        if (auto state = std::get_if<Connected>(&_state); state)
+        {
+            _state = Done{std::move(state->cm)};
+            MXL_INFO("Transition to Done state");
+        }
+        else
+        {
+            throw Exception::internal("Attempted to remove target when not in Connected state");
+        }
     }
 
     void RCInitiator::transferGrain(std::uint64_t grainIndex)
@@ -84,38 +86,96 @@ namespace mxl::lib::fabrics::rdma_core
             auto& local = _localRegions[grainIndex % _localRegions.size()].front();
 
             state->cm.write(grainIndex, local, remote);
-            pendingTransfer++;
+            _pendingTransfer++;
         }
-        else
-        {
-            throw Exception::internal("A target needs to be added before you attempt to transfer a grain.");
-        }
+    }
+
+    template<QueueReadMode queueReadMode>
+    bool RCInitiator::makeProgressInternal(std::chrono::steady_clock::duration timeout)
+    {
+        _state = std::visit(
+            overloaded{[](std::monostate) -> State
+                { throw Exception::invalidState("Initiator is an invalid state and can no longer make progress"); },
+                [](Uninitialized) -> State { throw Exception::internal("Attempt to make progress on a uninitialized initiator."); },
+                [&](Idle state) -> State { return state; },
+                [&](WaitForAddrResolved state) -> State
+                {
+                    MXL_INFO("Check if address resolved");
+                    if (auto event = readEventQueue<queueReadMode>(state.cm, timeout);
+                        event && event.value().isSuccess() && event.value().isAddrResolved())
+                    {
+                        MXL_INFO("Address Resolved!");
+                        state.cm.resolveRoute(std::chrono::seconds(2));
+                        return WaitForRouteResolved{.cm = std::move(state.cm), .regions = state.regions};
+                    }
+                    return state;
+                },
+                [&](WaitForRouteResolved state) -> State
+                {
+                    if (auto event = readEventQueue<queueReadMode>(state.cm, timeout);
+                        event && event.value().isSuccess() && event.value().isRouteResolved())
+                    {
+                        MXL_INFO("Route Resolved!");
+                        state.cm.createCompletionQueue();
+                        state.cm.createQueuePair(QueuePairAttr::defaults());
+
+                        state.cm.connect();
+                        return WaitConnection{.cm = std::move(state.cm), .regions = state.regions};
+                    }
+                    return state;
+                },
+                [&](WaitConnection state) -> State
+                {
+                    if (auto event = readEventQueue<queueReadMode>(state.cm, timeout);
+                        event && event.value().isSuccess() && event.value().isConnectionEstablished())
+                    {
+                        MXL_INFO("Connected!");
+                        return Connected{.cm = std::move(state.cm), .regions = std::move(state.regions)};
+                    }
+                    return state;
+                },
+                [&](Connected state) -> State
+                {
+                    if (auto event = readEventQueue<queueReadMode>(state.cm, timeout); event && event.value().isSuccess())
+                    {
+                        if (event.value().isDisconnected())
+                        {
+                            return Done{std::move(state.cm)};
+                        }
+                    }
+
+                    if (auto comp = readCompletionQueue<queueReadMode>(state.cm, timeout); comp)
+                    {
+                        if (comp.value().isErr())
+                        {
+                            MXL_ERROR("CQ Error: {}", comp.value().errToString());
+                        }
+                        else
+                        {
+                            _pendingTransfer--;
+                        }
+                    }
+
+                    return state;
+                },
+                [](Done) -> State
+                {
+                    throw Exception::interrupted("Initiator Done!");
+                }},
+            std::move(_state));
+
+        return _pendingTransfer > 0;
     }
 
     bool RCInitiator::makeProgress()
     {
-        if (auto state = std::get_if<Connected>(&_state); state && pendingTransfer > 0)
-        {
-            if (auto completion = state->cm.readCq(); completion)
-            {
-                pendingTransfer--;
-                return true;
-            }
-        }
-        return false;
+        return makeProgressInternal<QueueReadMode::NonBlocking>({});
     }
 
     bool RCInitiator::makeProgressBlocking(std::chrono::steady_clock::duration timeout)
+
     {
-        if (auto state = std::get_if<Connected>(&_state); state && pendingTransfer > 0)
-        {
-            if (auto completion = state->cm.readCqBlocking(timeout); completion)
-            {
-                pendingTransfer--;
-                return true;
-            }
-        }
-        return false;
+        return makeProgressInternal<QueueReadMode::Blocking>(timeout);
     }
 
     RCInitiator::RCInitiator(State state, std::vector<LocalRegionGroup> localRegions)

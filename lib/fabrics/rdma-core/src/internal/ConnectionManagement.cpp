@@ -34,8 +34,11 @@ namespace mxl::lib::fabrics::rdma_core
         , _ec(std::move(other._ec))
         , _pd(std::move(other._pd))
         , _cq(std::move(other._cq))
+        , _hasQp(other._hasQp)
+
     {
         other._raw = nullptr;
+        other._hasQp = false;
     }
 
     ConnectionManagement& ConnectionManagement::operator=(ConnectionManagement&& other)
@@ -48,6 +51,9 @@ namespace mxl::lib::fabrics::rdma_core
         _ec = std::move(other._ec);
         _pd = std::move(other._pd);
         _cq = std::move(other._cq);
+
+        _hasQp = other._hasQp;
+        other._hasQp = false;
 
         return *this;
     }
@@ -63,15 +69,17 @@ namespace mxl::lib::fabrics::rdma_core
         rdmaCall(rdma_listen, "Failed to listen", _raw, 8);
     }
 
-    ConnectionManagement ConnectionManagement::waitConnectionRequest(size_t retries)
+    ConnectionManagement ConnectionManagement::waitConnectionRequest(std::chrono::steady_clock::duration timeout)
     {
-        for (size_t retry = 0; retry < retries; retry++)
+        auto timeoutMs = std::chrono::duration_cast<std::chrono::milliseconds>(timeout);
+
+        for (;;)
         {
-            if (auto event = _ec->get(); event.isSuccess() && event.isConnectionRequest())
+            if (auto event = _ec->get(timeoutMs); event && event->isSuccess() && event->isConnectionRequest())
             {
-                auto clientId = event.clientId();
+                auto clientId = event->clientId();
                 MXL_INFO("listenId->pd={:p} clientId->pd{:p}", (void*)_raw->pd, (void*)clientId->pd);
-                return {event.clientId(), std::move(_ec), std::move(_pd), std::move(_cq)};
+                return {clientId, std::move(_ec), std::move(_pd), std::move(_cq), _hasQp};
             }
         }
 
@@ -81,14 +89,6 @@ namespace mxl::lib::fabrics::rdma_core
     void ConnectionManagement::accept()
     {
         rdmaCall(rdma_accept, "Failed to accept connection", _raw, nullptr);
-        if (auto event = _ec->get(); event.isSuccess() && event.isConnectionEstablished())
-        {
-            MXL_INFO("Connected!");
-        }
-        else
-        {
-            throw Exception::internal("Failed to receive \"Connection Established cm event\"");
-        }
     }
 
     ProtectionDomain& ConnectionManagement::pd()
@@ -100,36 +100,21 @@ namespace mxl::lib::fabrics::rdma_core
         throw Exception::internal("Failed to get protection domain, because it was not created yet");
     }
 
-    void ConnectionManagement::resolveAddr(Address& dstAddr, std::chrono::milliseconds timeout)
+    void ConnectionManagement::resolveAddr(Address& dstAddr, std::chrono::steady_clock::duration timeout)
     {
-        ;
-        if (rdma_resolve_addr(_raw, nullptr, dstAddr.aiActive().raw()->ai_dst_addr, timeout.count()))
+        if (rdma_resolve_addr(
+                _raw, nullptr, dstAddr.aiActive().raw()->ai_dst_addr, std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count()))
         {
             throw Exception::internal("Failed to resolve address");
         }
-
-        if (auto event = _ec->get(); event.isSuccess() && event.isAddrResolved())
-        {
-            MXL_INFO("Address Resolved");
-            return;
-        }
-
-        throw Exception::internal("Failed to receive \"Address resolved cm event\"");
     }
 
-    void ConnectionManagement::resolveRoute(std::chrono::milliseconds timeout)
+    void ConnectionManagement::resolveRoute(std::chrono::steady_clock::duration timeout)
     {
-        if (rdma_resolve_route(_raw, timeout.count()))
+        if (rdma_resolve_route(_raw, std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count()))
         {
             throw Exception::internal("Failed to resolve route");
         }
-        if (auto event = _ec->get(); event.isSuccess() && event.isRouteResolved())
-        {
-            MXL_INFO("Route resolved!");
-            return;
-        }
-
-        throw Exception::internal("Failed to receive \"Route resolved cm event\"");
     }
 
     void ConnectionManagement::connect()
@@ -142,14 +127,11 @@ namespace mxl::lib::fabrics::rdma_core
         {
             throw Exception::internal("Failed to connect to server");
         }
+    }
 
-        if (auto event = _ec->get(); event.isSuccess() && event.isConnectionEstablished())
-        {
-            MXL_INFO("Connected!");
-            return;
-        }
-
-        throw Exception::internal("Failed to receiver \"Connection established cm event\"");
+    void ConnectionManagement::disconnect()
+    {
+        rdmaCall(rdma_disconnect, "Failed to disconnect", _raw);
     }
 
     void ConnectionManagement::createProtectionDomain() noexcept
@@ -181,6 +163,8 @@ namespace mxl::lib::fabrics::rdma_core
         {
             throw Exception::internal("Failed to create Queue Pair");
         }
+
+        _hasQp = true;
     }
 
     void ConnectionManagement::write(std::uint64_t id, LocalRegion& localRegion, RemoteRegion& remoteRegion)
@@ -243,17 +227,30 @@ namespace mxl::lib::fabrics::rdma_core
         return std::nullopt;
     }
 
+    std::optional<EventChannel::Event> ConnectionManagement::readEvent()
+    {
+        return _ec->get({});
+    }
+
+    std::optional<EventChannel::Event> ConnectionManagement::readEventBlocking(std::chrono::steady_clock::duration timeout)
+    {
+        auto timeoutMs = std::chrono::duration_cast<std::chrono::milliseconds>(timeout);
+
+        return _ec->get(timeoutMs);
+    }
+
     ConnectionManagement::~ConnectionManagement()
     {
         close();
     }
 
     ConnectionManagement::ConnectionManagement(::rdma_cm_id* raw, std::shared_ptr<EventChannel> ec, std::optional<ProtectionDomain> pd,
-        std::optional<CompletionQueue> cq)
+        std::optional<CompletionQueue> cq, bool hasQp)
         : _raw(raw)
         , _ec(std::move(ec))
         , _pd(std::move(pd))
         , _cq(std::move(cq))
+        , _hasQp(hasQp)
     {}
 
     ::rdma_cm_id* ConnectionManagement::raw() noexcept
@@ -263,11 +260,27 @@ namespace mxl::lib::fabrics::rdma_core
 
     void ConnectionManagement::close()
     {
+        if (_hasQp)
+        {
+            if (rdma_disconnect(_raw))
+            {
+                throw Exception::internal("failed to disconnect: {}", strerror(errno));
+            }
+
+            // flush all the remaining event and cq entries
+            while (readCq())
+                ;
+            while (readEvent())
+                ;
+
+            rdma_destroy_qp(_raw);
+            _hasQp = false;
+        }
+
         if (_raw)
         {
             rdma_destroy_id(_raw);
             _raw = nullptr;
         }
     }
-
 }

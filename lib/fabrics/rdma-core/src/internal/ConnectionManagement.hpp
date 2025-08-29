@@ -30,19 +30,20 @@ namespace mxl::lib::fabrics::rdma_core
         // Server ops
         void bind(Address& srcAddr);
         void listen();
-        ConnectionManagement waitConnectionRequest(size_t retries = 15);
+        ConnectionManagement waitConnectionRequest(std::chrono::steady_clock::duration timeout);
         void accept();
 
         ProtectionDomain& pd();
         CompletionQueue& cq();
 
         // Client Connection ops
-        void resolveAddr(Address& dstAddr, std::chrono::milliseconds timeout);
-        void resolveRoute(std::chrono::milliseconds timeout);
+        void resolveAddr(Address& dstAddr, std::chrono::steady_clock::duration timeout);
+        void resolveRoute(std::chrono::steady_clock::duration timeout);
         void createProtectionDomain() noexcept;
         void createCompletionQueue() noexcept;
         void createQueuePair(QueuePairAttr attr);
         void connect();
+        void disconnect();
 
         // Client Verbs ops
         void write(std::uint64_t id, LocalRegion& localRegion, RemoteRegion& remoteRegion);
@@ -52,11 +53,14 @@ namespace mxl::lib::fabrics::rdma_core
         std::optional<Completion> readCq();
         std::optional<Completion> readCqBlocking(std::chrono::steady_clock::duration timeout);
 
+        std::optional<EventChannel::Event> readEvent();
+        std::optional<EventChannel::Event> readEventBlocking(std::chrono::steady_clock::duration timeout);
+
         ::rdma_cm_id* raw() noexcept;
 
     private:
         ConnectionManagement(::rdma_cm_id*, std::shared_ptr<EventChannel>, std::optional<ProtectionDomain> = std::nullopt,
-            std::optional<CompletionQueue> = std::nullopt);
+            std::optional<CompletionQueue> = std::nullopt, bool = false);
 
         void close();
 
@@ -66,5 +70,6 @@ namespace mxl::lib::fabrics::rdma_core
 
         std::optional<ProtectionDomain> _pd;
         std::optional<CompletionQueue> _cq;
+        bool _hasQp = false;
     };
 }

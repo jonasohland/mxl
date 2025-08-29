@@ -80,6 +80,8 @@ namespace mxl::lib::fabrics::rdma_core
 
     void ProtectionDomain::close()
     {
+        _registeredRegionGroups.clear();
+
         if (_raw)
         {
             if (ibv_dealloc_pd(_raw))

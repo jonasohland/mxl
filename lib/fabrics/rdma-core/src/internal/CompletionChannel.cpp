@@ -18,11 +18,6 @@ namespace mxl::lib::fabrics::rdma_core
         : _cq(cq)
     {}
 
-    Event::~Event()
-    {
-        ibv_ack_cq_events(_cq, 1);
-    }
-
     CompletionChannel CompletionChannel::create(ConnectionManagement& cm)
     {
         auto raw = ibv_create_comp_channel(cm.raw()->verbs);
@@ -89,6 +84,7 @@ namespace mxl::lib::fabrics::rdma_core
         {
             if (auto ret = ::ibv_get_cq_event(_raw, &cq, &ctx); ret == 0)
             {
+                ::ibv_ack_cq_events(cq, 1);
                 rdmaCall(ibv_req_notify_cq, "Failed to request cq notify", cq, 0);
                 return {Event{cq}};
             }

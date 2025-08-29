@@ -7,6 +7,7 @@
 #include "ConnectionManagement.hpp"
 #include "Initiator.hpp"
 #include "LocalRegion.hpp"
+#include "QueueHelpers.hpp"
 #include "RemoteRegion.hpp"
 #include "TargetInfo.hpp"
 
@@ -23,13 +24,37 @@ namespace mxl::lib::fabrics::rdma_core
             ConnectionManagement cm;
         };
 
-        struct Connected
+        struct WaitForAddrResolved
         {
             ConnectionManagement cm;
             std::vector<RemoteRegion> regions;
         };
 
-        using State = std::variant<Uninitialized, Idle, Connected>;
+        struct WaitForRouteResolved
+        {
+            ConnectionManagement cm;
+            std::vector<RemoteRegion> regions;
+        };
+
+        struct WaitConnection
+        {
+            ConnectionManagement cm;
+            std::vector<RemoteRegion> regions;
+        };
+
+        struct Connected
+
+        {
+            ConnectionManagement cm;
+            std::vector<RemoteRegion> regions;
+        };
+
+        struct Done
+        {
+            ConnectionManagement cm;
+        };
+
+        using State = std::variant<Uninitialized, Idle, WaitForAddrResolved, WaitForRouteResolved, WaitConnection, Connected, Done>;
 
     public:
         static std::unique_ptr<RCInitiator> setup(mxlInitiatorConfig const&);
@@ -43,9 +68,12 @@ namespace mxl::lib::fabrics::rdma_core
     private:
         RCInitiator(State state, std::vector<LocalRegionGroup> localRegions);
 
+        template<QueueReadMode>
+        bool makeProgressInternal(std::chrono::steady_clock::duration);
+
     private:
         std::vector<LocalRegionGroup> _localRegions;
         State _state = Uninitialized{};
-        size_t pendingTransfer = 0;
+        size_t _pendingTransfer = 0;
     };
 }
