@@ -88,12 +88,13 @@ namespace mxl::lib::fabrics::rdma_core
 
     std::optional<Completion> CompletionQueue::read()
     {
-        if (auto event = _cc.get(_raw, std::chrono::milliseconds::zero()))
-        {
-            return poll();
-        }
+        return poll();
+        // if (auto event = _cc.get(_raw, std::chrono::milliseconds::zero()))
+        // {
+        //     return poll();
+        // }
 
-        return std::nullopt;
+        // return std::nullopt;
     }
 
     std::optional<Completion> CompletionQueue::readBlocking(std::chrono::milliseconds timeout)
