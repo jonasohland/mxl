@@ -19,6 +19,8 @@ namespace mxl::lib::fabrics::rdma_core
         attr.qp_type = qpType;
         attr.sq_sig_all = 1;
         attr.cap.max_send_wr = 8;
+        attr.cap.max_send_sge = 1;
+        attr.cap.max_recv_sge = 1;
         attr.cap.max_recv_wr = 8;
         return attr;
     }

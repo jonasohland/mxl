@@ -3,7 +3,7 @@
 #include <chrono>
 #include <optional>
 #include "CompletionQueue.hpp"
-#include "Endpoint.hpp"
+#include "ConnectionManagement.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
 {
@@ -15,17 +15,17 @@ namespace mxl::lib::fabrics::rdma_core
     };
 
     template<QueueReadMode qrm>
-    std::optional<Completion> readCompletionQueue(ActiveEndpoint& aep, std::chrono::steady_clock::duration)
+    std::optional<Completion> readCompletionQueue(ConnectionManagement& cm, std::chrono::steady_clock::duration)
     {
         std::optional<Completion> completion;
 
         if constexpr (qrm == QueueReadMode::Blocking)
         {
-            completion = aep.readCqBlocking(); // TODO: find a way to enforce duration
+            completion = cm.readCqBlocking(); // TODO: find a way to enforce duration
         }
         else if constexpr (qrm == QueueReadMode::NonBlocking)
         {
-            completion = aep.readCq();
+            completion = cm.readCq();
         }
         else
         {

@@ -4,8 +4,7 @@
 #include <cstdint>
 #include <variant>
 #include "mxl/fabrics.h"
-#include "Address.hpp"
-#include "Endpoint.hpp"
+#include "ConnectionManagement.hpp"
 #include "Initiator.hpp"
 #include "LocalRegion.hpp"
 #include "RemoteRegion.hpp"
@@ -21,13 +20,12 @@ namespace mxl::lib::fabrics::rdma_core
 
         struct Idle
         {
-            PassiveEndpoint pep;
+            ConnectionManagement cm;
         };
 
         struct Connected
         {
-            ActiveEndpoint ep;
-            Address addr;
+            ConnectionManagement cm;
             std::vector<RemoteRegion> regions;
         };
 
@@ -48,5 +46,6 @@ namespace mxl::lib::fabrics::rdma_core
     private:
         std::vector<LocalRegionGroup> _localRegions;
         State _state = Uninitialized{};
+        size_t pendingTransfer = 0;
     };
 }

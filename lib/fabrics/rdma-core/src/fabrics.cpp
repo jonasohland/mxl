@@ -16,6 +16,7 @@
 #include <mxl/mxl.h>
 #include <rdma/fabric.h>
 #include <rfl/json.hpp>
+#include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
 #include "internal/FlowReader.hpp"
 #include "internal/Initiator.hpp"
@@ -48,6 +49,12 @@ namespace
             *out_regions = regionPtr->toAPI();
 
             return MXL_STATUS_OK;
+        }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
         }
         catch (std::exception& e)
         {
@@ -83,6 +90,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to create Regions object: {}", e.what());
@@ -117,6 +131,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to create Regions object: {}", e.what());
@@ -147,6 +168,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to free Regions object: {}", e.what());
@@ -176,6 +204,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             return MXL_ERR_UNKNOWN;
@@ -200,6 +235,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to destroy fabrics instance: {}", e.what());
@@ -227,6 +269,13 @@ namespace
             auto instance = rdma::FabricsInstance::fromAPI(in_fabricsInstance);
             *out_target = instance->createTarget()->toAPI();
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to create target : {}", e.what());
@@ -253,6 +302,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to destroy target : {}", e.what());
@@ -284,6 +340,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to set up target : {}", e.what());
@@ -316,6 +379,13 @@ namespace
 
             return MXL_ERR_NOT_READY;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to try for new grain : {}", e.what());
@@ -348,10 +418,16 @@ namespace
                 *out_index = res.grainAvailable.value();
                 return MXL_STATUS_OK;
             }
-            MXL_INFO("About to return timeout");
 
             return MXL_ERR_TIMEOUT;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to try for new grain : {}", e.what());
@@ -379,6 +455,13 @@ namespace
 
             *out_initiator = instance->createInitiator()->toAPI();
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to create initiator : {}", e.what());
@@ -406,6 +489,13 @@ namespace
             auto instance = rdma::FabricsInstance::fromAPI(in_fabricsInstance);
             instance->destroyInitiator(rdma::InitiatorWrapper::fromAPI(in_initiator));
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to create initiator : {}", e.what());
@@ -435,6 +525,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to set up initiator : {}", e.what());
@@ -463,6 +560,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to add target to initiator: {}", e.what());
@@ -491,6 +595,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to remove target from initiator : {}", e.what());
@@ -517,6 +628,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to transfer grain: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to transfer grain: {}", e.what());
@@ -546,6 +664,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to make progress : {}", e.what());
@@ -575,6 +700,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to make progress : {}", e.what());
@@ -625,6 +757,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             return MXL_ERR_UNKNOWN;
@@ -669,6 +808,13 @@ namespace
 
             return MXL_STATUS_OK;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             return MXL_ERR_UNKNOWN;
@@ -696,6 +842,13 @@ namespace
 
             delete info;
         }
+        catch (rdma::Exception& e)
+        {
+            MXL_ERROR("Failed to create regions object: {}", e.what());
+
+            return e.status();
+        }
+
         catch (std::exception& e)
         {
             MXL_ERROR("Failed to destroy target info object: {}", e.what());

@@ -61,5 +61,6 @@ namespace mxl::lib::fabrics::rdma_core
     private:
         CompletionQueue(ConnectionManagement& cm);
         ::ibv_cq* _raw;
+        ::ibv_comp_channel* _cc;
     };
 }

@@ -1,8 +1,9 @@
 #pragma once
 
+#include <memory>
 #include <variant>
 #include "mxl/fabrics.h"
-#include "Endpoint.hpp"
+#include "ConnectionManagement.hpp"
 #include "QueueHelpers.hpp"
 #include "Target.hpp"
 #include "TargetInfo.hpp"
@@ -14,13 +15,13 @@ namespace mxl::lib::fabrics::rdma_core
     private:
         struct WaitForConnectionRequest
         {
-            PassiveEndpoint pep;
+            ConnectionManagement cm;
         };
 
         struct Connected
         {
-            ActiveEndpoint ep;
-            Target::ImmediateDataLocation _immData;
+            ConnectionManagement cm;
+            std::unique_ptr<Target::ImmediateDataLocation> immData;
         };
 
         using State = std::variant<WaitForConnectionRequest, Connected>;

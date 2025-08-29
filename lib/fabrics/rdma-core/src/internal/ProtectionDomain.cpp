@@ -1,10 +1,10 @@
 #include "ProtectionDomain.hpp"
 #include <cstring>
-#include <stdexcept>
 #include <fmt/format.h>
 #include <infiniband/verbs.h>
 #include "internal/Logging.hpp"
 #include "ConnectionManagement.hpp"
+#include "Exception.hpp"
 #include "RegisteredRegion.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
@@ -16,7 +16,7 @@ namespace mxl::lib::fabrics::rdma_core
         _raw = ibv_alloc_pd(cm.raw()->verbs);
         if (_raw == nullptr)
         {
-            throw std::runtime_error(fmt::format("Failed to allocate protection domain: {}", strerror(errno)));
+            throw Exception::internal("Failed to allocate protection domain");
         }
         MXL_INFO("created pd");
     }
@@ -33,6 +33,7 @@ namespace mxl::lib::fabrics::rdma_core
 
     ProtectionDomain::ProtectionDomain(ProtectionDomain&& other) noexcept
         : _raw(other._raw)
+        , _registeredRegionGroups(std::move(other._registeredRegionGroups))
     {
         other._raw = nullptr;
     }
@@ -43,6 +44,8 @@ namespace mxl::lib::fabrics::rdma_core
 
         _raw = other._raw;
         other._raw = nullptr;
+
+        _registeredRegionGroups = std::move(other._registeredRegionGroups);
 
         return *this;
     }
@@ -81,7 +84,7 @@ namespace mxl::lib::fabrics::rdma_core
         {
             if (ibv_dealloc_pd(_raw))
             {
-                throw std::runtime_error(fmt::format("Failed to deallocate protection domain: {}", strerror(errno)));
+                throw Exception::internal("Failed to deallocate protection domain");
             }
 
             _raw = nullptr;

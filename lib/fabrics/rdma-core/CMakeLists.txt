@@ -79,7 +79,8 @@ set(mxl_fabrics_sources
         src/internal/Address.cpp
         src/internal/CompletionQueue.cpp
         src/internal/ConnectionManagement.cpp
-        src/internal/Endpoint.cpp
+        src/internal/EventChannel.cpp
+        src/internal/Exception.cpp
         src/internal/FabricsInstance.cpp
         src/internal/Initiator.cpp
         src/internal/LocalRegion.cpp

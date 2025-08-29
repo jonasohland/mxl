@@ -7,8 +7,9 @@
 #include "mxl/fabrics.h"
 #include "Address.hpp"
 #include "ConnectionManagement.hpp"
-#include "Endpoint.hpp"
+#include "Exception.hpp"
 #include "LocalRegion.hpp"
+#include "QueuePair.hpp"
 #include "TargetInfo.hpp"
 #include "VariantUtils.hpp"
 
@@ -18,15 +19,16 @@ namespace mxl::lib::fabrics::rdma_core
     {
         auto bindAddr = Address{config.endpointAddress.node, config.endpointAddress.service};
 
-        auto pep = PassiveEndpoint::create(bindAddr);
-        MXL_INFO("Created PassiveEndpoint");
+        auto cm = ConnectionManagement::create();
+        cm.bind(bindAddr);
 
-        pep.connectionManagement().protectionDomain().registerRegionGroups(*RegionGroups::fromAPI(config.regions),
-            0); // Local read access is always enabled for the MR.
+        cm.createProtectionDomain();
+        cm.pd().registerRegionGroups(*RegionGroups::fromAPI(config.regions),
+            IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ); // Local read access is always enabled for the MR.
 
         MXL_INFO("Success to register memory");
 
-        auto localRegions = pep.connectionManagement().protectionDomain().localRegionGroups();
+        auto localRegions = cm.pd().localRegionGroups();
         for (auto const& region : localRegions)
         {
             MXL_INFO("LocalRegion -> addr=0x{:x} len={} lkey=0x{:x} ", region.sgl()->addr, region.sgl()->length, region.sgl()->lkey);
@@ -40,12 +42,12 @@ namespace mxl::lib::fabrics::rdma_core
             {}
         };
 
-        return std::make_unique<MakeUniqueEnabler>(Idle{std::move(pep)}, localRegions);
+        return std::make_unique<MakeUniqueEnabler>(Idle{std::move(cm)}, std::move(localRegions));
     }
 
     void RCInitiator::addTarget(TargetInfo const& targetInfo)
     {
-        MXL_INFO("Add Target");
+        MXL_INFO("Add Target {}", targetInfo.addr.toString());
         _state = std::visit(
             overloaded{
                 [](Uninitialized) -> State
@@ -54,13 +56,17 @@ namespace mxl::lib::fabrics::rdma_core
                 {
                     auto dstAddr = targetInfo.addr;
 
-                    MXL_INFO("About to connect");
-                    auto aep = state.pep.connect(dstAddr);
-                    MXL_INFO("Connected!");
+                    // Prepare connection
+                    state.cm.resolveAddr(dstAddr, std::chrono::seconds(2));
+                    state.cm.resolveRoute(std::chrono::seconds(2));
+                    state.cm.createCompletionQueue();
+                    state.cm.createQueuePair(QueuePairAttr::defaults());
 
-                    return Connected{.ep = std::move(aep), .addr = dstAddr, .regions = targetInfo.remoteRegions};
+                    state.cm.connect();
+
+                    return Connected{.cm = std::move(state.cm), .regions = targetInfo.remoteRegions};
                 },
-                [](Connected) -> State { throw std::runtime_error("Currently the implementation does not support more than 1 target at a time."); },
+                [](Connected) -> State { throw Exception::internal("Currently the implementation does not support more than 1 target at a time."); },
             },
             std::move(_state));
     }
@@ -78,7 +84,8 @@ namespace mxl::lib::fabrics::rdma_core
             auto& remote = state->regions[grainIndex % state->regions.size()];
             auto& local = _localRegions[grainIndex % _localRegions.size()].front();
 
-            state->ep.write(grainIndex, local, remote);
+            state->cm.write(grainIndex, local, remote);
+            pendingTransfer++;
         }
         else
         {
@@ -88,10 +95,11 @@ namespace mxl::lib::fabrics::rdma_core
 
     bool RCInitiator::makeProgress()
     {
-        if (auto state = std::get_if<Connected>(&_state); state)
+        if (auto state = std::get_if<Connected>(&_state); state && pendingTransfer > 0)
         {
-            if (auto completion = state->ep.readCq(); completion)
+            if (auto completion = state->cm.readCq(); completion)
             {
+                pendingTransfer--;
                 return true;
             }
         }
@@ -100,10 +108,11 @@ namespace mxl::lib::fabrics::rdma_core
 
     bool RCInitiator::makeProgressBlocking(std::chrono::steady_clock::duration)
     {
-        if (auto state = std::get_if<Connected>(&_state); state)
+        if (auto state = std::get_if<Connected>(&_state); state && pendingTransfer > 0)
         {
-            if (auto completion = state->ep.readCqBlocking(); completion)
+            if (auto completion = state->cm.readCqBlocking(); completion)
             {
+                pendingTransfer--;
                 return true;
             }
         }

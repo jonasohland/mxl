@@ -5,6 +5,7 @@
 #include "Initiator.hpp"
 #include <stdexcept>
 #include "mxl/fabrics.h"
+#include "Exception.hpp"
 #include "RCInitiator.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
@@ -54,7 +55,7 @@ namespace mxl::lib::fabrics::rdma_core
     {
         if (!_inner)
         {
-            throw std::runtime_error("Initiator is not set up");
+            throw Exception::internal("Initiator is not set up");
         }
 
         _inner->transferGrain(grainIndex);

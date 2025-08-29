@@ -6,8 +6,9 @@
 #include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "Address.hpp"
-#include "Endpoint.hpp"
+#include "ConnectionManagement.hpp"
 #include "QueueHelpers.hpp"
+#include "QueuePair.hpp"
 #include "Region.hpp"
 #include "TargetInfo.hpp"
 #include "VariantUtils.hpp"
@@ -21,12 +22,14 @@ namespace mxl::lib::fabrics::rdma_core
 
         MXL_INFO("created bindAddr: {}", bindAddr.toString());
 
-        auto pep = PassiveEndpoint::create(bindAddr);
+        auto cm = ConnectionManagement::create();
+        cm.bind(bindAddr);
 
-        pep.connectionManagement().protectionDomain().registerRegionGroups(*RegionGroups::fromAPI(config.regions),
-            IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
+        cm.createProtectionDomain();
+        MXL_INFO("ProtectionDomain created");
+        cm.pd().registerRegionGroups(*RegionGroups::fromAPI(config.regions), IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_LOCAL_WRITE);
 
-        auto remoteRegions = pep.connectionManagement().protectionDomain().remoteRegions();
+        auto remoteRegions = cm.pd().remoteRegions();
         for (auto const& region : remoteRegions)
         {
             MXL_INFO("RemoteRegion -> addr=0x{:x} rkey={:x}", region.addr, region.rkey);
@@ -40,9 +43,9 @@ namespace mxl::lib::fabrics::rdma_core
             {}
         };
 
-        auto targetInfo = TargetInfo{bindAddr, pep.connectionManagement().protectionDomain().remoteRegions()};
+        auto targetInfo = TargetInfo{bindAddr, remoteRegions};
 
-        return {std::make_unique<MakeUniqueEnabler>(WaitForConnectionRequest{std::move(pep)}), std::make_unique<TargetInfo>(std::move(targetInfo))};
+        return {std::make_unique<MakeUniqueEnabler>(WaitForConnectionRequest{std::move(cm)}), std::make_unique<TargetInfo>(std::move(targetInfo))};
     }
 
     RCTarget::ReadResult RCTarget::read()
@@ -69,22 +72,24 @@ namespace mxl::lib::fabrics::rdma_core
                 [](std::monostate) -> State { throw std::runtime_error("Target is in an invalid state and can no longer make progress"); },
                 [](WaitForConnectionRequest state) -> State
                 {
-                    state.pep.listen();
-                    auto aep = state.pep.waitConnectionRequest();
+                    state.cm.listen();
+                    auto clientCm = state.cm.waitConnectionRequest();
+                    clientCm.createCompletionQueue();
+                    clientCm.createQueuePair(QueuePairAttr::defaults());
+                    clientCm.accept();
+
                     MXL_INFO("Connected!");
 
-                    auto immData = ImmediateDataLocation(aep.connectionManagement().protectionDomain());
-                    MXL_INFO("Created immData");
-                    auto immRegion = immData.toLocalRegion();
-                    aep.recv(immRegion);
-                    MXL_INFO("Posted imm data recv");
+                    auto immData = std::make_unique<ImmediateDataLocation>(clientCm.pd());
 
-                    return Connected{.ep = std::move(aep), ._immData = std::move(immData)};
+                    auto immRegion = immData->toLocalRegion();
+                    clientCm.recv(immRegion);
+
+                    return Connected{.cm = std::move(clientCm), .immData = std::move(immData)};
                 },
-                [&](Connected state) -> State
+                [&](RCTarget::Connected state) -> State
                 {
-                    MXL_INFO("Polling the completion queue");
-                    auto completion = readCompletionQueue<qrm>(state.ep, timeout);
+                    auto completion = readCompletionQueue<qrm>(state.cm, timeout);
                     if (completion)
                     {
                         if (completion.value().isErr())
@@ -94,15 +99,13 @@ namespace mxl::lib::fabrics::rdma_core
                         else
                         {
                             result.grainAvailable = completion.value().wrId();
-                            auto immRegion = state._immData.toLocalRegion();
-                            state.ep.recv(immRegion);
-                            MXL_INFO("Posted imm data recv");
+
+                            auto immRegion = state.immData->toLocalRegion();
+                            state.cm.recv(immRegion);
                         }
                     }
 
-                    MXL_INFO("Done polling");
-
-                    return std::move(state);
+                    return state;
                 },
             },
             std::move(_state));
