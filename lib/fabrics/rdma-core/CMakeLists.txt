@@ -77,6 +77,7 @@ target_link_libraries(mxl-fabrics-static
 set(mxl_fabrics_sources
         src/fabrics.cpp
         src/internal/Address.cpp
+        src/internal/CompletionChannel.cpp
         src/internal/CompletionQueue.cpp
         src/internal/ConnectionManagement.cpp
         src/internal/EventChannel.cpp

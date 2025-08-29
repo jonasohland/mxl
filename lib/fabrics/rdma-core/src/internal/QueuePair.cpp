@@ -1,9 +1,9 @@
 #include "QueuePair.hpp"
 #include <cerrno>
 #include <cstring>
-#include <stdexcept>
 #include <fmt/format.h>
 #include <infiniband/verbs.h>
+#include "Exception.hpp"
 #include "ProtectionDomain.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
@@ -31,7 +31,7 @@ namespace mxl::lib::fabrics::rdma_core
         _raw = ibv_create_qp(pd.raw(), &attrRaw);
         if (!_raw)
         {
-            throw std::runtime_error(fmt::format("Failed to create queue pair: {}", strerror(errno)));
+            throw Exception::internal("Failed to create queue pair: {}", strerror(errno));
         }
     }
 
@@ -67,7 +67,7 @@ namespace mxl::lib::fabrics::rdma_core
         {
             if (ibv_destroy_qp(_raw))
             {
-                throw std::runtime_error(fmt::format("Failed to destroy queue pair: {}", strerror(errno)));
+                throw Exception::internal("Failed to destroy queue pair: {}", strerror(errno));
             }
         }
     }

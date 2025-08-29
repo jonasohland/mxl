@@ -8,6 +8,7 @@
 #include <infiniband/verbs.h>
 #include <rdma/rdma_verbs.h>
 #include "internal/Logging.hpp"
+#include "CompletionChannel.hpp"
 #include "ConnectionManagement.hpp"
 #include "Exception.hpp"
 
@@ -45,14 +46,9 @@ namespace mxl::lib::fabrics::rdma_core
     }
 
     CompletionQueue::CompletionQueue(ConnectionManagement& cm)
+        : _cc(CompletionChannel::create(cm))
     {
-        _cc = ibv_create_comp_channel(cm.raw()->verbs);
-        if (!_cc)
-        {
-            throw Exception::internal("Failed to create completion channel");
-        }
-
-        _raw = ibv_create_cq(cm.raw()->verbs, 128, nullptr, _cc, 0);
+        _raw = ibv_create_cq(cm.raw()->verbs, 128, nullptr, _cc.raw(), 0);
         if (!_raw)
         {
             throw Exception::internal("Failed to create completion queue");
@@ -68,10 +64,9 @@ namespace mxl::lib::fabrics::rdma_core
 
     CompletionQueue::CompletionQueue(CompletionQueue&& other) noexcept
         : _raw(other._raw)
-        , _cc(other._cc)
+        , _cc(std::move(other._cc))
     {
         other._raw = nullptr;
-        other._cc = nullptr;
     }
 
     CompletionQueue& CompletionQueue::operator=(CompletionQueue&& other)
@@ -81,10 +76,14 @@ namespace mxl::lib::fabrics::rdma_core
         _raw = other._raw;
         other._raw = nullptr;
 
-        _cc = other._cc;
-        other._cc = nullptr;
+        _cc = std::move(other._cc);
 
         return *this;
+    }
+
+    ::ibv_cq* CompletionQueue::raw() noexcept
+    {
+        return _raw;
     }
 
     std::optional<Completion> CompletionQueue::read()
@@ -106,21 +105,12 @@ namespace mxl::lib::fabrics::rdma_core
 
     std::optional<Completion> CompletionQueue::readBlocking()
     {
-        if (auto completion = read(); completion)
+        if (auto event = _cc.get(_raw); event)
         {
-            return completion;
+            return read();
         }
 
-        // TODO: wrap cq events to its own class
-        void* ctx = nullptr;
-        rdmaCall(ibv_get_cq_event, "Failed to get cq event", _cc, &_raw, &ctx);
-
-        ibv_req_notify_cq(_raw, 0);
-        auto completion = read();
-
-        ibv_ack_cq_events(_raw, 1);
-
-        return completion;
+        return std::nullopt;
     }
 
     void CompletionQueue::close()
@@ -129,11 +119,6 @@ namespace mxl::lib::fabrics::rdma_core
         {
             rdmaCall(ibv_destroy_cq, "Failed to destroy completion queue", _raw);
             _raw = nullptr;
-        }
-
-        if (_cc)
-        {
-            rdmaCall(ibv_destroy_comp_channel, "Failed to destroy completion channel", _cc);
         }
     }
 }

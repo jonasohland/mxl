@@ -34,6 +34,7 @@ namespace mxl::lib::fabrics::rdma_core
         void accept();
 
         ProtectionDomain& pd();
+        CompletionQueue& cq();
 
         // Client Connection ops
         void resolveAddr(Address& dstAddr, std::chrono::milliseconds timeout);

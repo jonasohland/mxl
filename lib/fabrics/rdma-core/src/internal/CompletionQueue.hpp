@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <infiniband/verbs.h>
+#include "CompletionChannel.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
 {
@@ -52,6 +53,8 @@ namespace mxl::lib::fabrics::rdma_core
         std::optional<Completion> read();
         std::optional<Completion> readBlocking();
 
+        ::ibv_cq* raw() noexcept;
+
     private:
         void close();
 
@@ -61,6 +64,7 @@ namespace mxl::lib::fabrics::rdma_core
     private:
         CompletionQueue(ConnectionManagement& cm);
         ::ibv_cq* _raw;
-        ::ibv_comp_channel* _cc;
+
+        CompletionChannel _cc;
     };
 }

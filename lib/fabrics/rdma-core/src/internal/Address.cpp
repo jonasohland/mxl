@@ -1,8 +1,8 @@
 #include "Address.hpp"
 #include <cstring>
-#include <stdexcept>
 #include <fmt/format.h>
 #include <rdma/rdma_cma.h>
+#include "Exception.hpp"
 
 namespace mxl::lib::fabrics::rdma_core
 {
@@ -56,11 +56,7 @@ namespace mxl::lib::fabrics::rdma_core
         hints.ai_flags = RAI_PASSIVE;
         hints.ai_port_space = RDMA_PS_TCP;
 
-        int ret = rdma_getaddrinfo(_node.c_str(), _service.c_str(), &hints, &ai);
-        if (ret != 0)
-        {
-            throw std::runtime_error(fmt::format("failed to get addrinfo for {}:{} reason: {}", _node, _service, strerror(errno)));
-        }
+        rdmaCall(rdma_getaddrinfo, "Failed to get addrinfo", _node.c_str(), _service.c_str(), &hints, &ai);
 
         return {ai};
     }
@@ -74,7 +70,7 @@ namespace mxl::lib::fabrics::rdma_core
         int ret = rdma_getaddrinfo(_node.c_str(), _service.c_str(), &hints, &ai);
         if (ret != 0)
         {
-            throw std::runtime_error(fmt::format("failed to get addrinfo for {}:{} reason: {}", _node, _service, strerror(errno)));
+            throw Exception::internal("failed to get addrinfo for {}:{} reason: {}", _node, _service, strerror(errno));
         }
 
         return {ai};
@@ -90,8 +86,8 @@ namespace mxl::lib::fabrics::rdma_core
         auto pos = s.find(":");
         if (pos > s.size())
         {
-            throw std::runtime_error(
-                fmt::format("Failed to convert string \"{}\" into Address, no ':' found. Expecting a string of format <node>:<service> ", s));
+            throw Exception::internal("Failed to convert string \"{}\" into Address, no ':' found. Expecting a string of format <node>:<service> ",
+                s);
         }
 
         auto node = s.substr(0, pos);

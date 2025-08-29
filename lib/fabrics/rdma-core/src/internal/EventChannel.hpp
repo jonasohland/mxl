@@ -57,6 +57,7 @@ namespace mxl::lib::fabrics::rdma_core
 
         void close();
 
+    private:
         ::rdma_event_channel* _raw;
     };
 }

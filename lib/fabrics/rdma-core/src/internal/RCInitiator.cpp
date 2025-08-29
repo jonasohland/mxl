@@ -1,6 +1,5 @@
 #include "RCInitiator.hpp"
 #include <chrono>
-#include <stdexcept>
 #include <variant>
 #include <infiniband/verbs.h>
 #include "internal/Logging.hpp"
@@ -51,7 +50,7 @@ namespace mxl::lib::fabrics::rdma_core
         _state = std::visit(
             overloaded{
                 [](Uninitialized) -> State
-                { throw std::runtime_error("Initiator needs to be initialized by calling the setup function before trying to add targets."); },
+                { throw Exception::internal("Initiator needs to be initialized by calling the setup function before trying to add targets."); },
                 [&](Idle state) -> State
                 {
                     auto dstAddr = targetInfo.addr;
@@ -89,7 +88,7 @@ namespace mxl::lib::fabrics::rdma_core
         }
         else
         {
-            throw std::runtime_error("A target needs to be added before you attempt to transfer a grain.");
+            throw Exception::internal("A target needs to be added before you attempt to transfer a grain.");
         }
     }
 
