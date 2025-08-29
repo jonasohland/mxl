@@ -27,6 +27,8 @@ namespace mxl::lib::fabrics::rdma_core
         // Move-assigning an endpoint to another releases all resources from the moved-into endpoint and
         ConnectionManagement& operator=(ConnectionManagement&&);
 
+        ConnectionManagement(ConnectionManagement&&, ::rdma_cm_id*);
+
         // Server ops
         void bind(Address& srcAddr);
         void listen();

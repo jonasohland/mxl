@@ -69,6 +69,16 @@ namespace mxl::lib::fabrics::rdma_core
         rdmaCall(rdma_listen, "Failed to listen", _raw, 8);
     }
 
+    ConnectionManagement::ConnectionManagement(ConnectionManagement&& other, ::rdma_cm_id* clientId)
+        : _raw(clientId)
+        , _ec(std::move(other._ec))
+        , _pd(std::move(other._pd))
+        , _cq(std::move(other._cq))
+        , _hasQp(other._hasQp)
+    {
+        other._raw = nullptr;
+    }
+
     ConnectionManagement ConnectionManagement::waitConnectionRequest(std::chrono::steady_clock::duration timeout)
     {
         auto timeoutMs = std::chrono::duration_cast<std::chrono::milliseconds>(timeout);

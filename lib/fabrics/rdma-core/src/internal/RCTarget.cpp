@@ -45,7 +45,13 @@ namespace mxl::lib::fabrics::rdma_core
             {}
         };
 
+        cm.listen();
+
+        MXL_INFO("Listening");
+
         auto targetInfo = TargetInfo{bindAddr, remoteRegions};
+
+        MXL_INFO("Created TargetInfo");
 
         return {std::make_unique<MakeUniqueEnabler>(WaitForConnectionRequest{std::move(cm)}), std::make_unique<TargetInfo>(std::move(targetInfo))};
     }
@@ -74,18 +80,22 @@ namespace mxl::lib::fabrics::rdma_core
                 [](std::monostate) -> State { throw std::runtime_error("Target is in an invalid state and can no longer make progress"); },
                 [&](WaitForConnectionRequest state) -> State
                 {
-                    state.cm.listen();
-                    auto clientCm = state.cm.waitConnectionRequest(timeout);
-                    clientCm.createCompletionQueue();
-                    clientCm.createQueuePair(QueuePairAttr::defaults());
+                    if (auto event = readEventQueue<qrm>(state.cm, timeout);
+                        event && event.value().isSuccess() && event.value().isConnectionRequest())
+                    {
+                        auto clientCm = ConnectionManagement(std::move(state.cm), event.value().clientId());
+                        clientCm.createCompletionQueue();
+                        clientCm.createQueuePair(QueuePairAttr::defaults());
 
-                    auto immData = std::make_unique<ImmediateDataLocation>(clientCm.pd());
-                    auto immRegion = immData->toLocalRegion();
-                    clientCm.recv(immRegion);
+                        auto immData = std::make_unique<ImmediateDataLocation>(clientCm.pd());
+                        auto immRegion = immData->toLocalRegion();
+                        clientCm.recv(immRegion);
 
-                    clientCm.accept();
+                        clientCm.accept();
+                        return WaitForConnected{.cm = std::move(clientCm), .immData = std::move(immData)};
+                    }
 
-                    return WaitForConnected{.cm = std::move(clientCm), .immData = std::move(immData)};
+                    return state;
                 },
                 [&](RCTarget::WaitForConnected state) -> State
                 {

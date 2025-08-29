@@ -93,6 +93,8 @@ namespace mxl::lib::fabrics::rdma_core
     template<QueueReadMode queueReadMode>
     bool RCInitiator::makeProgressInternal(std::chrono::steady_clock::duration timeout)
     {
+        bool status = true;
+
         _state = std::visit(
             overloaded{[](std::monostate) -> State
                 { throw Exception::invalidState("Initiator is an invalid state and can no longer make progress"); },
@@ -105,7 +107,8 @@ namespace mxl::lib::fabrics::rdma_core
                         event && event.value().isSuccess() && event.value().isAddrResolved())
                     {
                         MXL_INFO("Address Resolved!");
-                        state.cm.resolveRoute(std::chrono::seconds(2));
+                        state.cm.resolveRoute(std::chrono::seconds(15));
+                        MXL_INFO("Switching to state WaitForRouteResolved");
                         return WaitForRouteResolved{.cm = std::move(state.cm), .regions = state.regions};
                     }
                     return state;
@@ -136,7 +139,7 @@ namespace mxl::lib::fabrics::rdma_core
                 },
                 [&](Connected state) -> State
                 {
-                    if (auto event = readEventQueue<queueReadMode>(state.cm, timeout); event && event.value().isSuccess())
+                    if (auto event = readEventQueue<QueueReadMode::NonBlocking>(state.cm, timeout); event && event.value().isSuccess())
                     {
                         if (event.value().isDisconnected())
                         {
@@ -156,6 +159,8 @@ namespace mxl::lib::fabrics::rdma_core
                         }
                     }
 
+                    status = _pendingTransfer > 0;
+
                     return state;
                 },
                 [](Done) -> State
@@ -164,7 +169,7 @@ namespace mxl::lib::fabrics::rdma_core
                 }},
             std::move(_state));
 
-        return _pendingTransfer > 0;
+        return status;
     }
 
     bool RCInitiator::makeProgress()
