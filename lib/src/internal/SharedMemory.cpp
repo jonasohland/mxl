@@ -5,7 +5,6 @@
 #include <cerrno>
 #include <cstring>
 #include <array>
-#include <stdexcept>
 #include <fcntl.h>
 #include <unistd.h>
 #include <utime.h>
@@ -38,7 +37,7 @@ namespace mxl::lib
         }
         else
         {
-            if ((_fd = ::open(path, (mode == AccessMode::READ_ONLY) ? OMODE_RW : OMODE_RW)) == -1)
+            if ((_fd = ::open(path, (mode == AccessMode::READ_ONLY) ? OMODE_RO : OMODE_RW)) == -1)
             {
                 throw std::system_error(errno, std::generic_category(), "Could not open shared memory segment.");
             }
@@ -62,12 +61,8 @@ namespace mxl::lib
         {
             if (static_cast<std::size_t>(statBuf.st_size) >= payloadSize)
             {
-                auto const shared_data_buffer = ::mmap(nullptr,
-                    statBuf.st_size,
-                    PROT_READ | PROT_WRITE | ((mode != AccessMode::READ_ONLY) ? PROT_WRITE : 0),
-                    MAP_SHARED | MAP_LOCKED,
-                    _fd,
-                    0);
+                auto const shared_data_buffer = ::mmap(
+                    nullptr, statBuf.st_size, PROT_READ | ((mode != AccessMode::READ_ONLY) ? PROT_WRITE : 0), MAP_SHARED | MAP_LOCKED, _fd, 0);
                 if (shared_data_buffer != MAP_FAILED)
                 {
                     _data = shared_data_buffer;
