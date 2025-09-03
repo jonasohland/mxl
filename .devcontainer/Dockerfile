@@ -74,6 +74,7 @@ RUN git clone -b v2.2.0 https://github.com/ofiwg/libfabric.git \
   && cd libfabric \
   && ./autogen.sh \
   && ./configure --prefix=/usr --with-cuda=/usr/local/cuda --enable-cuda-dlopen \
+      --disable-kdreg2 --disable-memhooks-monitor --disable-uffd-monitor \
   && make install -j
   
 

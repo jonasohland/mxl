@@ -17,6 +17,10 @@ namespace mxl::lib::fabrics::ofi
     {
         MXL_FABRICS_UNUSED(_mxlInstance);
 
+        // Disable memory registration cache: Since we only perform memory registration during initialization rather than runtime, the cache provides
+        // no benefit for our use case.
+        ::setenv("FI_MR_CACHE_MONITOR", "disabled", 1);
+
         fiInitLogging();
     }
 
