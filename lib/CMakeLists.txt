@@ -69,7 +69,6 @@ set(MXL_SOURCES
             src/internal/Thread.cpp
             src/internal/Time.cpp
             src/internal/Timing.cpp
-
 )
 
 target_sources(mxl PRIVATE ${MXL_SOURCES})
