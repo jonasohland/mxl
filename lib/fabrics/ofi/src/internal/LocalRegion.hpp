@@ -36,7 +36,7 @@ namespace mxl::lib::fabrics::ofi
         std::vector<LocalRegion> const& view() const noexcept;
 
         [[nodiscard]]
-        iovec const* iovec() const noexcept;
+        ::iovec const* iovec() const noexcept;
         [[nodiscard]]
         size_t count() const noexcept;
 

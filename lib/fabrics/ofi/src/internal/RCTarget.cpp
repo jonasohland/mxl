@@ -46,7 +46,10 @@ namespace mxl::lib::fabrics::ofi
         // See fi_domain(3) and fi_fabric(3) for more complete information about these concepts.
         auto fabric = Fabric::open(*fabricInfoList.begin());
         auto domain = Domain::open(fabric);
-        domain->registerRegionGroups(*RegionGroups::fromAPI(config.regions), FI_REMOTE_WRITE);
+        if (config.regions != nullptr)
+        {
+            domain->registerRegionGroups(*RegionGroups::fromAPI(config.regions), FI_REMOTE_WRITE);
+        }
 
         // Create a passive endpoint. A passive endpoint can be viewed like a bound TCP socket listening for
         // incoming connections

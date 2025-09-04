@@ -53,6 +53,11 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         std::size_t size() const noexcept;
 
+        bool operator==(FabricAddress const& other) const noexcept
+        {
+            return _inner == other._inner;
+        }
+
     private:
         explicit FabricAddress(std::vector<uint8_t> addr);
         static FabricAddress retrieveFabricAddress(::fid_t);
