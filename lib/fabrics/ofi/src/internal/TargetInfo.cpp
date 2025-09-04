@@ -18,4 +18,9 @@ namespace mxl::lib::fabrics::ofi
         return reinterpret_cast<mxlTargetInfo>(this);
     }
 
+    bool TargetInfo::operator==(TargetInfo const& other) const noexcept
+    {
+        return fabricAddress == other.fabricAddress && remoteRegionGroups == other.remoteRegionGroups && id == other.id;
+    }
+
 }
