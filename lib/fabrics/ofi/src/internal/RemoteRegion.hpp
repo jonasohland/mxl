@@ -23,6 +23,8 @@ namespace mxl::lib::fabrics::ofi
 
         [[nodiscard]]
         ::fi_rma_iov toRmaIov() const noexcept;
+
+        bool operator==(RemoteRegion const& other) const noexcept;
     };
 
     class RemoteRegionGroup
@@ -41,6 +43,8 @@ namespace mxl::lib::fabrics::ofi
 
         [[nodiscard]]
         size_t count() const noexcept;
+
+        bool operator==(RemoteRegionGroup const& other) const noexcept;
 
     private:
         static std::vector<::fi_rma_iov> rmaIovsFromGroup(std::vector<RemoteRegion> group) noexcept;

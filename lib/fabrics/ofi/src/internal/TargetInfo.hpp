@@ -34,6 +34,8 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::mxlTargetInfo toAPI() noexcept;
 
+        bool operator==(TargetInfo const& other) const noexcept;
+
         FabricAddress fabricAddress;
         std::vector<RemoteRegionGroup> remoteRegionGroups;
         Endpoint::Id id;
