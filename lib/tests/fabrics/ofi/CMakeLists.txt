@@ -6,14 +6,16 @@ if (NOT TARGET Catch2::Catch2WithMain)
     find_package(Catch2 REQUIRED)
 endif()
 
-add_executable(mxl-fabrics-tests)
 
-target_compile_features(mxl-fabrics-tests
+project(mxl-fabrics-ofi-tests)
+
+add_executable(${PROJECT_NAME})
+target_compile_features(${PROJECT_NAME}
         PRIVATE
             cxx_std_20
     )
 
-set_target_properties(mxl-fabrics-tests
+set_target_properties(${PROJECT_NAME}
         PROPERTIES
             POSITION_INDEPENDENT_CODE    ON
             VISIBILITY_INLINES_HIDDEN    ON
@@ -23,12 +25,19 @@ set_target_properties(mxl-fabrics-tests
             CXX_EXTENSIONS               OFF
     )
 
-target_sources(mxl-fabrics-tests
+target_sources(${PROJECT_NAME}
     PRIVATE
-        test_basics.cpp
+    test_Address.cpp
+    test_Domain.cpp
+    test_Provider.cpp
+    test_Region.cpp
+    test_TargetInfo.cpp
+    test_Connection.cpp
+
+
 )
 
-target_link_libraries(mxl-fabrics-tests
+target_link_libraries(${PROJECT_NAME}
     PRIVATE
         mxl
         mxl-fabrics-static
@@ -36,22 +45,13 @@ target_link_libraries(mxl-fabrics-tests
         stduuid
 )
 
-
-if (MXL_FABRICS_OFI)
-    target_include_directories(mxl-fabrics-tests
-        PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../fabrics/ofi/src/internal"
-    )
-    target_compile_definitions(mxl-fabrics-tests
-        PRIVATE
-        -DMXL_FABRICS_OFI
-    )
-    add_subdirectory(ofi)
-endif()
-
+target_include_directories(${PROJECT_NAME}
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../../fabrics/ofi/src/internal"
+)
 
 include(CTest)
 include(Catch)
-catch_discover_tests(mxl-fabrics-tests)
+catch_discover_tests(${PROJECT_NAME})
 
 
