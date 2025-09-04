@@ -170,12 +170,19 @@ public:
 
         do
         {
-            status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 250);
-            if (status == MXL_ERR_INTERRUPTED)
+            // only non-blocking progress supported in efa
+            if (_config.provider == MXL_SHARING_PROVIDER_EFA)
             {
-                return MXL_STATUS_OK;
+                status = mxlFabricsInitiatorMakeProgressNonBlocking(_initiator);
             }
-
+            else
+            {
+                status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 250);
+                if (status == MXL_ERR_INTERRUPTED)
+                {
+                    return MXL_STATUS_OK;
+                }
+            }
             if (status != MXL_ERR_NOT_READY && status != MXL_STATUS_OK)
             {
                 return status;
@@ -243,10 +250,17 @@ public:
 
             do
             {
-                status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 10);
-                if (status == MXL_ERR_INTERRUPTED)
+                if (_config.provider == MXL_SHARING_PROVIDER_EFA)
                 {
-                    return MXL_STATUS_OK;
+                    status = mxlFabricsInitiatorMakeProgressNonBlocking(_initiator);
+                }
+                else
+                {
+                    status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 10);
+                    if (status == MXL_ERR_INTERRUPTED)
+                    {
+                        return MXL_STATUS_OK;
+                    }
                 }
 
                 if (status != MXL_ERR_NOT_READY && status != MXL_STATUS_OK)
@@ -274,10 +288,17 @@ public:
 
         do
         {
-            status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 250);
-            if (status == MXL_ERR_INTERRUPTED)
+            if (_config.provider == MXL_SHARING_PROVIDER_EFA)
             {
-                return MXL_STATUS_OK;
+                status = mxlFabricsInitiatorMakeProgressNonBlocking(_initiator);
+            }
+            else
+            {
+                status = mxlFabricsInitiatorMakeProgressBlocking(_initiator, 250);
+                if (status == MXL_ERR_INTERRUPTED)
+                {
+                    return MXL_STATUS_OK;
+                }
             }
             if (status != MXL_ERR_NOT_READY && status != MXL_STATUS_OK)
             {
@@ -342,7 +363,7 @@ public:
             }
         }
 
-        if (_flowExits)
+        if (_flowExists)
         {
             if (status = mxlDestroyFlow(_instance, _config.flowID.c_str()); status != MXL_STATUS_OK)
             {
@@ -382,7 +403,8 @@ public:
             MXL_ERROR("Failed to create flow with status '{}'", static_cast<int>(status));
             return status;
         }
-        _flowExits = true;
+
+        _flowExists = true;
 
         // Create a flow writer for the given flow id.
         status = mxlCreateFlowWriter(_instance, _config.flowID.c_str(), "", &_writer);
@@ -465,23 +487,39 @@ public:
 
         while (!g_exit_requested)
         {
-            status = mxlFabricsTargetWaitForNewGrain(_target, &grainIndex, 200);
-            if (status == MXL_ERR_TIMEOUT)
+            if (_config.provider == MXL_SHARING_PROVIDER_EFA)
             {
-                // No completion before a timeout was triggered, most likely a problem upstream.
-                // MXL_WARN("wait for new grain timeout, most likely there is a problem upstream.");
-                continue;
-            }
+                status = mxlFabricsTargetTryNewGrain(_target, &grainIndex);
+                if (status == MXL_ERR_NOT_READY)
+                {
+                    continue;
+                }
 
-            if (status == MXL_ERR_INTERRUPTED)
-            {
-                return MXL_STATUS_OK;
+                if (status != MXL_STATUS_OK)
+                {
+                    return status;
+                }
             }
-
-            if (status != MXL_STATUS_OK)
+            else
             {
-                MXL_ERROR("Failed to wait for grain with status '{}'", static_cast<int>(status));
-                return status;
+                status = mxlFabricsTargetWaitForNewGrain(_target, &grainIndex, 200);
+                if (status == MXL_ERR_TIMEOUT)
+                {
+                    // No completion before a timeout was triggered, most likely a problem upstream.
+                    // MXL_WARN("wait for new grain timeout, most likely there is a problem upstream.");
+                    continue;
+                }
+
+                if (status == MXL_ERR_INTERRUPTED)
+                {
+                    return MXL_STATUS_OK;
+                }
+
+                if (status != MXL_STATUS_OK)
+                {
+                    MXL_ERROR("Failed to wait for grain with status '{}'", static_cast<int>(status));
+                    return status;
+                }
             }
 
             // Here we open so that we can commit, we are not going to modify the grain as it was already modified by the initiator.
@@ -515,7 +553,7 @@ private:
     mxlFabricsTarget _target;
     mxlTargetInfo _targetInfo;
 
-    bool _flowExits{false};
+    bool _flowExists{false};
 };
 
 int main(int argc, char** argv)
