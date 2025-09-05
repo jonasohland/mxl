@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Contributors to the Media eXchange Layer project.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 #include <catch2/catch_test_macros.hpp>
 #include <rdma/fabric.h>
 #include "Util.hpp"
