@@ -115,7 +115,14 @@ namespace mxl::lib::fabrics::ofi
 
         auto endpoint = std::make_shared<Endpoint>(Endpoint::create(std::move(domain)));
 
-        auto cq = CompletionQueue::open(endpoint->domain());
+        // For EFA, only NONE wait object is supported
+        auto cqAttr = CompletionQueueAttr::defaults();
+        if (provider == Provider::EFA)
+        {
+            cqAttr.waitObject = FI_WAIT_NONE;
+        }
+
+        auto cq = CompletionQueue::open(endpoint->domain(), cqAttr);
         endpoint->bind(cq, FI_TRANSMIT | FI_RECV);
 
         auto av = AddressVector::open(endpoint->domain());
