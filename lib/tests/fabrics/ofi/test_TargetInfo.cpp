@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2025 Contributors to the Media eXchange Layer project.
+//
+// SPDX-License-Identifier: Apache-2.0
+
 #include <catch2/catch_test_macros.hpp>
 #include <rfl/json/read.hpp>
 #include <rfl/json/write.hpp>
@@ -39,4 +43,3 @@ TEST_CASE("TargetInfo deserialize/serialize", "[ofi::TargetInfo]")
     auto output = rfl::json::write(info);
     REQUIRE(output == input);
 }
-
