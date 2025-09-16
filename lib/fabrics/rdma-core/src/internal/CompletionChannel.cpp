@@ -23,8 +23,8 @@ namespace mxl::lib::fabrics::rdma_core
         auto raw = ibv_create_comp_channel(cm.raw()->verbs);
 
         // By default events are blocking, let's change that to non-blocking
-        int flags = fcntl(raw->fd, F_GETFL);
-        rdmaCall(fcntl, "Failed to set completion channel as non-blocking", raw->fd, F_SETFL, flags | O_NONBLOCK);
+        int flags = ::fcntl(raw->fd, F_GETFL);
+        rdmaCall(::fcntl, "Failed to set completion channel as non-blocking", raw->fd, F_SETFL, flags | O_NONBLOCK);
 
         auto epollFd = epoll_create(1);
         if (epollFd == -1)

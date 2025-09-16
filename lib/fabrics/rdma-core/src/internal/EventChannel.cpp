@@ -2,6 +2,7 @@
 #include <chrono>
 #include <memory>
 #include <optional>
+#include <fcntl.h>
 #include <rdma/rdma_cma.h>
 #include <sys/epoll.h>
 #include "Exception.hpp"
@@ -98,6 +99,10 @@ namespace mxl::lib::fabrics::rdma_core
         {
             throw Exception::internal("Failed to create event channel");
         }
+
+        // By default events are blocking, let's change that to non-blocking
+        int flags = ::fcntl(raw->fd, F_GETFL);
+        rdmaCall(::fcntl, "Failed to set completion channel as non-blocking", raw->fd, F_SETFL, flags | O_NONBLOCK);
 
         auto epollFd = epoll_create(1);
         if (epollFd == -1)
