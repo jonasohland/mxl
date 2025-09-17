@@ -5,6 +5,7 @@
 find_package(CLI11 CONFIG REQUIRED)
 find_package(stduuid CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
+find_package(CUDAToolkit REQUIRED)
 
 # Add the test executable
 add_executable(mxl-fabrics-demo
@@ -17,6 +18,7 @@ target_link_libraries(mxl-fabrics-demo PRIVATE
     stduuid
     CLI11::CLI11
     spdlog::spdlog
+    CUDA::cudart
 )
 
 set_target_properties(mxl-fabrics-demo PROPERTIES

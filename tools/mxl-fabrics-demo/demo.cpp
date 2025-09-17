@@ -9,6 +9,7 @@
 #include <string>
 #include <uuid.h>
 #include <CLI/CLI.hpp>
+#include <cuda_runtime_api.h>
 #include <mxl/fabrics.h>
 #include <mxl/flow.h>
 #include <mxl/mxl.h>
@@ -36,6 +37,7 @@ struct Config
 
     // flow configuration
     std::string flowID;
+    bool useCuda;
 
     // endpoint configuration
     std::optional<std::string> node;
@@ -102,6 +104,17 @@ public:
 
     mxlStatus setup(std::string targetInfoStr)
     {
+        std::ifstream file(_config.flowID, std::ios::in | std::ios::binary);
+        if (!file)
+        {
+            MXL_ERROR("Failed to open file: '{}'", _config.flowID);
+            return MXL_ERR_INVALID_ARG;
+        }
+        std::string flowDescriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+        mxl::lib::FlowParser descriptorParser{flowDescriptor};
+
+        _flowID = uuids::to_string(descriptorParser.getId());
+
         _instance = mxlCreateInstance(_config.domain.c_str(), "");
         if (_instance == nullptr)
         {
@@ -117,7 +130,7 @@ public:
         }
 
         // Create a flow reader for the given flow id.
-        status = mxlCreateFlowReader(_instance, _config.flowID.c_str(), "", &_reader);
+        status = mxlCreateFlowReader(_instance, _flowID.c_str(), "", &_reader);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to create flow reader with status '{}'", static_cast<int>(status));
@@ -132,11 +145,34 @@ public:
         }
 
         mxlRegions regions;
-        status = mxlFabricsRegionsForFlowReader(_reader, &regions);
-        if (status != MXL_STATUS_OK)
+        if (_config.useCuda)
         {
-            MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
-            return status;
+            size_t cudaSize = descriptorParser.getPayloadSize() + 8192; // 8192 is the header size.
+            void* cudaPtr;
+            if (cudaMalloc(&cudaPtr, cudaSize) != cudaSuccess)
+            {
+                MXL_ERROR("Failed to allocate cuda memory");
+                return MXL_ERR_UNKNOWN;
+            }
+
+            mxlFabricsMemoryRegion region{
+                reinterpret_cast<std::uintptr_t>(cudaPtr), cudaSize, {MXL_MEMORY_REGION_TYPE_CUDA, 0}
+            };
+
+            mxlFabricsMemoryRegionGroup group{&region, 1};
+            if (mxlFabricsRegionsFromBufferGroups(&group, 1, &regions))
+            {
+                throw std::runtime_error("failed to create mxl regions from cuda region groups");
+            }
+        }
+        else
+        {
+            status = mxlFabricsRegionsForFlowReader(_reader, &regions);
+            if (status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
+                return status;
+            }
         }
 
         mxlInitiatorConfig initiatorConfig = {
@@ -144,7 +180,7 @@ public:
                                 .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
             .regions = regions,
-            .deviceSupport = false,
+            .deviceSupport = true,
         };
 
         status = mxlFabricsInitiatorSetup(_initiator, &initiatorConfig);
@@ -297,6 +333,8 @@ private:
     mxlFlowReader _reader;
     mxlFabricsInitiator _initiator;
     mxlTargetInfo _targetInfo;
+
+    std::string _flowID;
 };
 
 class AppTarget
@@ -344,7 +382,7 @@ public:
 
         if (_flowExits)
         {
-            if (status = mxlDestroyFlow(_instance, _config.flowID.c_str()); status != MXL_STATUS_OK)
+            if (status = mxlDestroyFlow(_instance, _flowID.c_str()); status != MXL_STATUS_OK)
             {
                 MXL_ERROR("Failed to destroy flow with status '{}'", static_cast<int>(status));
             }
@@ -359,8 +397,19 @@ public:
         }
     }
 
-    mxlStatus setup(std::string const& flowDescriptor)
+    mxlStatus setup()
     {
+        std::ifstream file(_config.flowID, std::ios::in | std::ios::binary);
+        if (!file)
+        {
+            MXL_ERROR("Failed to open file: '{}'", _config.flowID);
+            return MXL_ERR_INVALID_ARG;
+        }
+        std::string flowDescriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+        mxl::lib::FlowParser descriptorParser{flowDescriptor};
+
+        _flowID = uuids::to_string(descriptorParser.getId());
+
         _instance = mxlCreateInstance(_config.domain.c_str(), "");
         if (_instance == nullptr)
         {
@@ -385,19 +434,43 @@ public:
         _flowExits = true;
 
         // Create a flow writer for the given flow id.
-        status = mxlCreateFlowWriter(_instance, _config.flowID.c_str(), "", &_writer);
+        status = mxlCreateFlowWriter(_instance, _flowID.c_str(), "", &_writer);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to create flow writer with status '{}'", static_cast<int>(status));
             return status;
         }
 
-        mxlRegions memoryRegions;
-        status = mxlFabricsRegionsForFlowWriter(_writer, &memoryRegions);
-        if (status != MXL_STATUS_OK)
+        mxlRegions regions;
+        if (_config.useCuda)
         {
-            MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
-            return status;
+            size_t cudaSize = descriptorParser.getPayloadSize() + 8192; // 8192 is the header size.
+            void* cudaPtr;
+            if (cudaMalloc(&cudaPtr, cudaSize) != cudaSuccess)
+            {
+                MXL_ERROR("Failed to allocate cuda memory");
+                return MXL_ERR_UNKNOWN;
+            }
+            MXL_INFO("Allocated cuda!");
+
+            mxlFabricsMemoryRegion region{
+                reinterpret_cast<std::uintptr_t>(cudaPtr), cudaSize, {MXL_MEMORY_REGION_TYPE_CUDA, 0}
+            };
+
+            mxlFabricsMemoryRegionGroup group{&region, 1};
+            if (mxlFabricsRegionsFromBufferGroups(&group, 1, &regions))
+            {
+                throw std::runtime_error("failed to create mxl regions from cuda region groups");
+            }
+        }
+        else
+        {
+            status = mxlFabricsRegionsForFlowWriter(_writer, &regions);
+            if (status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to get flow memory region with status '{}'", static_cast<int>(status));
+                return status;
+            }
         }
 
         status = mxlFabricsCreateTarget(_fabricsInstance, &_target);
@@ -411,8 +484,8 @@ public:
             .endpointAddress = {.node = _config.node ? _config.node.value().c_str() : nullptr,
                                 .service = _config.service ? _config.service.value().c_str() : nullptr},
             .provider = _config.provider,
-            .regions = memoryRegions,
-            .deviceSupport = false,
+            .regions = regions,
+            .deviceSupport = true,
         };
         status = mxlFabricsTargetSetup(_target, &targetConfig, &_targetInfo);
         if (status != MXL_STATUS_OK)
@@ -421,7 +494,7 @@ public:
             return status;
         }
 
-        status = mxlFabricsRegionsFree(memoryRegions);
+        status = mxlFabricsRegionsFree(regions);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to free memory regions with status '{}'", static_cast<int>(status));
@@ -516,6 +589,7 @@ private:
     mxlTargetInfo _targetInfo;
 
     bool _flowExits{false};
+    std::string _flowID;
 };
 
 int main(int argc, char** argv)
@@ -564,6 +638,10 @@ int main(int argc, char** argv)
         "The target information. This is used when configured as an initiator . This is the target information to send to."
         "You first start the target and it will print the targetInfo that you paste to this argument");
 
+    bool useCuda;
+    auto useCudaOpt = app.add_option("--use-cuda", useCuda, "Use cuda memory for transfers instead of host.");
+    useCudaOpt->default_val(false);
+
     CLI11_PARSE(app, argc, argv);
 
     mxlFabricsProvider mxlProvider;
@@ -582,6 +660,7 @@ int main(int argc, char** argv)
             Config{
                    .domain = domain,
                    .flowID = flowConf,
+                   .useCuda = useCuda,
                    .node = node,
                    .service = service,
                    .provider = mxlProvider,
@@ -618,14 +697,15 @@ int main(int argc, char** argv)
         auto app = AppTarget{
             Config{
                    .domain = domain,
-                   .flowID = flowId,
+                   .flowID = flowConf,
+                   .useCuda = useCuda,
                    .node = node,
                    .service = service,
                    .provider = mxlProvider,
                    },
         };
 
-        if (status = app.setup(flowDescriptor); status != MXL_STATUS_OK)
+        if (status = app.setup(); status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to setup target with status '{}'", static_cast<int>(status));
             return status;
