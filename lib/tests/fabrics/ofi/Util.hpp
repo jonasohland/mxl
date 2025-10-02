@@ -125,6 +125,6 @@ namespace mxl::lib::fabrics::ofi
         };
         // clang-format on
 
-        return {RegionGroups::fromGroups(inputGroups.data(), inputGroups.size()), innerRegions};
+        return {regionGroupsfromGroups(inputGroups.data(), inputGroups.size()), innerRegions};
     }
 }

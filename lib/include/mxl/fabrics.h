@@ -48,6 +48,8 @@ extern "C"
     /// Address of a logical network endpoint. This is analogous to a hostname and port number in classic ipv4 networking.
     /// The actual values for node and service vary between providers, but often an ip address as the node value and a port number as the service
     /// value are sufficient.
+    /// `node` and `service` pointers are expected to live at least until the target or initiator `setup` function is executed.
+    /// internally be cloned.
     typedef struct mxlEndpointAddress_t
     {
         char const* node;

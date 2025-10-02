@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <variant>
 #include <vector>
@@ -65,7 +66,7 @@ namespace mxl::lib::fabrics::ofi
             Inner _inner;
         };
 
-        explicit Region(std::uintptr_t base, std::size_t size, Location loc = Location::host())
+        explicit Region(std::uintptr_t base, std::size_t size, Location loc = Location::host()) noexcept
             : base(base)
             , size(size)
             , loc(loc)
@@ -73,13 +74,11 @@ namespace mxl::lib::fabrics::ofi
         {}
 
     public:
-        virtual ~Region() = default;
+        [[nodiscard]]
+        ::iovec const* asIovec() const noexcept;
 
         [[nodiscard]]
-        ::iovec const* as_iovec() const noexcept;
-
-        [[nodiscard]]
-        ::iovec to_iovec() const noexcept;
+        ::iovec toIovec() const noexcept;
 
     public:
         std::uintptr_t base;
@@ -96,6 +95,10 @@ namespace mxl::lib::fabrics::ofi
     class RegionGroup
     {
     public:
+        using iterator = std::vector<Region>::iterator;
+        using const_iterator = std::vector<Region>::const_iterator;
+
+    public:
         explicit RegionGroup() = default;
 
         explicit RegionGroup(std::vector<Region> inner)
@@ -103,11 +106,46 @@ namespace mxl::lib::fabrics::ofi
             , _iovecs(iovecsFromGroup(_inner))
         {}
 
-        [[nodiscard]]
-        std::vector<Region> const& view() const noexcept;
+        iterator begin()
+        {
+            return _inner.begin();
+        }
+
+        iterator end()
+        {
+            return _inner.end();
+        }
 
         [[nodiscard]]
-        ::iovec const* as_iovec() const noexcept;
+        const_iterator begin() const
+        {
+            return _inner.cbegin();
+        }
+
+        [[nodiscard]]
+        const_iterator end() const
+        {
+            return _inner.cend();
+        }
+
+        Region& operator[](std::size_t index)
+        {
+            return _inner[index];
+        }
+
+        Region const& operator[](std::size_t index) const
+        {
+            return _inner[index];
+        }
+
+        [[nodiscard]]
+        size_t size() const noexcept
+        {
+            return _inner.size();
+        }
+
+        [[nodiscard]]
+        ::iovec const* asIovec() const noexcept;
 
     private:
         static std::vector<::iovec> iovecsFromGroup(std::vector<Region> const& group) noexcept;
@@ -120,23 +158,61 @@ namespace mxl::lib::fabrics::ofi
     class RegionGroups
     {
     public:
-        static RegionGroups fromFlow(FlowData& flow);
-        static RegionGroups fromGroups(mxlFabricsMemoryRegionGroup const* groups, size_t count);
+        using iterator = std::vector<RegionGroup>::iterator;
+        using const_iterator = std::vector<RegionGroup>::const_iterator;
+
+    public:
+        explicit RegionGroups(std::vector<RegionGroup> inner)
+            : _inner(std::move(inner))
+        {}
 
         static RegionGroups* fromAPI(mxlRegions) noexcept;
         [[nodiscard]]
         mxlRegions toAPI() noexcept;
 
-        [[nodiscard]]
-        std::vector<RegionGroup> const& view() const noexcept;
+        iterator begin()
+        {
+            return _inner.begin();
+        }
 
-    private:
-        explicit RegionGroups(std::vector<RegionGroup> inner)
-            : _inner(std::move(inner))
-        {}
+        iterator end()
+        {
+            return _inner.end();
+        }
+
+        [[nodiscard]]
+        const_iterator begin() const
+        {
+            return _inner.cbegin();
+        }
+
+        [[nodiscard]]
+        const_iterator end() const
+        {
+            return _inner.cend();
+        }
+
+        RegionGroup& operator[](std::size_t index)
+        {
+            return _inner[index];
+        }
+
+        RegionGroup const& operator[](std::size_t index) const
+        {
+            return _inner[index];
+        }
+
+        [[nodiscard]]
+        size_t size() const noexcept
+        {
+            return _inner.size();
+        }
 
     private:
         std::vector<RegionGroup> _inner;
     };
+
+    RegionGroups regionGroupsfromFlow(FlowData& flow);
+    RegionGroups regionGroupsfromGroups(mxlFabricsMemoryRegionGroup const* groups, size_t count);
 
 }

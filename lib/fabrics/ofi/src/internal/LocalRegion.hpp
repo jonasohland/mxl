@@ -17,7 +17,7 @@ namespace mxl::lib::fabrics::ofi
     {
     public:
         [[nodiscard]]
-        ::iovec toIov() const noexcept;
+        ::iovec toIovec() const noexcept;
 
     public:
         std::uint64_t addr;
@@ -28,6 +28,10 @@ namespace mxl::lib::fabrics::ofi
     class LocalRegionGroup
     {
     public:
+        using iterator = std::vector<LocalRegion>::iterator;
+        using const_iterator = std::vector<LocalRegion>::const_iterator;
+
+    public:
         LocalRegionGroup(std::vector<LocalRegion> inner)
             : _inner(std::move(inner))
             , _iovs(iovFromGroup(_inner))
@@ -35,15 +39,47 @@ namespace mxl::lib::fabrics::ofi
         {}
 
         [[nodiscard]]
-        std::vector<LocalRegion> const& view() const noexcept;
-
-        [[nodiscard]]
-        ::iovec const* iovec() const noexcept;
-        [[nodiscard]]
-        std::size_t count() const noexcept;
-
+        ::iovec const* asIovec() const noexcept;
         [[nodiscard]]
         void* const* desc() const noexcept;
+
+        iterator begin()
+        {
+            return _inner.begin();
+        }
+
+        iterator end()
+        {
+            return _inner.end();
+        }
+
+        [[nodiscard]]
+        const_iterator begin() const
+        {
+            return _inner.cbegin();
+        }
+
+        [[nodiscard]]
+        const_iterator end() const
+        {
+            return _inner.cend();
+        }
+
+        LocalRegion& operator[](std::size_t index)
+        {
+            return _inner[index];
+        }
+
+        LocalRegion const& operator[](std::size_t index) const
+        {
+            return _inner[index];
+        }
+
+        [[nodiscard]]
+        size_t size() const noexcept
+        {
+            return _inner.size();
+        }
 
     private:
         static std::vector<::iovec> iovFromGroup(std::vector<LocalRegion> group) noexcept;

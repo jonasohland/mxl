@@ -46,7 +46,7 @@ namespace mxl::lib::fabrics::ofi
     void Domain::registerRegionGroups(RegionGroups const& regionGroups, std::uint64_t access)
     {
         std::ranges::transform(
-            regionGroups.view(), std::back_inserter(_registeredRegionGroups), [&](auto const& group) { return registerRegionGroup(group, access); });
+            regionGroups, std::back_inserter(_registeredRegionGroups), [&](auto const& group) { return registerRegionGroup(group, access); });
     }
 
     std::vector<LocalRegionGroup> Domain::localRegionGroups() const noexcept
@@ -77,7 +77,7 @@ namespace mxl::lib::fabrics::ofi
     RegisteredRegionGroup Domain::registerRegionGroup(RegionGroup const& regionGroup, std::uint64_t access)
     {
         std::vector<RegisteredRegion> out;
-        std::ranges::transform(regionGroup.view(), std::back_inserter(out), [&](auto const& region) { return registerRegion(region, access); });
+        std::ranges::transform(regionGroup, std::back_inserter(out), [&](auto const& region) { return registerRegion(region, access); });
         return RegisteredRegionGroup{std::move(out)};
     }
 

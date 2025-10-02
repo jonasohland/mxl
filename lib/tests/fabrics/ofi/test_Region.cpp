@@ -28,9 +28,9 @@ TEST_CASE("ofi: RegionGroup view and iovec conversion", "[ofi][RegionGroup]")
     auto r1 = Region{0x1000, 64, Region::Location::host()};
     auto r2 = Region{0x2000, 128, Region::Location::host()};
     auto group = RegionGroup({r1, r2});
-    REQUIRE(group.view().size() == 2);
+    REQUIRE(group.size() == 2);
 
-    auto const* iovecs = group.as_iovec();
+    auto const* iovecs = group.asIovec();
     REQUIRE(iovecs[0].iov_base == reinterpret_cast<void*>(0x1000));
     REQUIRE(iovecs[0].iov_len == 64);
 
@@ -56,14 +56,14 @@ TEST_CASE("ofi: RegionGroups fromGroups and view", "[ofi][RegionGroups]")
     };
     // clang-format on
 
-    auto groups = RegionGroups::fromGroups(inputGroups.data(), 1);
+    auto groups = regionGroupsfromGroups(inputGroups.data(), 1);
 
-    REQUIRE(groups.view().size() == 1);
+    REQUIRE(groups.size() == 1);
 
-    auto const& group = groups.view().front();
-    REQUIRE(group.view().size() == 1);
+    auto const& group = groups[0];
+    REQUIRE(group.size() == 1);
 
-    auto const& region = group.view().front();
+    auto const& region = group[0];
     REQUIRE(region.base == 0x3000);
     REQUIRE(region.size == 256);
     REQUIRE(region.loc.isHost());
