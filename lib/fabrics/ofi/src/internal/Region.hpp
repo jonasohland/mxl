@@ -27,7 +27,7 @@ namespace mxl::lib::fabrics::ofi
 
             /// Return the device id. For host location 0 is returned.
             [[nodiscard]]
-            uint64_t id() const noexcept;
+            std::uint64_t id() const noexcept;
 
             /// Convert the current location to libfabric "iface" representation
             [[nodiscard]]
@@ -56,25 +56,24 @@ namespace mxl::lib::fabrics::ofi
 
             using Inner = std::variant<Host, Cuda>;
 
+        private:
             Location(Inner inner)
                 : _inner(inner)
             {}
 
+        private:
             Inner _inner;
         };
 
-        explicit Region(std::uintptr_t base, size_t size, Location loc = Location::host())
+        explicit Region(std::uintptr_t base, std::size_t size, Location loc = Location::host())
             : base(base)
             , size(size)
             , loc(loc)
             , _iovec(iovecFromRegion(base, size))
         {}
 
+    public:
         virtual ~Region() = default;
-
-        std::uintptr_t base;
-        size_t size;
-        Location loc;
 
         [[nodiscard]]
         ::iovec const* as_iovec() const noexcept;
@@ -82,14 +81,19 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::iovec to_iovec() const noexcept;
 
-    private:
-        static ::iovec iovecFromRegion(std::uintptr_t, size_t) noexcept;
+    public:
+        std::uintptr_t base;
+        std::size_t size;
+        Location loc;
 
+    private:
+        static ::iovec iovecFromRegion(std::uintptr_t, std::size_t) noexcept;
+
+    private:
         ::iovec _iovec;
     };
 
     class RegionGroup
-
     {
     public:
         explicit RegionGroup() = default;
@@ -108,8 +112,8 @@ namespace mxl::lib::fabrics::ofi
     private:
         static std::vector<::iovec> iovecsFromGroup(std::vector<Region> const& group) noexcept;
 
+    private:
         std::vector<Region> _inner;
-
         std::vector<::iovec> _iovecs;
     };
 
@@ -131,6 +135,7 @@ namespace mxl::lib::fabrics::ofi
             : _inner(std::move(inner))
         {}
 
+    private:
         std::vector<RegionGroup> _inner;
     };
 

@@ -17,7 +17,7 @@ namespace mxl::lib::fabrics::ofi
     class MemoryRegion
     {
     public:
-        static MemoryRegion reg(Domain& domain, Region const& region, uint64_t access);
+        static MemoryRegion reg(Domain& domain, Region const& region, std::uint64_t access);
 
         ~MemoryRegion();
 
@@ -35,15 +35,17 @@ namespace mxl::lib::fabrics::ofi
         void* desc() const noexcept;
 
         [[nodiscard]]
-        uint64_t rkey() const noexcept;
+        std::uint64_t rkey() const noexcept;
 
     private:
         friend class RegisteredRegion;
 
+    private:
         void close();
 
         MemoryRegion(::fid_mr* raw);
 
+    private:
         ::fid_mr* _raw;
     };
 }

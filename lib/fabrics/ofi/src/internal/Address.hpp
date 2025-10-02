@@ -59,16 +59,16 @@ namespace mxl::lib::fabrics::ofi
         }
 
     private:
-        explicit FabricAddress(std::vector<uint8_t> addr);
+        explicit FabricAddress(std::vector<std::uint8_t> addr);
         static FabricAddress retrieveFabricAddress(::fid_t);
 
-        std::vector<uint8_t> _inner;
+    private:
+        std::vector<std::uint8_t> _inner;
     };
 
     struct FabricAddressRfl
     {
-        rfl::Field<"addr", std::string> addr;
-
+    public:
         static FabricAddressRfl from_class(FabricAddress const& fa)
         {
             return FabricAddressRfl{.addr = fa.toBase64()};
@@ -79,6 +79,9 @@ namespace mxl::lib::fabrics::ofi
         {
             return FabricAddress::fromBase64(addr.get());
         }
+
+    public:
+        rfl::Field<"addr", std::string> addr;
     };
 }
 

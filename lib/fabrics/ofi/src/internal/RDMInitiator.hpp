@@ -58,6 +58,7 @@ namespace mxl::lib::fabrics::ofi
 
         using State = std::variant<Idle, Added, Done>;
 
+    private:
         State _state;
         std::shared_ptr<Endpoint> _ep; // The endpoint used to post transfer with. There is only one endpoint shared for all targets in constrast to
                                        // the RCInitiator where each target will have their own endppint.
@@ -103,6 +104,7 @@ namespace mxl::lib::fabrics::ofi
         void handleCompletionError(Completion::Error); /// Handles a completion error event.
         void handleCompletionData(Completion::Data);   /// Handle a completion data event.
 
+    private:
         std::shared_ptr<Endpoint> _endpoint;
 
         std::vector<LocalRegionGroup> _localRegions;

@@ -43,7 +43,7 @@ namespace mxl::lib::fabrics::ofi
         return std::make_shared<MakeSharedEnabler>(domain, std::move(fabric), std::vector<RegisteredRegionGroup>{});
     }
 
-    void Domain::registerRegionGroups(RegionGroups const& regionGroups, uint64_t access)
+    void Domain::registerRegionGroups(RegionGroups const& regionGroups, std::uint64_t access)
     {
         std::ranges::transform(
             regionGroups.view(), std::back_inserter(_registeredRegionGroups), [&](auto const& group) { return registerRegionGroup(group, access); });
@@ -69,12 +69,12 @@ namespace mxl::lib::fabrics::ofi
         return (_fabric->info().raw()->rx_attr->mode & FI_RX_CQ_DATA) != 0;
     }
 
-    RegisteredRegion Domain::registerRegion(Region const& region, uint64_t access)
+    RegisteredRegion Domain::registerRegion(Region const& region, std::uint64_t access)
     {
         return RegisteredRegion{MemoryRegion::reg(*this, region, access), region};
     }
 
-    RegisteredRegionGroup Domain::registerRegionGroup(RegionGroup const& regionGroup, uint64_t access)
+    RegisteredRegionGroup Domain::registerRegionGroup(RegionGroup const& regionGroup, std::uint64_t access)
     {
         std::vector<RegisteredRegion> out;
         std::ranges::transform(regionGroup.view(), std::back_inserter(out), [&](auto const& region) { return registerRegion(region, access); });

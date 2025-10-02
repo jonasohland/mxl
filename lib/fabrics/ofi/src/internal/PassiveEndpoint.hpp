@@ -51,6 +51,7 @@ namespace mxl::lib::fabrics::ofi
 
         PassiveEndpoint(::fid_pep* raw, std::shared_ptr<Fabric> fabric, std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt);
 
+    private:
         ::fid_pep* _raw;
         std::shared_ptr<Fabric> _fabric;
 

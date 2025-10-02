@@ -52,7 +52,7 @@ namespace mxl::lib::fabrics::ofi
         void consume(Completion);
 
         /// Post a data transfer request to this endpoint.
-        void postTransfer(LocalRegionGroup const& localRegion, uint64_t index);
+        void postTransfer(LocalRegionGroup const& localRegion, std::uint64_t index);
 
     private:
         /// The idle state. In this state the endpoint waits to be activated. This will happen immediately if the
@@ -87,16 +87,18 @@ namespace mxl::lib::fabrics::ofi
         struct Done
         {};
 
+        /// The various states that the endpoint can be in are stored inside a variant that we move
+        /// from and then back into when processing events.
+        using State = std::variant<Idle, Connecting, Connected, Shutdown, Done>;
+
+    private:
         void handleCompletionError(Completion::Error); /// Handles a completion error event.
         void handleCompletionData(Completion::Data);   /// Handle a completion data event.
 
         /// Restarts the endpoint. Produces a new Idle state from any previous state.
         Idle restart(Endpoint const&);
 
-        /// The various states that the endpoint can be in are stored inside a variant that we move
-        /// from and then back into when processing events.
-        using State = std::variant<Idle, Connecting, Connected, Shutdown, Done>;
-
+    private:
         State _state;                            /// The internal state object
         FabricAddress _addr;                     /// The remote fabric address to connect to.
         std::vector<RemoteRegionGroup> _regions; /// Descriptions of the remote memory regions where we need to write our grains.
@@ -158,6 +160,7 @@ namespace mxl::lib::fabrics::ofi
         /// Evict any dead endpoints that are no longer used.
         void evictDeadEndpoints();
 
+    private:
         std::shared_ptr<Domain> _domain;
         std::shared_ptr<CompletionQueue> _cq;
         std::shared_ptr<EventQueue> _eq;

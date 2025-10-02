@@ -18,6 +18,12 @@ namespace mxl::lib::fabrics::ofi
     // Realiable+Connected Target implementation
     class RCTarget : public Target
     {
+    public:
+        static std::pair<std::unique_ptr<RCTarget>, std::unique_ptr<TargetInfo>> setup(mxlTargetConfig const&);
+
+        Target::ReadResult read() final;
+        Target::ReadResult readBlocking(std::chrono::steady_clock::duration timeout) final;
+
     private:
         struct WaitForConnectionRequest
         {
@@ -37,18 +43,13 @@ namespace mxl::lib::fabrics::ofi
 
         using State = std::variant<WaitForConnectionRequest, WaitForConnection, Connected>;
 
-    public:
-        static std::pair<std::unique_ptr<RCTarget>, std::unique_ptr<TargetInfo>> setup(mxlTargetConfig const&);
-
-        Target::ReadResult read() final;
-        Target::ReadResult readBlocking(std::chrono::steady_clock::duration timeout) final;
-
     private:
         RCTarget(std::shared_ptr<Domain> domain, PassiveEndpoint pep);
 
         template<QueueReadMode>
         Target::ReadResult makeProgress(std::chrono::steady_clock::duration timeout);
 
+    private:
         std::shared_ptr<Domain> _domain;
         std::vector<RegisteredRegionGroup> _regRegions;
 

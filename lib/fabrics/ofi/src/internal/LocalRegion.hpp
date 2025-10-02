@@ -15,12 +15,14 @@ namespace mxl::lib::fabrics::ofi
 
     struct LocalRegion
     {
-        uint64_t addr;
-        size_t len;
-        void* desc;
-
+    public:
         [[nodiscard]]
         ::iovec toIov() const noexcept;
+
+    public:
+        std::uint64_t addr;
+        std::size_t len;
+        void* desc;
     };
 
     class LocalRegionGroup
@@ -38,14 +40,16 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::iovec const* iovec() const noexcept;
         [[nodiscard]]
-        size_t count() const noexcept;
+        std::size_t count() const noexcept;
 
+        [[nodiscard]]
         void* const* desc() const noexcept;
 
     private:
         static std::vector<::iovec> iovFromGroup(std::vector<LocalRegion> group) noexcept;
         static std::vector<void*> descFromGroup(std::vector<LocalRegion> group) noexcept;
 
+    private:
         std::vector<LocalRegion> _inner;
 
         std::vector<::iovec> _iovs;
