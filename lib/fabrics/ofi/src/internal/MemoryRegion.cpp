@@ -52,7 +52,7 @@ namespace mxl::lib::fabrics::ofi
         ::fi_mr_attr attr{};
         setDeviceId(attr, region.loc);
 
-        attr.mr_iov = region.as_iovec();
+        attr.mr_iov = region.asIovec();
         attr.iov_count = 1;
         attr.access = access;
         attr.offset = 0;                // reserved to 0

@@ -332,12 +332,12 @@ namespace mxl::lib::fabrics::ofi
         flags |= immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
 
         ::fi_msg_rma msg = {
-            .msg_iov = localGroup.iovec(),
+            .msg_iov = localGroup.asIovec(),
             .desc = const_cast<void**>(localGroup.desc()),
-            .iov_count = localGroup.count(),
+            .iov_count = localGroup.size(),
             .addr = destAddr,
-            .rma_iov = remoteGroup.rmaIovs(),
-            .rma_iov_count = remoteGroup.count(),
+            .rma_iov = remoteGroup.asRmaIovs(),
+            .rma_iov_count = remoteGroup.size(),
             .context = _raw,
             .data = data,
         };
@@ -347,7 +347,7 @@ namespace mxl::lib::fabrics::ofi
 
     void Endpoint::recv(LocalRegion region)
     {
-        auto iovec = region.toIov();
+        auto iovec = region.toIovec();
         fiCall(::fi_recv, "Failed to push recv to work queue", _raw, iovec.iov_base, iovec.iov_len, nullptr, FI_ADDR_UNSPEC, nullptr);
     }
 }

@@ -7,24 +7,14 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    ::iovec LocalRegion::toIov() const noexcept
+    ::iovec LocalRegion::toIovec() const noexcept
     {
         return ::iovec{.iov_base = reinterpret_cast<void*>(addr), .iov_len = len};
     }
 
-    std::vector<LocalRegion> const& LocalRegionGroup::view() const noexcept
-    {
-        return _inner;
-    }
-
-    ::iovec const* LocalRegionGroup::iovec() const noexcept
+    ::iovec const* LocalRegionGroup::asIovec() const noexcept
     {
         return _iovs.data();
-    }
-
-    std::size_t LocalRegionGroup::count() const noexcept
-    {
-        return _inner.size();
     }
 
     void* const* LocalRegionGroup::desc() const noexcept
@@ -35,7 +25,7 @@ namespace mxl::lib::fabrics::ofi
     std::vector<::iovec> LocalRegionGroup::iovFromGroup(std::vector<LocalRegion> group) noexcept
     {
         std::vector<::iovec> iovs;
-        std::ranges::transform(group, std::back_inserter(iovs), [](LocalRegion const& reg) { return reg.toIov(); });
+        std::ranges::transform(group, std::back_inserter(iovs), [](LocalRegion const& reg) { return reg.toIovec(); });
         return iovs;
     }
 

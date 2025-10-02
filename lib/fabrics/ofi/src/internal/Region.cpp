@@ -73,19 +73,16 @@ namespace mxl::lib::fabrics::ofi
     {
         return std::visit(overloaded{[](std::monostate) -> std::string { throw Exception::invalidState("Region type is not set"); },
                               [](Location::Host const&) -> std::string { return "host"; },
-                              [&](Location::Cuda const&) -> std::string
-                              {
-                                  return fmt::format("cuda, id={}", id());
-                              }},
+                              [&](Location::Cuda const&) -> std::string { return fmt::format("cuda, id={}", id()); }},
             _inner);
     }
 
-    ::iovec const* Region::as_iovec() const noexcept
+    ::iovec const* Region::asIovec() const noexcept
     {
         return &_iovec;
     }
 
-    ::iovec Region::to_iovec() const noexcept
+    ::iovec Region::toIovec() const noexcept
     {
         return _iovec;
     }
@@ -96,12 +93,7 @@ namespace mxl::lib::fabrics::ofi
         return ::iovec{.iov_base = reinterpret_cast<void*>(base), .iov_len = size};
     }
 
-    std::vector<Region> const& RegionGroup::view() const noexcept
-    {
-        return _inner;
-    }
-
-    ::iovec const* RegionGroup::as_iovec() const noexcept
+    ::iovec const* RegionGroup::asIovec() const noexcept
     {
         return _iovecs.data();
     }
@@ -109,11 +101,21 @@ namespace mxl::lib::fabrics::ofi
     std::vector<::iovec> RegionGroup::iovecsFromGroup(std::vector<Region> const& group) noexcept
     {
         std::vector<::iovec> iovecs;
-        std::ranges::transform(group, std::back_inserter(iovecs), [](Region const& reg) { return reg.to_iovec(); });
+        std::ranges::transform(group, std::back_inserter(iovecs), [](Region const& reg) { return reg.toIovec(); });
         return iovecs;
     }
 
-    RegionGroups RegionGroups::fromFlow(FlowData& flow)
+    RegionGroups* RegionGroups::fromAPI(mxlRegions regions) noexcept
+    {
+        return reinterpret_cast<RegionGroups*>(regions);
+    }
+
+    mxlRegions RegionGroups::toAPI() noexcept
+    {
+        return reinterpret_cast<mxlRegions>(this);
+    }
+
+    RegionGroups regionGroupsfromFlow(FlowData& flow)
     {
         static_assert(sizeof(GrainHeader) == 8192,
             "GrainHeader type size changed! The Fabrics API makes assumptions on the memory layout of a flow, please review the code below if the "
@@ -152,22 +154,7 @@ namespace mxl::lib::fabrics::ofi
         return RegionGroups{std::move(regionGroups)};
     }
 
-    RegionGroups* RegionGroups::fromAPI(mxlRegions regions) noexcept
-    {
-        return reinterpret_cast<RegionGroups*>(regions);
-    }
-
-    mxlRegions RegionGroups::toAPI() noexcept
-    {
-        return reinterpret_cast<mxlRegions>(this);
-    }
-
-    std::vector<RegionGroup> const& RegionGroups::view() const noexcept
-    {
-        return _inner;
-    }
-
-    RegionGroups RegionGroups::fromGroups(mxlFabricsMemoryRegionGroup const* groups, size_t count)
+    RegionGroups regionGroupsfromGroups(mxlFabricsMemoryRegionGroup const* groups, size_t count)
     {
         std::vector<RegionGroup> outGroups;
         for (size_t i = 0; i < count; i++)

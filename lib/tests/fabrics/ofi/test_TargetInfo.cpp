@@ -27,14 +27,14 @@ TEST_CASE("TargetInfo deserialize/serialize", "[ofi::TargetInfo]")
     REQUIRE(info->id == 1995225397354848055U);
     REQUIRE(info->remoteRegionGroups.size() == 2);
 
-    REQUIRE(info->remoteRegionGroups[0].count() == 1);
-    auto region = info->remoteRegionGroups[0].view().front();
+    REQUIRE(info->remoteRegionGroups[0].size() == 1);
+    auto region = info->remoteRegionGroups[0][0];
     REQUIRE(region.addr == 0U);
     REQUIRE(region.len == 2496512U);
     REQUIRE(region.rkey == 12490884954606633550U);
 
-    REQUIRE(info->remoteRegionGroups[1].count() == 1);
-    region = info->remoteRegionGroups[1].view().front();
+    REQUIRE(info->remoteRegionGroups[1].size() == 1);
+    region = info->remoteRegionGroups[1][0];
     REQUIRE(region.addr == 0U);
     REQUIRE(region.len == 2496512U);
     REQUIRE(region.rkey == 8202674608102871622U);

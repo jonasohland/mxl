@@ -19,21 +19,21 @@ TEST_CASE("Domain - RegisteredRegion to Local Region", "[ofi][Domain][LocalRegio
     REQUIRE(localGroups.size() == 2);
 
     auto group0 = localGroups[0];
-    REQUIRE(group0.view().size() == 2);
-    auto region00 = group0.view()[0];
-    REQUIRE(region00.addr == regions.view()[0].view()[0].base);
+    REQUIRE(group0.size() == 2);
+    auto region00 = group0[0];
+    REQUIRE(region00.addr == regions[0][0].base);
     REQUIRE(region00.len == 256);
-    auto region01 = group0.view()[1];
-    REQUIRE(region01.addr == regions.view()[0].view()[1].base);
+    auto region01 = group0[1];
+    REQUIRE(region01.addr == regions[0][1].base);
     REQUIRE(region01.len == 512);
 
     auto group1 = localGroups[1];
-    REQUIRE(group1.view().size() == 2);
-    auto region10 = group1.view()[0];
-    REQUIRE(region10.addr == regions.view()[1].view()[0].base);
+    REQUIRE(group1.size() == 2);
+    auto region10 = group1[0];
+    REQUIRE(region10.addr == regions[1][0].base);
     REQUIRE(region10.len == 1024);
-    auto region11 = group1.view()[1];
-    REQUIRE(region11.addr == regions.view()[1].view()[1].base);
+    auto region11 = group1[1];
+    REQUIRE(region11.addr == regions[1][1].base);
     REQUIRE(region11.len == 2048);
 }
 
@@ -50,21 +50,21 @@ TEST_CASE("Domain - RegisteredRegion to Remote Region with Virtual Addresses", "
     REQUIRE(remoteGroups.size() == 2);
 
     auto group0 = remoteGroups[0];
-    REQUIRE(group0.view().size() == 2);
-    auto region00 = group0.view()[0];
-    REQUIRE(region00.addr == regions.view()[0].view()[0].base);
+    REQUIRE(group0.size() == 2);
+    auto region00 = group0[0];
+    REQUIRE(region00.addr == regions[0][0].base);
     REQUIRE(region00.len == 256);
-    auto region01 = group0.view()[1];
-    REQUIRE(region01.addr == regions.view()[0].view()[1].base);
+    auto region01 = group0[1];
+    REQUIRE(region01.addr == regions[0][1].base);
     REQUIRE(region01.len == 512);
 
     auto group1 = remoteGroups[1];
-    REQUIRE(group1.view().size() == 2);
-    auto region10 = group1.view()[0];
-    REQUIRE(region10.addr == regions.view()[1].view()[0].base);
+    REQUIRE(group1.size() == 2);
+    auto region10 = group1[0];
+    REQUIRE(region10.addr == regions[1][0].base);
     REQUIRE(region10.len == 1024);
-    auto region11 = group1.view()[1];
-    REQUIRE(region11.addr == regions.view()[1].view()[1].base);
+    auto region11 = group1[1];
+    REQUIRE(region11.addr == regions[1][1].base);
     REQUIRE(region11.len == 2048);
 }
 
@@ -81,20 +81,20 @@ TEST_CASE("Domain - RegisteredRegion to Remote Region with Relative Addresses", 
     REQUIRE(remoteGroups.size() == 2);
 
     auto group0 = remoteGroups[0];
-    REQUIRE(group0.view().size() == 2);
-    auto region00 = group0.view()[0];
+    REQUIRE(group0.size() == 2);
+    auto region00 = group0[0];
     REQUIRE(region00.addr == 0);
     REQUIRE(region00.len == 256);
-    auto region01 = group0.view()[1];
+    auto region01 = group0[1];
     REQUIRE(region01.addr == 0);
     REQUIRE(region01.len == 512);
 
     auto group1 = remoteGroups[1];
-    REQUIRE(group1.view().size() == 2);
-    auto region10 = group1.view()[0];
+    REQUIRE(group1.size() == 2);
+    auto region10 = group1[0];
     REQUIRE(region10.addr == 0);
     REQUIRE(region10.len == 1024);
-    auto region11 = group1.view()[1];
+    auto region11 = group1[1];
     REQUIRE(region11.addr == 0);
     REQUIRE(region11.len == 2048);
 }

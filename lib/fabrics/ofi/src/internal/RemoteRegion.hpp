@@ -13,6 +13,12 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+
+    namespace rfl_types
+    {
+        struct RemoteRegionGroupRfl;
+    }
+
     class LocalRegionGroup;
 
     struct RemoteRegion
@@ -32,25 +38,71 @@ namespace mxl::lib::fabrics::ofi
     class RemoteRegionGroup
     {
     public:
+        using iterator = std::vector<RemoteRegion>::iterator;
+        using const_iterator = std::vector<RemoteRegion>::const_iterator;
+
+    public:
         RemoteRegionGroup(std::vector<RemoteRegion> group)
             : _inner(std::move(group))
             , _rmaIovs(rmaIovsFromGroup(_inner))
         {}
 
         [[nodiscard]]
-        std::vector<RemoteRegion> const& view() const noexcept;
-
-        [[nodiscard]]
-        ::fi_rma_iov const* rmaIovs() const noexcept;
-
-        [[nodiscard]]
-        std::size_t count() const noexcept;
+        ::fi_rma_iov const* asRmaIovs() const noexcept;
 
         bool operator==(RemoteRegionGroup const& other) const noexcept;
+
+        iterator begin()
+        {
+            return _inner.begin();
+        }
+
+        iterator end()
+        {
+            return _inner.end();
+        }
+
+        [[nodiscard]]
+        const_iterator begin() const
+        {
+            return _inner.cbegin();
+        }
+
+        [[nodiscard]]
+        const_iterator end() const
+        {
+            return _inner.cend();
+        }
+
+        RemoteRegion& operator[](std::size_t index)
+        {
+            return _inner[index];
+        }
+
+        RemoteRegion const& operator[](std::size_t index) const
+        {
+            return _inner[index];
+        }
+
+        [[nodiscard]]
+        std::size_t size() const noexcept
+        {
+            return _inner.size();
+        }
+
+    private:
+        friend struct rfl_types::RemoteRegionGroupRfl;
 
     private:
         static std::vector<::fi_rma_iov> rmaIovsFromGroup(std::vector<RemoteRegion> group) noexcept;
 
+        [[nodiscard]]
+        std::vector<RemoteRegion> clone() const
+        {
+            return _inner;
+        }
+
+    private:
         std::vector<RemoteRegion> _inner;
 
         std::vector<::fi_rma_iov> _rmaIovs;
@@ -82,7 +134,7 @@ namespace mxl::lib::fabrics::ofi
 
             static RemoteRegionGroupRfl from_class(RemoteRegionGroup const& group)
             {
-                return RemoteRegionGroupRfl{.group = group.view()};
+                return RemoteRegionGroupRfl{.group = group.clone()};
             };
 
             [[nodiscard]]
