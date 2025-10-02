@@ -27,7 +27,7 @@ project(mxl
     LANGUAGES CXX C
 )
 
-option(MXL_FABRICS "Enable the mxl-fabrics module" FALSE)
+option(MXL_FABRICS_OFI "Build the mxl-fabrics module using libfabric" FALSE)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 

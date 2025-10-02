@@ -122,7 +122,10 @@ target_link_libraries(mxl
 # in lieu of a module from the local source tree
 add_library(${PROJECT_NAME}::mxl ALIAS mxl)
 
-add_subdirectory(fabrics)
+if (MXL_FABRICS_OFI)
+    add_subdirectory(fabrics)
+endif()
+
 add_subdirectory(tests)
 
 # Install targets
