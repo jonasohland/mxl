@@ -7,7 +7,7 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    ::uint32_t fiVersion() noexcept
+    std::uint32_t fiVersion() noexcept
     {
         return FI_VERSION(FI_MAJOR_VERSION, FI_MINOR_VERSION);
     }

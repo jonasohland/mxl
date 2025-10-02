@@ -55,7 +55,7 @@ namespace mxl::lib::fabrics::ofi
 
     std::optional<Event> EventQueue::read()
     {
-        uint32_t eventType;
+        std::uint32_t eventType;
         ::fi_eq_entry entry;
 
         auto const ret = fi_eq_read(_raw, &eventType, &entry, sizeof(entry), 0);
@@ -71,7 +71,7 @@ namespace mxl::lib::fabrics::ofi
             return read();
         }
 
-        uint32_t eventType;
+        std::uint32_t eventType;
         ::fi_eq_entry entry;
 
         auto const ret = fi_eq_sread(_raw, &eventType, &entry, sizeof(entry), timeoutMs, 0);
@@ -108,7 +108,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    std::optional<Event> EventQueue::handleReadResult(ssize_t ret, uint32_t eventType, ::fi_eq_entry const& entry)
+    std::optional<Event> EventQueue::handleReadResult(ssize_t ret, std::uint32_t eventType, ::fi_eq_entry const& entry)
     {
         if (ret == -FI_EAGAIN)
         {

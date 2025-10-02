@@ -61,7 +61,7 @@ namespace mxl::lib::fabrics::ofi
         class Error final
         {
         public:
-            Error(std::shared_ptr<EventQueue> eq, ::fid_t fid, int err, int providerErr, std::vector<uint8_t> errData);
+            Error(std::shared_ptr<EventQueue> eq, ::fid_t fid, int err, int providerErr, std::vector<std::uint8_t> errData);
 
             [[nodiscard]]
             int code() const noexcept;
@@ -79,13 +79,14 @@ namespace mxl::lib::fabrics::ofi
             ::fid_t _fid;
             int _err;
             int _providerErr;
-            std::vector<uint8_t> _errData;
+            std::vector<std::uint8_t> _errData;
         };
 
         using Inner = std::variant<ConnectionRequested, Connected, Shutdown, Error>;
 
-        static Event fromRawEntry(::fi_eq_entry const& raw, uint32_t eventType);
-        static Event fromRawCMEntry(::fi_eq_cm_entry const& raw, uint32_t eventType);
+    public:
+        static Event fromRawEntry(::fi_eq_entry const& raw, std::uint32_t eventType);
+        static Event fromRawCMEntry(::fi_eq_cm_entry const& raw, std::uint32_t eventType);
         static Event fromError(std::shared_ptr<EventQueue> queue, ::fi_eq_err_entry const* raw);
 
         [[nodiscard]]
@@ -111,6 +112,8 @@ namespace mxl::lib::fabrics::ofi
 
     private:
         Event(Inner);
+
+    private:
         Inner _event;
     };
 }

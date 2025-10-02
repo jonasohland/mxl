@@ -17,6 +17,7 @@ namespace mxl::lib::fabrics::ofi
     /// Attributes to configure newly created event queues.
     struct EventQueueAttr final
     {
+    public:
         /// Creates a configuration with all values set to reasonable defaults.
         static EventQueueAttr defaults();
 
@@ -24,8 +25,9 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::fi_eq_attr raw() const noexcept;
 
+    public:
         /// Size of the event queue.
-        size_t size;
+        std::size_t size;
     };
 
     class EventQueue : public std::enable_shared_from_this<EventQueue>
@@ -68,8 +70,9 @@ namespace mxl::lib::fabrics::ofi
         EventQueue(::fid_eq* raw, std::shared_ptr<Fabric> fabric);
 
         // Handles blocking and non-blocking read results.
-        std::optional<Event> handleReadResult(ssize_t, uint32_t, ::fi_eq_entry const&);
+        std::optional<Event> handleReadResult(ssize_t, std::uint32_t, ::fi_eq_entry const&);
 
+    private:
         ::fid_eq* _raw;                  /// Raw resource reference
         std::shared_ptr<Fabric> _fabric; /// Pointer to the fabric for which the event queue was created.
     };

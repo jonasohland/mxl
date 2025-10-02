@@ -53,6 +53,7 @@ namespace mxl::lib::fabrics::ofi
 
         void free() noexcept;
 
+    private:
         ::fi_info* _raw;
     };
 
@@ -76,6 +77,8 @@ namespace mxl::lib::fabrics::ofi
         friend FIInfo;
 
         FIInfoView(::fi_info const*);
+
+    private:
         ::fi_info* _raw;
     };
 
@@ -87,15 +90,16 @@ namespace mxl::lib::fabrics::ofi
     class FIInfoIterator
     {
     public:
-        FIInfoIterator()
-            : _it(nullptr)
-        {}
-
         friend FIInfoList;
 
         using difference_type = std::ptrdiff_t;
         using value_type = std::conditional_t<Const, FIInfoView const, FIInfoView>;
         using raw_type = std::conditional_t<Const, ::fi_info const*, ::fi_info*>;
+
+    public:
+        FIInfoIterator()
+            : _it(nullptr)
+        {}
 
         value_type operator*() const
         {
@@ -130,24 +134,26 @@ namespace mxl::lib::fabrics::ofi
             : _it(it)
         {}
 
+    private:
         raw_type _it;
     };
 
     class FIInfoList
     {
     public:
+        // Type aliases for const and non-const versions of the iterator template
+        using iterator = FIInfoIterator<false>;
+        using const_iterator = FIInfoIterator<true>;
+
+    public:
         /**
          * Get a list of provider configurations supported to the specified
          * node/service
          */
-        static FIInfoList get(std::string node, std::string service, Provider provider, uint64_t caps, ::fi_ep_type epType);
+        static FIInfoList get(std::string node, std::string service, Provider provider, std::uint64_t caps, ::fi_ep_type epType);
 
         // Take ownership over a fi_info raw pointer.
         static FIInfoList own(::fi_info* info) noexcept;
-
-        // Type aliases for const and non-const versions of the iterator template
-        using iterator = FIInfoIterator<false>;
-        using const_iterator = FIInfoIterator<true>;
 
         // calls ::fi_freeinfo to deallocate the underlying linked-list
         ~FIInfoList();
@@ -181,6 +187,7 @@ namespace mxl::lib::fabrics::ofi
 
         void free();
 
+    private:
         ::fi_info* _begin;
     };
 

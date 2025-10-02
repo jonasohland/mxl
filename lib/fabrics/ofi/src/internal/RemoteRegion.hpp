@@ -17,14 +17,16 @@ namespace mxl::lib::fabrics::ofi
 
     struct RemoteRegion
     {
-        uint64_t addr;
-        size_t len;
-        uint64_t rkey;
-
+    public:
         [[nodiscard]]
         ::fi_rma_iov toRmaIov() const noexcept;
 
         bool operator==(RemoteRegion const& other) const noexcept;
+
+    public:
+        std::uint64_t addr;
+        std::size_t len;
+        std::uint64_t rkey;
     };
 
     class RemoteRegionGroup
@@ -42,7 +44,7 @@ namespace mxl::lib::fabrics::ofi
         ::fi_rma_iov const* rmaIovs() const noexcept;
 
         [[nodiscard]]
-        size_t count() const noexcept;
+        std::size_t count() const noexcept;
 
         bool operator==(RemoteRegionGroup const& other) const noexcept;
 
@@ -58,9 +60,9 @@ namespace mxl::lib::fabrics::ofi
     {
         struct RemoteRegionRfl
         {
-            rfl::Rename<"addr", uint64_t> addr;
-            rfl::Rename<"len", size_t> len;
-            rfl::Rename<"rkey", uint64_t> rkey;
+            rfl::Rename<"addr", std::uint64_t> addr;
+            rfl::Rename<"len", std::size_t> len;
+            rfl::Rename<"rkey", std::uint64_t> rkey;
 
             static RemoteRegionRfl from_class(RemoteRegion const& reg)
             {

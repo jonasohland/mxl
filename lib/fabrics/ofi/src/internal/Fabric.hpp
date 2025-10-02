@@ -35,6 +35,7 @@ namespace mxl::lib::fabrics::ofi
 
         Fabric(::fid_fabric* raw, FIInfoView info);
 
+    private:
         ::fid_fabric* _raw;
         FIInfo _info;
     };

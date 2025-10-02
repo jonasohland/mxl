@@ -13,7 +13,7 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    FabricAddress::FabricAddress(std::vector<uint8_t> addr)
+    FabricAddress::FabricAddress(std::vector<std::uint8_t> addr)
         : _inner(std::move(addr))
     {}
 
@@ -44,9 +44,9 @@ namespace mxl::lib::fabrics::ofi
 
     FabricAddress FabricAddress::fromBase64(std::string_view data)
     {
-        return FabricAddress{base64::decode_into<std::vector<uint8_t>>(data)};
+        return FabricAddress{base64::decode_into<std::vector<std::uint8_t>>(data)};
 
-        auto decoded = base64::decode_into<std::vector<uint8_t>>(data);
+        auto decoded = base64::decode_into<std::vector<std::uint8_t>>(data);
         if (decoded.empty())
         {
             throw std::runtime_error("Failed to decode base64 data into FabricAddress");
@@ -65,7 +65,7 @@ namespace mxl::lib::fabrics::ofi
         }
 
         // Now that we have the address length, allocate a receiving buffer and call fi_getname again to retrieve the actual address
-        std::vector<uint8_t> addr(addrlen);
+        std::vector<std::uint8_t> addr(addrlen);
         fiCall(fi_getname, "Failed to retrieve endpoint's local address.", fid, addr.data(), &addrlen);
 
         return FabricAddress{addr};

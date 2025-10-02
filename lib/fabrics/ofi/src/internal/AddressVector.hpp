@@ -18,18 +18,21 @@ namespace mxl::lib::fabrics::ofi
     public:
         struct Attributes
         {
+        public:
             static Attributes defaults() noexcept;
+
+            [[nodiscard]]
+            ::fi_av_attr toRaw() const noexcept;
+
+        public:
             // Indicates the expected number of addresses that will be inserted into the AV. The provider uses this to optimize resource allocations.
-            size_t count;
+            std::size_t count;
 
             // This field indicates the number of endpoints that will be associated with a specific fabric, or network, address. If the number of
             // endpoints per node is unknown, this value should be set to 0. The provider uses this value to optimize resource allocations. For
             // example, distributed, parallel applications may set this to the number of processes allocated per node, times the number of endpoints
             // each process will open.
-            size_t epPerNode;
-
-            [[nodiscard]]
-            ::fi_av_attr toRaw() const noexcept;
+            std::size_t epPerNode;
         };
 
         static std::shared_ptr<AddressVector> open(std::shared_ptr<Domain> domain, Attributes attr = Attributes::defaults());
@@ -61,6 +64,7 @@ namespace mxl::lib::fabrics::ofi
         /// Close the address vector and release all resources. Called from the destructor and the move assignment operator.
         void close();
 
+    private:
         fid_av* _raw;
         std::shared_ptr<Domain> _domain;
     };
