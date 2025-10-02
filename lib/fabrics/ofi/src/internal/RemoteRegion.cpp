@@ -17,19 +17,9 @@ namespace mxl::lib::fabrics::ofi
         return addr == other.addr && len == other.len && rkey == other.rkey;
     }
 
-    std::vector<RemoteRegion> const& RemoteRegionGroup::view() const noexcept
-    {
-        return _inner;
-    }
-
-    ::fi_rma_iov const* RemoteRegionGroup::rmaIovs() const noexcept
+    ::fi_rma_iov const* RemoteRegionGroup::asRmaIovs() const noexcept
     {
         return _rmaIovs.data();
-    }
-
-    size_t RemoteRegionGroup::count() const noexcept
-    {
-        return _inner.size();
     }
 
     bool RemoteRegionGroup::operator==(RemoteRegionGroup const& other) const noexcept
