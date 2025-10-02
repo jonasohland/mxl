@@ -8,6 +8,8 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN echo 'vm.swappiness=0'          >> /etc/sysctl.conf
 
+COPY ./scripts/ /tmp/scripts
+
 # Install basic and runtime dependencies
 RUN apt clean all && apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -37,7 +39,9 @@ RUN apt clean all && apt-get update \
     flex \
     htop \
     ccache \
-    rustup
+    rustup \
+    librdmacm-dev
+
 
 ARG CLANG_VERSION=19
 RUN apt-get install -y --no-install-recommends \
@@ -50,14 +54,7 @@ RUN apt-get install -y --no-install-recommends \
     ninja-build
 
 # Make the selected clang version the default alternative
-COPY register-clang-version.sh ./register-clang-version.sh 
-RUN ./register-clang-version.sh "${CLANG_VERSION}" 100 \
- && rm ./register-clang-version.sh
-
-# Install CUDA toolkit only (do not update the driver, this comes from the host)
-RUN wget https://developer.download.nvidia.com/compute/cuda/12.9.0/local_installers/cuda_12.9.0_575.51.03_linux.run \
-  && chmod +x cuda_12.9.0_575.51.03_linux.run \
-  && ./cuda_12.9.0_575.51.03_linux.run --silent --toolkit
+RUN /tmp/scripts/debian/register-clang-version.sh "${CLANG_VERSION}" 100 
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgstreamer1.0-dev \
@@ -65,18 +62,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-ugly \
-    gstreamer1.0-x \
-    librdmacm-dev \
-    perftest
+    gstreamer1.0-x 
 
-# Install libfabric
-RUN git clone -b v2.2.0 https://github.com/ofiwg/libfabric.git \
-  && cd libfabric \
-  && ./autogen.sh \
-  && ./configure --prefix=/usr --with-cuda=/usr/local/cuda --enable-cuda-dlopen \
-      --disable-kdreg2 --disable-memhooks-monitor --disable-uffd-monitor \
-  && make install -j
-  
+RUN /tmp/scripts/common/libfabric/install.sh
 
 # Remove the default ubuntu user if it exists
 RUN userdel --remove ubuntu >/dev/null 2>&1 || true
