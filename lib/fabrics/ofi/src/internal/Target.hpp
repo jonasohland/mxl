@@ -16,24 +16,27 @@ namespace mxl::lib::fabrics::ofi
 
     class Target
     {
-    protected:
-        struct ImmediateDataLocation
-        {
-            uint64_t data;
-
-            LocalRegion toLocalRegion() noexcept;
-        };
-
     public:
         struct ReadResult
         {
-            std::optional<uint64_t> grainAvailable{std::nullopt};
+            std::optional<std::uint64_t> grainAvailable{std::nullopt};
         };
 
+    public:
         virtual ~Target() = default;
 
         virtual ReadResult read() = 0;
         virtual ReadResult readBlocking(std::chrono::steady_clock::duration timeout) = 0;
+
+    protected:
+        struct ImmediateDataLocation
+        {
+        public:
+            LocalRegion toLocalRegion() noexcept;
+
+        public:
+            std::uint64_t data;
+        };
     };
 
     class TargetWrapper

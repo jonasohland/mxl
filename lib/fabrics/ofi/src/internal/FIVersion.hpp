@@ -8,5 +8,5 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    ::uint32_t fiVersion() noexcept;
+    std::uint32_t fiVersion() noexcept;
 }

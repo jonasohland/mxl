@@ -44,7 +44,7 @@ namespace mxl::lib::fabrics::ofi
         return _fid;
     }
 
-    Event::Error::Error(std::shared_ptr<EventQueue> eq, ::fid_t fid, int err, int providerErr, std::vector<uint8_t> errData)
+    Event::Error::Error(std::shared_ptr<EventQueue> eq, ::fid_t fid, int err, int providerErr, std::vector<std::uint8_t> errData)
         : _eq(std::move(eq))
         , _fid(fid)
         , _err(err)
@@ -76,12 +76,12 @@ namespace mxl::lib::fabrics::ofi
         : _event(std::move(ev))
     {}
 
-    Event Event::fromRawEntry(::fi_eq_entry const&, uint32_t)
+    Event Event::fromRawEntry(::fi_eq_entry const&, std::uint32_t)
     {
         throw Exception::internal("unimplemented");
     }
 
-    Event Event::fromRawCMEntry(::fi_eq_cm_entry const& entry, uint32_t eventType)
+    Event Event::fromRawCMEntry(::fi_eq_cm_entry const& entry, std::uint32_t eventType)
     {
         // clang-format off
         switch (eventType)

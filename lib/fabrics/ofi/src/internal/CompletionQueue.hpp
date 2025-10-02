@@ -18,6 +18,7 @@ namespace mxl::lib::fabrics::ofi
     /// operation of newly created completion queues.
     struct CompletionQueueAttr
     {
+    public:
         /// Returns the a CompletionQueueAttr with all of its attributes
         /// set to reasonable defaults.
         static CompletionQueueAttr defaults();
@@ -26,7 +27,8 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::fi_cq_attr raw() const noexcept;
 
-        size_t size;                 /// Size of the queue.
+    public:
+        std::size_t size;            /// Size of the queue.
         enum fi_wait_obj waitObject; /// The underlying wait object that should be used.
     };
 
@@ -71,6 +73,7 @@ namespace mxl::lib::fabrics::ofi
         // Handle the result of a blocking or non-blocking read.
         std::optional<Completion> handleReadResult(ssize_t ret, ::fi_cq_data_entry const& entry);
 
+    private:
         ::fid_cq* _raw;                  /// Raw resource reference.
         std::shared_ptr<Domain> _domain; /// The domain this queue was created into.
     };

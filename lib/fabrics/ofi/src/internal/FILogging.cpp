@@ -15,8 +15,8 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    int fiLogEnabled(const struct fi_provider* prov, enum fi_log_level level, enum fi_log_subsys subsys, uint64_t flags);
-    int fiLogReady(const struct fi_provider* prov, enum fi_log_level level, enum fi_log_subsys subsys, uint64_t flags, uint64_t* showtime);
+    int fiLogEnabled(const struct fi_provider* prov, enum fi_log_level level, enum fi_log_subsys subsys, std::uint64_t flags);
+    int fiLogReady(const struct fi_provider* prov, enum fi_log_level level, enum fi_log_subsys subsys, std::uint64_t flags, std::uint64_t* showtime);
     void fiLog(const struct fi_provider* prov, enum fi_log_level level, enum fi_log_subsys subsys, char const*, int line, char const* msgIn);
 
     class FILogging
@@ -50,7 +50,7 @@ namespace mxl::lib::fabrics::ofi
         }
 
     private:
-        friend int fiLogEnabled(const struct fi_provider*, enum fi_log_level, enum fi_log_subsys, uint64_t);
+        friend int fiLogEnabled(const struct fi_provider*, enum fi_log_level, enum fi_log_subsys, std::uint64_t);
 
         [[nodiscard]]
         fi_log_level level() const noexcept
@@ -104,14 +104,14 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    int fiLogEnabled(const struct fi_provider* prov, enum fi_log_level level, enum fi_log_subsys subsys, uint64_t flags)
+    int fiLogEnabled(const struct fi_provider* prov, enum fi_log_level level, enum fi_log_subsys subsys, std::uint64_t flags)
     {
         MXL_FABRICS_UNUSED(flags);
 
         return level <= logging.level() && logging.isProviderLoggingEnabled(prov) && logging.isSubsystemLoggingEnabled(subsys);
     }
 
-    int fiLogReady(const struct fi_provider*, enum fi_log_level, enum fi_log_subsys, uint64_t, uint64_t*)
+    int fiLogReady(const struct fi_provider*, enum fi_log_level, enum fi_log_subsys, std::uint64_t, std::uint64_t*)
     {
         return 0;
     }
