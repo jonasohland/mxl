@@ -21,6 +21,7 @@ namespace mxl::lib::fabrics::ofi
     // In the context of libfabric this means, the fi_addr, all the buffer addresses and sizes, and the remote protection key.
     struct TargetInfo
     {
+    public:
         TargetInfo() = default;
 
         TargetInfo(FabricAddress fabricAddress, std::vector<RemoteRegionGroup> regions, Endpoint::Id id = Endpoint::randomId())
@@ -36,6 +37,7 @@ namespace mxl::lib::fabrics::ofi
 
         bool operator==(TargetInfo const& other) const noexcept;
 
+    public:
         FabricAddress fabricAddress;
         std::vector<RemoteRegionGroup> remoteRegionGroups;
         Endpoint::Id id;

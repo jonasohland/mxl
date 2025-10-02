@@ -32,6 +32,7 @@ namespace mxl::lib::fabrics::ofi
         // An id type that can be used to reference this endpoint from completions and events
         using Id = std::uintptr_t;
 
+    public:
         // Generate a new random endpoint id.
         static Id randomId() noexcept;
 
@@ -82,7 +83,7 @@ namespace mxl::lib::fabrics::ofi
 
         /// Bind the endpoint to a completion queue. The endpoint can be bound to an event queue only once. The Endpoint object will take ownership of
         /// an instance of the shared pointer, so the queue can not be destroyed before the endpoint.
-        void bind(std::shared_ptr<CompletionQueue> cq, uint64_t flags);
+        void bind(std::shared_ptr<CompletionQueue> cq, std::uint64_t flags);
 
         /// Bind the endpoint to an address vector. The endpoint can be bound to an address vector only once. The Endpoint object will take ownership
         /// of an instance of the shared pointer, so the address vector can not be destroyed before the endpoint.
@@ -154,7 +155,7 @@ namespace mxl::lib::fabrics::ofi
          * \param 64 bits of user data that will be available in the completion entry associated with this transfer.
          */
         void write(LocalRegionGroup const& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
-            std::optional<uint64_t> immData = std::nullopt);
+            std::optional<std::uint64_t> immData = std::nullopt);
 
         /*
          * Push a recv work request to the endpoint work queue. In the MXL context the memory region passed here is not the memory
@@ -183,6 +184,7 @@ namespace mxl::lib::fabrics::ofi
         Endpoint(::fid_ep* raw, FIInfoView info, std::shared_ptr<Domain> domain, std::optional<std::shared_ptr<CompletionQueue>> cq = std::nullopt,
             std::optional<std::shared_ptr<EventQueue>> eq = std::nullopt, std::optional<std::shared_ptr<AddressVector>> av = std::nullopt);
 
+    private:
         ::fid_ep* _raw;                                      /// Raw resource reference
         FIInfo _info;                                        /// Info passed via Endpoint::create()
         std::shared_ptr<Domain> _domain;                     /// Domain in which the endpoint was created

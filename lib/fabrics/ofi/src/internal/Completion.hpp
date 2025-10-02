@@ -21,7 +21,7 @@ namespace mxl::lib::fabrics::ofi
         {
         public:
             [[nodiscard]]
-            std::optional<uint64_t> data() const noexcept;
+            std::optional<std::uint64_t> data() const noexcept;
             [[nodiscard]]
             ::fid_ep* fid() const noexcept;
 
@@ -31,10 +31,12 @@ namespace mxl::lib::fabrics::ofi
             bool isLocalWrite() const noexcept;
 
         private:
-            explicit Data(::fi_cq_data_entry const& raw);
-
             friend class CompletionQueue;
 
+        private:
+            explicit Data(::fi_cq_data_entry const& raw);
+
+        private:
             ::fi_cq_data_entry _raw;
         };
 
@@ -48,14 +50,17 @@ namespace mxl::lib::fabrics::ofi
             ::fid_ep* fid() const noexcept;
 
         private:
-            explicit Error(::fi_cq_err_entry const& raw, std::shared_ptr<CompletionQueue> queue);
-
             friend class CompletionQueue;
 
+        private:
+            explicit Error(::fi_cq_err_entry const& raw, std::shared_ptr<CompletionQueue> queue);
+
+        private:
             ::fi_cq_err_entry _raw;
             std::shared_ptr<CompletionQueue> _cq;
         };
 
+    public:
         explicit Completion(Data entry);
         explicit Completion(Error entry);
 
@@ -82,6 +87,7 @@ namespace mxl::lib::fabrics::ofi
 
         using Inner = std::variant<Data, Error>;
 
+    private:
         Inner _inner;
     };
 }

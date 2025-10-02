@@ -67,7 +67,7 @@ namespace mxl::lib::fabrics::ofi
         _inner->removeTarget(targetInfo);
     }
 
-    void InitiatorWrapper::transferGrain(uint64_t grainIndex)
+    void InitiatorWrapper::transferGrain(std::uint64_t grainIndex)
     {
         if (!_inner)
         {

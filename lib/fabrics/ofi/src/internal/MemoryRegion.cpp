@@ -34,7 +34,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    MemoryRegion MemoryRegion::reg(Domain& domain, Region const& region, uint64_t access)
+    MemoryRegion MemoryRegion::reg(Domain& domain, Region const& region, std::uint64_t access)
     {
         ::fid_mr* raw;
         std::random_device rd;
@@ -46,7 +46,7 @@ namespace mxl::lib::fabrics::ofi
             region.size,
             region.loc.toString());
 
-        uint64_t flags = 0;
+        std::uint64_t flags = 0;
         flags |= region.loc.isHost() ? 0 : FI_HMEM_DEVICE_ONLY;
 
         ::fi_mr_attr attr{};
@@ -104,7 +104,7 @@ namespace mxl::lib::fabrics::ofi
         return fi_mr_desc(_raw);
     }
 
-    uint64_t MemoryRegion::rkey() const noexcept
+    std::uint64_t MemoryRegion::rkey() const noexcept
     {
         return fi_mr_key(_raw);
     }

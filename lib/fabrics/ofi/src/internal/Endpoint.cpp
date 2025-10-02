@@ -157,7 +157,7 @@ namespace mxl::lib::fabrics::ofi
         _eq = eq;
     }
 
-    void Endpoint::bind(std::shared_ptr<CompletionQueue> cq, uint64_t flags)
+    void Endpoint::bind(std::shared_ptr<CompletionQueue> cq, std::uint64_t flags)
     {
         fiCall(::fi_ep_bind, "Failed to bind completion queue to endpoint", _raw, &cq->raw()->fid, flags);
 
@@ -325,10 +325,10 @@ namespace mxl::lib::fabrics::ofi
     }
 
     void Endpoint::write(LocalRegionGroup const& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr,
-        std::optional<uint64_t> immData)
+        std::optional<std::uint64_t> immData)
     {
-        uint64_t data = immData.value_or(0);
-        uint64_t flags = FI_DELIVERY_COMPLETE;
+        std::uint64_t data = immData.value_or(0);
+        std::uint64_t flags = FI_DELIVERY_COMPLETE;
         flags |= immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
 
         ::fi_msg_rma msg = {

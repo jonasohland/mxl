@@ -28,6 +28,7 @@ namespace mxl::lib::fabrics::ofi
         template<QueueReadMode>
         Target::ReadResult makeProgress(std::chrono::steady_clock::duration timeout);
 
+    private:
         Endpoint _endpoint;
         std::vector<RegisteredRegionGroup> _regRegions;
         std::unique_ptr<ImmediateDataLocation> _immData;

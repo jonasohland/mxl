@@ -16,7 +16,7 @@ namespace mxl::lib::fabrics::ofi
         : _raw(raw)
     {}
 
-    std::optional<uint64_t> Completion::Data::data() const noexcept
+    std::optional<std::uint64_t> Completion::Data::data() const noexcept
     {
         if (!(_raw.flags & FI_REMOTE_CQ_DATA))
         {

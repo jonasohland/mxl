@@ -7,7 +7,6 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-
     ::iovec LocalRegion::toIov() const noexcept
     {
         return ::iovec{.iov_base = reinterpret_cast<void*>(addr), .iov_len = len};
@@ -23,7 +22,7 @@ namespace mxl::lib::fabrics::ofi
         return _iovs.data();
     }
 
-    size_t LocalRegionGroup::count() const noexcept
+    std::size_t LocalRegionGroup::count() const noexcept
     {
         return _inner.size();
     }
@@ -46,5 +45,4 @@ namespace mxl::lib::fabrics::ofi
         std::ranges::transform(group, std::back_inserter(descs), [](LocalRegion& reg) { return reg.desc; });
         return descs;
     }
-
 } // namespace mxl::lib::fabrics::ofi
