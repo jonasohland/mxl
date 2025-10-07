@@ -4,14 +4,18 @@
 
 #include "RCInitiator.hpp"
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <algorithm>
+#include <span>
 #include <uuid.h>
 #include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
 #include "internal/Logging.hpp"
+#include "mxl/flow.h"
 #include "Domain.hpp"
 #include "Exception.hpp"
+#include "LocalRegion.hpp"
 #include "Region.hpp"
 #include "VariantUtils.hpp"
 
@@ -206,6 +210,28 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
+    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, std::uint64_t index, std::size_t count)
+    {
+        if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
+        {
+            // TODO: make a function to create/parse immediate data for samples
+            auto immData = count & 0xFFFF + index & 0xFFFF << 16;
+
+            auto const& remote = _regions[index % _regions.size()];
+
+            // Post a write work item to the endpoint and increment the pending counter. When the write is complete, a completion will be posted to
+            // the completion queue, after which the counter will be decremented again if the target is still in the connected state.
+            auto iovLimit = connected->ep.info()->tx_attr->iov_limit;
+            auto nbWrites = (local.size() + (iovLimit - 1)) / iovLimit;
+            for (size_t i = 0; i < nbWrites; i++)
+            {
+                // TODO: use the local span
+                connected->ep.write(local, remote, FI_ADDR_UNSPEC, immData);
+                ++connected->pending;
+            }
+        }
+    }
+
     void RCInitiatorEndpoint::handleCompletionData(Completion::Data)
     {
         _state = std::visit(
@@ -320,7 +346,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiator::transferGrain(uint64_t index)
+    void RCInitiator::transferGrain(std::uint64_t index)
     {
         // Find the local region in which the grain with this index is stored.
         auto& localRegion = _localRegions[index % _localRegions.size()];
@@ -330,6 +356,38 @@ namespace mxl::lib::fabrics::ofi
         for (auto& [_, target] : _targets)
         {
             target.postTransfer(localRegion, index);
+        }
+    }
+
+    void RCInitiator::transferSamples(std::uint64_t headIndex, std::size_t count, mxlWrappedMultiBufferSlice* slices)
+    {
+        if (_localRegions.empty())
+        {
+            MXL_WARN("No region registered. This should not happen");
+            return;
+        }
+
+        // Create a scatter-gather list using the headIndex, sample count, region base address, the channel count and size
+        std::vector<LocalRegion> sgList;
+
+        auto bufferBase = _localRegions[headIndex % _localRegions.size()].begin()->addr;
+        auto desc = _localRegions.front().begin()->desc;
+
+        for (size_t i; i < 2; i++) // There's possibly 2 slices if the range wraps
+        {
+            if (slices->base.fragments[i].size > 0)
+            {
+                for (size_t chan = 0; chan < slices->count; chan++)
+                {
+                    auto chanAddr = reinterpret_cast<std::uintptr_t>(slices->base.fragments[i].pointer) + (slices->stride * chan);
+                    sgList.emplace_back(LocalRegion{.addr = chanAddr, .len = slices->base.fragments[i].size, .desc = desc});
+                }
+            }
+        }
+
+        for (auto& [_, target] : _targets)
+        {
+            target.postTransfer(sgList, headIndex, count);
         }
     }
 

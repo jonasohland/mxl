@@ -206,6 +206,26 @@ extern "C"
     mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint64_t* out_index, uint16_t in_timeoutMs);
 
     /**
+     * Non-blocking accessor for a flow grain at a specific index.
+     * \param in_target A valid fabrics target
+     * \param out_index The head index of the samples that is ready, if any.
+     * \param out_count The number of samples in each channels that are ready
+     * \return The result code. MXL_ERR_NOT_READY if no samples are available at the time of the call, and the call should be retried. \see mxlStatus
+     */
+    MXL_EXPORT
+    mxlStatus mxlFabricsTargetTryNewSamples(mxlFabricsTarget in_target, uint64_t* out_index, size_t* out_count);
+
+    /**
+     * Blocking accessor for a flow grain at a specific index.
+     * \param in_target A valid fabrics target
+     * \param out_index The head index of the samples that is ready, if any.
+     * \param out_count The number of samples in each channels that are ready
+     * \param in_timeoutMs How long should we wait for new samples (in milliseconds)
+     * \return The result code. MXL_ERR_NOT_READY if no grain was available before the timeout. \see mxlStatus
+     */
+    MXL_EXPORT
+    mxlStatus mxlFabricsTargetWaitForNewSamples(mxlFabricsTarget in_target, uint64_t* out_index, size_t* out_count, uint16_t in_timeoutMs);
+    /**
      * Create a fabrics initiator instance.
      * \param in_fabricsInstance A valid mxl fabrics instance
      * \param out_initiator A valid fabrics initiator
@@ -261,6 +281,17 @@ extern "C"
      */
     MXL_EXPORT
     mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInitiator in_initiator, uint64_t in_grainIndex);
+
+    /**
+     * Enqueue a transfer operation to all added targets. This function is always non-blocking. The transfer operation might be started right away,
+     * but is only guaranteed to have completed after mxlFabricsInitiatorMakeProgress*() no longer returns MXL_ERR_NOT_READY.
+     * \param in_initiator A valid fabrics initiator
+     * \param in_index The head index of the samples to transfer.
+     * \param in_count The number of samples to transfer (per channel).
+     * \return The result code. \see mxlStatus
+     */
+    MXL_EXPORT
+    mxlStatus mxlFabricsInitiatorTransferSamples(mxlFabricsInitiator in_initiator, uint64_t in_index, size_t count);
 
     /**
      * This function must be called regularly for the initiator to make progress on queued transfer operations, connection establishment operations

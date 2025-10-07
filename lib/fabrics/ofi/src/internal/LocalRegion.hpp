@@ -12,6 +12,7 @@
 namespace mxl::lib::fabrics::ofi
 {
     class RemoteRegionGroup;
+    class LocalRegionGroupSpan;
 
     struct LocalRegion
     {
@@ -81,6 +82,8 @@ namespace mxl::lib::fabrics::ofi
             return _inner.size();
         }
 
+        LocalRegionGroupSpan span(size_t beginIndex, size_t endIndex);
+
     private:
         static std::vector<::iovec> iovFromGroup(std::vector<LocalRegion> group) noexcept;
         static std::vector<void*> descFromGroup(std::vector<LocalRegion> group) noexcept;
@@ -90,6 +93,43 @@ namespace mxl::lib::fabrics::ofi
 
         std::vector<::iovec> _iovs;
         std::vector<void*> _descs;
+    };
+
+    class LocalRegionGroupSpan
+    {
+    public:
+        [[nodiscard]]
+        ::iovec const* asIovec() const noexcept
+        {
+            return _inner;
+        }
+
+        [[nodiscard]]
+        void* const* desc() const noexcept
+        {
+            return _desc;
+        }
+
+        [[nodiscard]]
+        std::size_t size() const noexcept
+        {
+            return _size;
+        }
+
+    private:
+        friend class LocalRegionGroup;
+
+    private:
+        LocalRegionGroupSpan(::iovec const* begin, std::size_t size, void* const* desc)
+            : _inner(begin)
+            , _size(size)
+            , _desc(desc)
+        {}
+
+    private:
+        ::iovec const* _inner;
+        std::size_t _size;
+        void* const* _desc;
     };
 
 }

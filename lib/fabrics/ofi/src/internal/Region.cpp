@@ -6,9 +6,12 @@
 #include <cassert>
 #include <cstdint>
 #include <algorithm>
+#include <stdexcept>
 #include <bits/types/struct_iovec.h>
+#include "internal/ContinuousFlowData.hpp"
 #include "internal/DiscreteFlowData.hpp"
 #include "internal/Flow.hpp"
+#include "mxl/dataformat.h"
 #include "mxl/flow.h"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
@@ -126,29 +129,45 @@ namespace mxl::lib::fabrics::ofi
             throw Exception::make(MXL_ERR_UNKNOWN, "Non-discrete flows not supported for now");
         }
 
-        auto& discreteFlow = static_cast<DiscreteFlowData&>(flow);
-
         std::vector<RegionGroup> regionGroups;
 
-        for (std::size_t i = 0; i < discreteFlow.grainCount(); ++i)
+        if (mxlIsDiscreteDataFormat(flow.flowInfo()->common.format))
         {
-            auto grain = discreteFlow.grainAt(i);
+            auto& discreteFlow = static_cast<DiscreteFlowData&>(flow);
 
-            auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow.grainAt(i));
-            auto grainInfoSize = sizeof(GrainHeader);
-            auto grainPayloadSize = grain->header.info.grainSize;
-
-            if (grain->header.info.payloadLocation != MXL_PAYLOAD_LOCATION_HOST_MEMORY)
+            for (std::size_t i = 0; i < discreteFlow.grainCount(); ++i)
             {
-                throw Exception::make(MXL_ERR_UNKNOWN,
-                    "GPU memory is not currently supported in the Flow API of MXL. Edit the code below when it is supported");
+                auto grain = discreteFlow.grainAt(i);
+
+                auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow.grainAt(i));
+                auto grainInfoSize = sizeof(GrainHeader);
+                auto grainPayloadSize = grain->header.info.grainSize;
+
+                if (grain->header.info.payloadLocation != MXL_PAYLOAD_LOCATION_HOST_MEMORY)
+                {
+                    throw Exception::make(MXL_ERR_UNKNOWN,
+                        "GPU memory is not currently supported in the Flow API of MXL. Edit the code below when it is supported");
+                }
+
+                auto regionGroup = RegionGroup({
+                    Region{grainInfoBaseAddr, grainInfoSize + grainPayloadSize, Region::Location::host()},
+                });
+
+                regionGroups.emplace_back(std::move(regionGroup));
             }
+        }
+        else if (mxlIsContinuousDataFormat(flow.flowInfo()->common.format))
+        {
+            auto& continuousFlow = static_cast<ContinuousFlowData&>(flow);
 
-            auto regionGroup = RegionGroup({
-                Region{grainInfoBaseAddr, grainInfoSize + grainPayloadSize, Region::Location::host()},
-            });
-
-            regionGroups.emplace_back(std::move(regionGroup));
+            // location would come from mxlCommonFlowInfo
+            regionGroups.emplace_back(RegionGroup({
+                Region{reinterpret_cast<std::uintptr_t>(continuousFlow.channelData()), continuousFlow.channelDataSize(), Region::Location::host()},
+            }));
+        }
+        else
+        {
+            throw std::runtime_error("Unsupported data format.");
         }
 
         return RegionGroups{std::move(regionGroups)};

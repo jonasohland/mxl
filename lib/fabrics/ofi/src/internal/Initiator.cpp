@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "Initiator.hpp"
+#include <cstddef>
 #include "mxl/fabrics.h"
 #include "Exception.hpp"
 #include "RCInitiator.hpp"
@@ -75,6 +76,16 @@ namespace mxl::lib::fabrics::ofi
         }
 
         _inner->transferGrain(grainIndex);
+    }
+
+    void InitiatorWrapper::transferSamples(std::uint64_t headIndex, std::size_t count)
+    {
+        if (!_inner)
+        {
+            throw Exception::invalidState("Initiator is not set up");
+        }
+
+        _inner->transferSamples(headIndex, count);
     }
 
     bool InitiatorWrapper::makeProgress()

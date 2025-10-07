@@ -7,6 +7,7 @@
 #include <memory>
 #include <variant>
 #include <vector>
+#include "mxl/flow.h"
 #include "Completion.hpp"
 #include "Domain.hpp"
 #include "Endpoint.hpp"
@@ -53,6 +54,9 @@ namespace mxl::lib::fabrics::ofi
 
         /// Post a data transfer request to this endpoint.
         void postTransfer(LocalRegionGroup const& localRegion, std::uint64_t index);
+
+        /// Post a data transfer request to this endpoint.
+        void postTransfer(LocalRegionGroup const& localRegion, std::uint64_t index, std::size_t count);
 
     private:
         /// The idle state. In this state the endpoint waits to be activated. This will happen immediately if the
@@ -123,7 +127,11 @@ namespace mxl::lib::fabrics::ofi
 
         /// Transfer a grain to all targets. This is a non-blocking operation.
         /// The transfer is complete only after makeProgress() or makeProgressBlocking() returns false.
-        void transferGrain(uint64_t grainIndex) final;
+        void transferGrain(std::uint64_t grainIndex) final;
+
+        /// Transfer samples to all targets. This is a non-blocking operation.
+        /// The transfer is complete only after makeProgress() or makeProgressBlocking() returns false.
+        void transferSamples(std::uint64_t headIndex, std::size_t count, mxlWrappedMultiBufferSlice* slices) final;
 
         /// The actual work of connecting, shutting down and transferring grains is done when this function is called.
         /// This is the non blocking version. That means it will do all currently pending work, check all queues, but not wait

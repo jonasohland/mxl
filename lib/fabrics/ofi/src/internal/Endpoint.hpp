@@ -10,6 +10,7 @@
 #include <uuid.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_endpoint.h>
+#include <sys/uio.h>
 #include "Address.hpp"
 #include "AddressVector.hpp"
 #include "Completion.hpp"
@@ -155,7 +156,7 @@ namespace mxl::lib::fabrics::ofi
          * \param 64 bits of user data that will be available in the completion entry associated with this transfer.
          */
         void write(LocalRegionGroup const& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
-            std::optional<std::uint64_t> immData = std::nullopt);
+            std::optional<std::uint32_t> immData = std::nullopt);
 
         /*
          * Push a recv work request to the endpoint work queue. In the MXL context the memory region passed here is not the memory

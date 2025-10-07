@@ -4,6 +4,8 @@
 
 #include "LocalRegion.hpp"
 #include <algorithm>
+#include <sys/uio.h>
+#include "Exception.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -35,4 +37,24 @@ namespace mxl::lib::fabrics::ofi
         std::ranges::transform(group, std::back_inserter(descs), [](LocalRegion& reg) { return reg.desc; });
         return descs;
     }
+
+    LocalRegionGroupSpan LocalRegionGroup::span(std::size_t beginIndex, std::size_t endIndex)
+    {
+        if (endIndex < beginIndex)
+        {
+            throw Exception::internal("endIndex {} is smaller than beginIndex {}", endIndex, beginIndex);
+        }
+
+        auto spanLength = endIndex - beginIndex;
+        if (spanLength > _inner.size())
+        {
+            throw Exception::internal("requested span size {} will be bigger than the actual size of the full vector {}", spanLength, _inner.size());
+        }
+
+        auto begin = &_iovs[beginIndex];
+        auto desc = &_descs[beginIndex];
+
+        return LocalRegionGroupSpan{begin, spanLength, desc};
+    }
+
 } // namespace mxl::lib::fabrics::ofi
