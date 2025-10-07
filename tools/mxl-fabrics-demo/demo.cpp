@@ -22,10 +22,10 @@
 /*
     Example how to use:
 
-        1- Start a target: ./mlx-fabrics-demo -f <flow-file-to-produce> --node 2.2.2.2 --service 1234 --provider verbs
+        1- Start a target: ./mxl-fabrics-demo -d <tmpfs folder> -f <NMOS JSON File> --node 2.2.2.2 --service 1234 --provider verbs
         2- Paste the target info that gets printed in stdout to the --target-info argument of the initiator.
-        3- Start a sender: ./mlx-fabrics-demo -i -f <flow-to-transfer> --node 1.1.1.1 --service 1234 --provider verbs --target-info <targetInfo>
-   <targetInfo>
+        3- Start a sender: ./mxl-fabrics-demo -i -d <tmpfs folder> -f <test source flow uuid> --node 1.1.1.1 --service 1234 --provider verbs
+   --target-info <targetInfo>
 */
 
 std::sig_atomic_t volatile g_exit_requested = 0;
