@@ -19,6 +19,7 @@
 #include "Exception.hpp"
 #include "Fabric.hpp"
 #include "FIInfo.hpp"
+#include "ImmData.hpp"
 #include "Provider.hpp"
 #include "Region.hpp"
 #include "TargetInfo.hpp"
@@ -85,7 +86,7 @@ namespace mxl::lib::fabrics::ofi
             auto const& remote = _regions[index % _regions.size()];
 
             // Post a write work item to the endpoint and increment the pending counter. When the write is complete,
-            _ep->write(local, remote, state->fiAddr, index);
+            _ep->write(local, remote, state->fiAddr, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
         }
     }
 

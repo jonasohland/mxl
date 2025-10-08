@@ -18,6 +18,7 @@
 #include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
 #include "internal/FlowReader.hpp"
+#include "internal/ImmData.hpp"
 #include "internal/Initiator.hpp"
 #include "internal/Provider.hpp"
 #include "internal/Region.hpp"
@@ -364,9 +365,12 @@ mxlStatus mxlFabricsTargetTryNewGrain(mxlFabricsTarget in_target, uint64_t* out_
     {
         auto target = ofi::TargetWrapper::fromAPI(in_target);
         auto res = target->read();
-        if (res.grainAvailable.has_value())
+        if (res.immData)
         {
-            *out_index = res.grainAvailable.value();
+            auto [grainIndex, sliceIndex] = ofi::ImmDataGrain{*res.immData}.unpack();
+            *out_index = grainIndex;
+            // TODO: sliceIndex
+
             return MXL_STATUS_OK;
         }
 
@@ -407,9 +411,12 @@ mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint64_t* 
     {
         auto target = ofi::TargetWrapper::fromAPI(in_target);
         auto res = target->readBlocking(std::chrono::milliseconds(in_timeoutMs));
-        if (res.grainAvailable)
+        if (res.immData)
         {
-            *out_index = res.grainAvailable.value();
+            auto [grainIndex, sliceIndex] = ofi::ImmDataGrain{*res.immData}.unpack();
+            *out_index = grainIndex;
+            // TODO: sliceIndex
+
             return MXL_STATUS_OK;
         }
 
