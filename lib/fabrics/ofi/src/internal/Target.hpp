@@ -19,7 +19,7 @@ namespace mxl::lib::fabrics::ofi
     public:
         struct ReadResult
         {
-            std::optional<std::uint64_t> grainAvailable{std::nullopt};
+            std::optional<std::uint32_t> immData{std::nullopt};
         };
 
     public:
