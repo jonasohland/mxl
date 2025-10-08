@@ -202,8 +202,7 @@ namespace mxl::lib::fabrics::ofi
 
             // Post a write work item to the endpoint and increment the pending counter. When the write is complete, a completion will be posted to
             // the completion queue, after which the counter will be decremented again if the target is still in the connected state.
-            connected->ep.write(local, remote, FI_ADDR_UNSPEC, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
-            ++connected->pending;
+            connected->pending += connected->ep.write(local, remote[0], FI_ADDR_UNSPEC, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
         }
     }
 

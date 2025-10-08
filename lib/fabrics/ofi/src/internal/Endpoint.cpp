@@ -324,25 +324,62 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
-    void Endpoint::write(LocalRegionGroup const& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr,
+    size_t Endpoint::write(LocalRegionGroup const& localGroup, RemoteRegion const& remoteRegion, ::fi_addr_t destAddr,
         std::optional<std::uint32_t> immData)
     {
+        // In this function we will potentially post more than a single write transfer. This occurs if the iov limit supported by the endpoint is
+        // smaller than the number of local region in the local region group. In that case, we need to perform multiple transfers. Only the last
+        // transfer is posted with immediate data to signal completion to the target. If multiple writes are posted, we also need to add and offset to
+        // the remote region for each request otherwise we overwrite the indices.
+
         std::uint64_t data = immData.value_or(0);
         std::uint64_t flags = FI_DELIVERY_COMPLETE;
-        flags |= immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
 
-        ::fi_msg_rma msg = {
-            .msg_iov = localGroup.asIovec(),
-            .desc = const_cast<void**>(localGroup.desc()),
-            .iov_count = localGroup.size(),
-            .addr = destAddr,
-            .rma_iov = remoteGroup.asRmaIovs(),
-            .rma_iov_count = remoteGroup.size(),
-            .context = _raw,
-            .data = data,
-        };
+        auto remoteRmaIov = remoteRegion.toRmaIov();
+        auto remoteOffset = 0;
 
-        fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
+        auto iovLimit = _info->tx_attr->iov_limit;
+        auto nbWrites = (localGroup.size() + (iovLimit - 1)) / iovLimit;
+
+        for (std::size_t i = 0; i < nbWrites; i++)
+        {
+            auto begin = i * iovLimit;
+            auto end = begin + std::min(iovLimit, localGroup.size() - begin);
+
+            auto localGroupSpan = localGroup.span(begin, end);
+            // check if we would bust the remote region
+            if ((remoteOffset + localGroupSpan.byteSize()) > remoteRegion.len)
+            {
+                Exception::internal("attempt to remote write out of the remote region boundary. remote region size {} local group size {}",
+                    remoteRegion.len,
+                    remoteOffset + localGroupSpan.byteSize());
+            }
+
+            remoteRmaIov.addr = remoteRegion.addr + remoteOffset;
+
+            // check if it is the last transfer, if it is, we post the request with immediate data
+            if (i == nbWrites - 1)
+            {
+                flags |= immData ? FI_REMOTE_CQ_DATA : 0;
+            }
+
+            ::fi_msg_rma msg = {
+                .msg_iov = localGroupSpan.asIovec(),
+                .desc = const_cast<void**>(localGroupSpan.desc()),
+                .iov_count = localGroupSpan.size(),
+                .addr = destAddr,
+                .rma_iov = &remoteRmaIov,
+                .rma_iov_count = 1,
+                .context = _raw,
+                .data = data,
+            };
+
+            fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
+
+            remoteOffset += localGroupSpan.byteSize();
+        }
+
+        return nbWrites;
     }
 
     void Endpoint::recv(LocalRegion region)

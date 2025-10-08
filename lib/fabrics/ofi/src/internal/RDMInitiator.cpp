@@ -78,7 +78,7 @@ namespace mxl::lib::fabrics::ofi
             std::move(_state));
     }
 
-    void RDMInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, uint64_t index)
+    std::size_t RDMInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, uint64_t index)
     {
         if (auto state = std::get_if<Added>(&_state); state != nullptr)
         {
@@ -86,8 +86,10 @@ namespace mxl::lib::fabrics::ofi
             auto const& remote = _regions[index % _regions.size()];
 
             // Post a write work item to the endpoint and increment the pending counter. When the write is complete,
-            _ep->write(local, remote, state->fiAddr, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
+            return _ep->write(local, remote[0], state->fiAddr, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
         }
+
+        return 0;
     }
 
     std::unique_ptr<RDMInitiator> RDMInitiator::setup(mxlInitiatorConfig const& config)
@@ -163,10 +165,9 @@ namespace mxl::lib::fabrics::ofi
         // this is a no-op.
         for (auto& [_, target] : _targets)
         {
-            target.postTransfer(localRegion, index);
+            pending += target.postTransfer(localRegion, index);
 
             // A completion will be posted to the completion queue, after which the counter will be decremented again
-            pending++;
         }
     }
 

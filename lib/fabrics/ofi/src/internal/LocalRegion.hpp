@@ -6,12 +6,14 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <vector>
 #include <bits/types/struct_iovec.h>
 
 namespace mxl::lib::fabrics::ofi
 {
     class RemoteRegionGroup;
+    class LocalRegionGroupSpan;
 
     struct LocalRegion
     {
@@ -81,6 +83,9 @@ namespace mxl::lib::fabrics::ofi
             return _inner.size();
         }
 
+        [[nodiscard]]
+        LocalRegionGroupSpan span(std::size_t beginIndex, std::size_t endIndex) const;
+
     private:
         static std::vector<::iovec> iovFromGroup(std::vector<LocalRegion> group) noexcept;
         static std::vector<void*> descFromGroup(std::vector<LocalRegion> group) noexcept;
@@ -92,4 +97,40 @@ namespace mxl::lib::fabrics::ofi
         std::vector<void*> _descs;
     };
 
+    class LocalRegionGroupSpan
+    {
+    public:
+        [[nodiscard]]
+        ::iovec const* asIovec() const noexcept
+        {
+            return _iovec.data();
+        }
+
+        [[nodiscard]]
+        void* const* desc() const noexcept
+        {
+            return _descs.data();
+        }
+
+        [[nodiscard]]
+        std::size_t size() const noexcept
+        {
+            return _inner.size();
+        }
+
+        /// Returns the sum of all region "len" in the span which corresponds to the total amount of bytes all non-contiguous buffers uses.
+        [[nodiscard]]
+        std::size_t byteSize() const noexcept;
+
+    private:
+        friend class LocalRegionGroup;
+
+    private:
+        LocalRegionGroupSpan(std::span<LocalRegion const>, std::span<::iovec const>, std::span<void* const>);
+
+    private:
+        std::span<LocalRegion const> _inner;
+        std::span<::iovec const> _iovec;
+        std::span<void* const> _descs;
+    };
 }
