@@ -35,7 +35,7 @@ namespace mxl::lib::fabrics::ofi
             LocalRegion toLocalRegion() noexcept;
 
         public:
-            std::uint32_t data;
+            std::int64_t data;
         };
     };
 

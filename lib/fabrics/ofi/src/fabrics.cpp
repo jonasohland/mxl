@@ -15,6 +15,7 @@
 #include <mxl/mxl.h>
 #include <rdma/fabric.h>
 #include <rfl/json.hpp>
+#include "internal/ContinuousFlowData.hpp"
 #include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
 #include "internal/FlowReader.hpp"
@@ -446,6 +447,106 @@ mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint64_t* 
 }
 
 extern "C" MXL_EXPORT
+mxlStatus mxlFabricsTargetTryNewSample(mxlFabricsTarget in_target, uint64_t* out_index, size_t* out_count)
+{
+    if (in_target == nullptr || out_index == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    try
+    {
+        auto target = ofi::TargetWrapper::fromAPI(in_target);
+        auto res = target->read();
+        if (res.immData)
+        {
+            auto [headIndex, count] = ofi::ImmDataSample{*res.immData}.unpack();
+
+            *out_index = headIndex;
+            *out_count = count;
+
+            // channelBufferLength, sampleWordSize, channelCount, baseBufferPtr,
+            mxlWrappedMultiBufferSlice slice = {};
+            mxl::lib::getMultiBufferSlices(headIndex, count, 0, 0, 0, nullptr, slice);
+
+            // unpack the buffer!
+
+            return MXL_STATUS_OK;
+        }
+
+        return MXL_ERR_NOT_READY;
+    }
+
+    catch (ofi::Exception& e)
+    {
+        MXL_ERROR("Failed to try for new grain: {}", e.what());
+
+        return e.status();
+    }
+
+    catch (std::exception& e)
+    {
+        MXL_ERROR("Failed to try for new grain : {}", e.what());
+        return MXL_ERR_UNKNOWN;
+    }
+
+    catch (...)
+    {
+        MXL_ERROR("Failed to try for new grain");
+        return MXL_ERR_UNKNOWN;
+    }
+
+    return MXL_STATUS_OK;
+}
+
+extern "C" MXL_EXPORT
+mxlStatus mxlFabricsTargetWaitForNewSamples(mxlFabricsTarget in_target, uint64_t* out_index, size_t* out_count, uint16_t in_timeoutMs)
+{
+    if (in_target == nullptr || out_index == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    try
+    {
+        auto target = ofi::TargetWrapper::fromAPI(in_target);
+        auto res = target->readBlocking(std::chrono::milliseconds(in_timeoutMs));
+        if (res.immData)
+        {
+            auto [headIndex, count] = ofi::ImmDataSample{*res.immData}.unpack();
+
+            *out_index = headIndex;
+            *out_count = count;
+
+            // TODO: handle remote region unpacking
+
+            return MXL_STATUS_OK;
+        }
+
+        return MXL_ERR_TIMEOUT;
+    }
+
+    catch (ofi::Exception& e)
+    {
+        MXL_ERROR("Failed to try for new grain: {}", e.what());
+
+        return e.status();
+    }
+
+    catch (std::exception& e)
+    {
+        MXL_ERROR("Failed to try for new grain : {}", e.what());
+        return MXL_ERR_UNKNOWN;
+    }
+
+    catch (...)
+    {
+        MXL_ERROR("Failed to try for new grain");
+        return MXL_ERR_UNKNOWN;
+    }
+}
+
+extern "C" MXL_EXPORT
 mxlStatus mxlFabricsCreateInitiator(mxlFabricsInstance in_fabricsInstance, mxlFabricsInitiator* out_initiator)
 {
     if (in_fabricsInstance == nullptr || out_initiator == nullptr)
@@ -648,8 +749,7 @@ mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInitiator in_initiator, uin
 }
 
 extern "C" MXL_EXPORT
-mxlStatus mxlFabricsInitiatorTransferSamples(mxlFabricsInitiator in_initiator, uint64_t in_index, size_t in_count,
-    mxlWrappedMultiBufferSlice* in_slices)
+mxlStatus mxlFabricsInitiatorTransferSamples(mxlFabricsInitiator in_initiator, uint64_t in_index, size_t in_count)
 {
     if (in_initiator == nullptr)
     {
@@ -658,7 +758,7 @@ mxlStatus mxlFabricsInitiatorTransferSamples(mxlFabricsInitiator in_initiator, u
 
     try
     {
-        ofi::InitiatorWrapper::fromAPI(in_initiator)->transferSamples(in_index, in_count, in_slices);
+        ofi::InitiatorWrapper::fromAPI(in_initiator)->transferSamples(in_index, in_count);
 
         return MXL_STATUS_OK;
     }

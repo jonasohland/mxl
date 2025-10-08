@@ -154,6 +154,7 @@ namespace mxl::lib::fabrics::ofi
                 },
                 [&](RCTarget::Connected state) -> State
                 {
+                    MXL_INFO("make progress");
                     auto [completion, event] = readEndpointQueues<queueReadMode>(state.ep, timeout);
 
                     if (event && event.value().isShutdown())
@@ -165,6 +166,7 @@ namespace mxl::lib::fabrics::ofi
                     {
                         if (auto dataEntry = completion.value().tryData(); dataEntry)
                         {
+                            MXL_INFO("Received completion");
                             // The written grain index is sent as immediate data, and was returned
                             // from the completion queue.
                             result.immData = dataEntry->data();

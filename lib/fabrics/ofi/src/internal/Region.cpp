@@ -80,18 +80,7 @@ namespace mxl::lib::fabrics::ofi
             _inner);
     }
 
-    ::iovec const* Region::asIovec() const noexcept
-    {
-        return &_iovec;
-    }
-
     ::iovec Region::toIovec() const noexcept
-    {
-        return _iovec;
-    }
-
-    // Region implementations
-    ::iovec Region::iovecFromRegion(std::uintptr_t base, size_t size) noexcept
     {
         return ::iovec{.iov_base = reinterpret_cast<void*>(base), .iov_len = size};
     }

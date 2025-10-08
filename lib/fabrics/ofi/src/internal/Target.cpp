@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "Target.hpp"
+#include <cstdint>
 #include <memory>
 #include <utility>
 #include <fmt/format.h>
@@ -21,8 +22,8 @@ namespace mxl::lib::fabrics::ofi
         auto addr = &data;
 
         return LocalRegion{
-            .addr = reinterpret_cast<std::uintptr_t>(addr),
-            .len = sizeof(data),
+            .addr = reinterpret_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(addr)),
+            .len = sizeof(uint64_t),
             .desc = nullptr,
         };
     }

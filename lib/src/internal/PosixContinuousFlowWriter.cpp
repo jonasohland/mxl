@@ -40,23 +40,7 @@ namespace mxl::lib
         {
             if (count <= (_bufferLength / 2))
             {
-                auto const startOffset = (index + _bufferLength - count) % _bufferLength;
-                auto const endOffset = (index % _bufferLength);
-
-                auto const firstLength = (startOffset < endOffset) ? count : _bufferLength - startOffset;
-                auto const secondLength = count - firstLength;
-
-                auto const baseBufferPtr = static_cast<std::uint8_t*>(_flowData->channelData());
-                auto const sampleWordSize = _flowData->sampleWordSize();
-
-                payloadBufferSlices.base.fragments[0].pointer = baseBufferPtr + sampleWordSize * startOffset;
-                payloadBufferSlices.base.fragments[0].size = sampleWordSize * firstLength;
-
-                payloadBufferSlices.base.fragments[1].pointer = baseBufferPtr;
-                payloadBufferSlices.base.fragments[1].size = sampleWordSize * secondLength;
-
-                payloadBufferSlices.stride = sampleWordSize * _bufferLength;
-                payloadBufferSlices.count = _channelCount;
+                _flowData->multiBufferSlices(index, count, payloadBufferSlices);
 
                 _currentIndex = index;
 

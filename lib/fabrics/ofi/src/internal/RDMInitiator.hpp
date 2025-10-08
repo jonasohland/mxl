@@ -76,6 +76,7 @@ namespace mxl::lib::fabrics::ofi
         void addTarget(TargetInfo const&) final;
         void removeTarget(TargetInfo const&) final;
         void transferGrain(uint64_t grainIndex) final;
+        void transferSamples(std::uint64_t headIndex, std::size_t count) final;
         bool makeProgress() final;
         bool makeProgressBlocking(std::chrono::steady_clock::duration) final;
 

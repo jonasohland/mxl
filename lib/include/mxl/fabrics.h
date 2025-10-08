@@ -288,12 +288,10 @@ extern "C"
      * \param in_initiator A valid fabrics initiator
      * \param in_index The head index of the samples to transfer.
      * \param in_count The number of samples to transfer (per channel).
-     * \param in_slices. The sample slices to transfer
      * \return The result code. \see mxlStatus
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsInitiatorTransferSamples(mxlFabricsInitiator in_initiator, uint64_t in_index, size_t in_count,
-        mxlWrappedMultiBufferSlice* in_slices);
+    mxlStatus mxlFabricsInitiatorTransferSamples(mxlFabricsInitiator in_initiator, uint64_t in_index, size_t in_count);
 
     /**
      * This function must be called regularly for the initiator to make progress on queued transfer operations, connection establishment operations

@@ -106,7 +106,7 @@ namespace mxl::lib::fabrics::ofi
             {
                 // The written grain index is sent as immediate data, and was returned
                 // from the completion queue.
-                result.grainAvailable = dataEntry->data();
+                result.immData = dataEntry->data();
 
                 // Need to post receive buffers for immediate data
                 if (_endpoint.domain()->usingRecvBufForCqData())

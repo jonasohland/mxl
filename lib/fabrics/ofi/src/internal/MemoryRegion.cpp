@@ -41,18 +41,15 @@ namespace mxl::lib::fabrics::ofi
         std::mt19937_64 gen(rd());
         std::uniform_int_distribution<uint64_t> dist(0, UINT64_MAX);
 
-        MXL_DEBUG("Registering memory region with address 0x{}, size {} and location {}",
-            reinterpret_cast<void*>(region.base),
-            region.size,
-            region.loc.toString());
-
         std::uint64_t flags = 0;
         flags |= region.loc.isHost() ? 0 : FI_HMEM_DEVICE_ONLY;
 
         ::fi_mr_attr attr{};
         setDeviceId(attr, region.loc);
 
-        attr.mr_iov = region.asIovec();
+        auto iov = region.toIovec();
+
+        attr.mr_iov = &iov;
         attr.iov_count = 1;
         attr.access = access;
         attr.offset = 0;                // reserved to 0
@@ -67,6 +64,12 @@ namespace mxl::lib::fabrics::ofi
         attr.sub_mr_cnt = 0;    // not used
 
         fiCall(fi_mr_regattr, "Failed to register memory region", domain.raw(), &attr, flags, &raw);
+
+        MXL_INFO("Registered memory region with address 0x{}, size {}, location {} and key=0x{:x}",
+            reinterpret_cast<void*>(region.base),
+            region.size,
+            region.loc.toString(),
+            fi_mr_key(raw));
 
         struct MakeSharedEnabler : public MemoryRegion
         {

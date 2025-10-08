@@ -44,23 +44,7 @@ namespace mxl::lib
 
                 if ((index >= minIndex) && ((index - minIndex) >= count))
                 {
-                    auto const startOffset = (index + _bufferLength - count) % _bufferLength;
-                    auto const endOffset = (index % _bufferLength);
-
-                    auto const firstLength = (startOffset < endOffset) ? count : _bufferLength - startOffset;
-                    auto const secondLength = count - firstLength;
-
-                    auto const baseBufferPtr = static_cast<std::uint8_t const*>(_flowData->channelData());
-                    auto const sampleWordSize = _flowData->sampleWordSize();
-
-                    payloadBuffersSlices.base.fragments[0].pointer = baseBufferPtr + sampleWordSize * startOffset;
-                    payloadBuffersSlices.base.fragments[0].size = sampleWordSize * firstLength;
-
-                    payloadBuffersSlices.base.fragments[1].pointer = baseBufferPtr;
-                    payloadBuffersSlices.base.fragments[1].size = sampleWordSize * secondLength;
-
-                    payloadBuffersSlices.stride = sampleWordSize * _bufferLength;
-                    payloadBuffersSlices.count = _channelCount;
+                    _flowData->multiBufferSlices(index, count, payloadBuffersSlices);
 
                     return MXL_STATUS_OK;
                 }

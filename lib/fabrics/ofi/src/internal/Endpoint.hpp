@@ -10,7 +10,6 @@
 #include <uuid.h>
 #include <rdma/fabric.h>
 #include <rdma/fi_endpoint.h>
-#include <sys/uio.h>
 #include "Address.hpp"
 #include "AddressVector.hpp"
 #include "Completion.hpp"
@@ -150,7 +149,7 @@ namespace mxl::lib::fabrics::ofi
         /**
          * Push a remote write work request to the endpoint work queue. When the write is complete, a Completion::Data will be pushed to the
          * completion queue associated with the endpoint. Before a write request can be made, the endpoint must have beed enabled.
-         * \param localGroup Source memory regions to write f  rom.
+         * \param localGroup Source memory regions to write from.
          * \param remoteRegion Destination memory region to write to
          * \param destAddr The destination address of the target endpoint. This is unused when using connected endpoints.
          * \param 64 bits of user data that will be available in the completion entry associated with this transfer.

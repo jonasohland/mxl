@@ -3,6 +3,9 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include "mxl/flow.h"
 #include "FlowData.hpp"
 
 namespace mxl::lib
@@ -31,6 +34,9 @@ namespace mxl::lib
         constexpr void* channelData() noexcept;
         constexpr void const* channelData() const noexcept;
 
+        void multiBufferSlices(std::uint64_t index, std::size_t count, mxlMutableWrappedMultiBufferSlice& slices) noexcept;
+        void multiBufferSlices(std::uint64_t index, std::size_t count, mxlWrappedMultiBufferSlice& slices) const noexcept;
+
     private:
         SharedMemorySegment _channelBuffers;
         std::size_t _sampleWordSize;
@@ -39,6 +45,47 @@ namespace mxl::lib
     /**************************************************************************/
     /* Inline implementation.                                                 */
     /**************************************************************************/
+
+    // TODO: merge these two
+    inline void getMultiBufferSlices(std::uint64_t index, std::size_t count, size_t channelBufferLength, std::size_t sampleWordSize,
+        std::size_t channelCount, std::uint8_t const* const baseBufferPtr, mxlWrappedMultiBufferSlice& slice) noexcept
+    {
+        auto const startOffset = (index + channelBufferLength - count) % channelBufferLength;
+        auto const endOffset = (index % channelBufferLength);
+
+        auto const firstLength = (startOffset < endOffset) ? count : channelBufferLength - startOffset;
+        auto const secondLength = count - firstLength;
+
+        slice.base.fragments[0].pointer = baseBufferPtr + sampleWordSize * startOffset;
+        slice.base.fragments[0].size = sampleWordSize * firstLength;
+
+        slice.base.fragments[1].pointer = baseBufferPtr;
+        slice.base.fragments[1].size = sampleWordSize * secondLength;
+
+        slice.stride = sampleWordSize * channelBufferLength;
+        slice.count = channelCount;
+    }
+
+    inline void getMultiBufferSlices(std::uint64_t index, std::size_t count, size_t channelBufferLength, std::size_t sampleWordSize,
+        std::size_t channelCount, std::uint8_t* const baseBufferPtr, mxlMutableWrappedMultiBufferSlice& slice) noexcept
+    {
+        auto const startOffset = (index + channelBufferLength - count) % channelBufferLength;
+        auto const endOffset = (index % channelBufferLength);
+
+        auto const firstLength = (startOffset < endOffset) ? count : channelBufferLength - startOffset;
+        auto const secondLength = count - firstLength;
+
+        slice.base.fragments[0].pointer = baseBufferPtr + sampleWordSize * startOffset;
+        slice.base.fragments[0].size = sampleWordSize * firstLength;
+
+        slice.base.fragments[1].pointer = baseBufferPtr;
+        slice.base.fragments[1].size = sampleWordSize * secondLength;
+
+        slice.stride = sampleWordSize * channelBufferLength;
+        slice.count = channelCount;
+    }
+
+    // TODO: merge these two
 
     inline ContinuousFlowData::ContinuousFlowData(SharedMemoryInstance<Flow>&& flowSegement) noexcept
         : FlowData{std::move(flowSegement)}
@@ -114,4 +161,17 @@ namespace mxl::lib
     {
         return _channelBuffers.data();
     }
+
+    inline void ContinuousFlowData::multiBufferSlices(std::uint64_t index, std::size_t count, mxlMutableWrappedMultiBufferSlice& slices) noexcept
+    {
+        getMultiBufferSlices(
+            index, count, channelBufferLength(), sampleWordSize(), channelCount(), static_cast<std::uint8_t* const>(channelData()), slices);
+    }
+
+    inline void ContinuousFlowData::multiBufferSlices(std::uint64_t index, std::size_t count, mxlWrappedMultiBufferSlice& slices) const noexcept
+    {
+        getMultiBufferSlices(
+            index, count, channelBufferLength(), sampleWordSize(), channelCount(), static_cast<std::uint8_t const* const>(channelData()), slices);
+    }
+
 }

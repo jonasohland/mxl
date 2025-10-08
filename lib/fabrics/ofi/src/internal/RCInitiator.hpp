@@ -7,7 +7,6 @@
 #include <memory>
 #include <variant>
 #include <vector>
-#include "mxl/flow.h"
 #include "Completion.hpp"
 #include "Domain.hpp"
 #include "Endpoint.hpp"
@@ -133,7 +132,7 @@ namespace mxl::lib::fabrics::ofi
 
         /// Transfer samples to all targets. This is a non-blocking operation.
         /// The transfer is complete only after makeProgress() or makeProgressBlocking() returns false.
-        void transferSamples(std::uint64_t headIndex, std::size_t count, mxlWrappedMultiBufferSlice* slices) final;
+        void transferSamples(std::uint64_t headIndex, std::size_t count) final;
 
         /// The actual work of connecting, shutting down and transferring grains is done when this function is called.
         /// This is the non blocking version. That means it will do all currently pending work, check all queues, but not wait

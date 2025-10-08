@@ -85,7 +85,7 @@ namespace mxl::lib::fabrics::ofi
             auto const& remote = _regions[index % _regions.size()];
 
             // Post a write work item to the endpoint and increment the pending counter. When the write is complete,
-            _ep->write(local, remote, state->fiAddr, index);
+            _ep->write(local, remote[0], state->fiAddr, index);
         }
     }
 
@@ -153,7 +153,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RDMInitiator::transferGrain(uint64_t index)
+    void RDMInitiator::transferGrain(std::uint64_t index)
     {
         // Find the local region in which the grain with this index is stored.
         auto& localRegion = _localRegions[index % _localRegions.size()];
@@ -167,6 +167,11 @@ namespace mxl::lib::fabrics::ofi
             // A completion will be posted to the completion queue, after which the counter will be decremented again
             pending++;
         }
+    }
+
+    void RDMInitiator::transferSamples(std::uint64_t headIndex, std::size_t count)
+    {
+        // TODO:
     }
 
     // makeProgress

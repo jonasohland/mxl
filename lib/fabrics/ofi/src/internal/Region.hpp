@@ -70,13 +70,9 @@ namespace mxl::lib::fabrics::ofi
             : base(base)
             , size(size)
             , loc(loc)
-            , _iovec(iovecFromRegion(base, size))
         {}
 
     public:
-        [[nodiscard]]
-        ::iovec const* asIovec() const noexcept;
-
         [[nodiscard]]
         ::iovec toIovec() const noexcept;
 
@@ -84,12 +80,6 @@ namespace mxl::lib::fabrics::ofi
         std::uintptr_t base;
         std::size_t size;
         Location loc;
-
-    private:
-        static ::iovec iovecFromRegion(std::uintptr_t, std::size_t) noexcept;
-
-    private:
-        ::iovec _iovec;
     };
 
     class RegionGroup

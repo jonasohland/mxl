@@ -4,12 +4,12 @@
 
 #include "RCInitiator.hpp"
 #include <chrono>
-#include <cstddef>
 #include <cstdint>
 #include <algorithm>
 #include <uuid.h>
 #include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
+#include "internal/ContinuousFlowData.hpp"
 #include "internal/Logging.hpp"
 #include "mxl/flow.h"
 #include "Domain.hpp"
@@ -187,6 +187,7 @@ namespace mxl::lib::fabrics::ofi
 
     void RCInitiatorEndpoint::consume(Completion completion)
     {
+        MXL_INFO("Got completion!");
         if (auto error = completion.tryErr(); error)
         {
             handleCompletionError(*error);
@@ -353,7 +354,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiator::transferSamples(std::uint64_t headIndex, std::size_t count, mxlWrappedMultiBufferSlice* slices)
+    void RCInitiator::transferSamples(std::uint64_t headIndex, std::size_t count)
     {
         if (_localRegions.empty())
         {
@@ -361,18 +362,21 @@ namespace mxl::lib::fabrics::ofi
             return;
         }
 
+        mxlWrappedMultiBufferSlice slice = {};
+        getMultiBufferSlices(headIndex, count, 0, 0, 0, nullptr, slice); // TODO: set these correctly
+
         // Create the scatter-gather list using the slices. We create at least one scatter-gather entry per channel. We potentially create an
         // additional one per channel if 2 fragments are present (wrap-around). When a fragment is not present its size will be 0.
         std::vector<LocalRegion> sgList;
         auto desc = _localRegions.front().begin()->desc;
-        for (auto& fragment : slices->base.fragments)
+        for (auto& fragment : slice.base.fragments)
         {
             // check if the fragment present
             if (fragment.size > 0)
             {
-                for (size_t chan = 0; chan < slices->count; chan++)
+                for (size_t chan = 0; chan < slice.count; chan++)
                 {
-                    auto chanAddr = reinterpret_cast<std::uintptr_t>(fragment.pointer) + (slices->stride * chan);
+                    auto chanAddr = reinterpret_cast<std::uintptr_t>(fragment.pointer) + (slice.stride * chan);
                     sgList.emplace_back(LocalRegion{.addr = chanAddr, .len = fragment.size, .desc = desc});
                 }
             }

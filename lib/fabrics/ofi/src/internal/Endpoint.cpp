@@ -360,8 +360,17 @@ namespace mxl::lib::fabrics::ofi
             // check if it is the last transfer, if it is, we post the request with immediate data
             if (i == nbWrites - 1)
             {
+                // MXL_INFO("with immediate data!");
                 flags |= immData ? FI_REMOTE_CQ_DATA : 0;
             }
+
+            // MXL_INFO("local: addr={:p} size={} iov_count={}     remote: addr=0x{} size={} key=0x{:x}",
+            //     localGroupSpan.asIovec()->iov_base,
+            //     localGroupSpan.asIovec()->iov_len,
+            //     localGroupSpan.size(),
+            //     remoteRmaIov.addr,
+            //     remoteRmaIov.len,
+            //     remoteRmaIov.key);
 
             ::fi_msg_rma msg = {
                 .msg_iov = localGroupSpan.asIovec(),

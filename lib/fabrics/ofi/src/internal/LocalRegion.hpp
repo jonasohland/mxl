@@ -118,15 +118,12 @@ namespace mxl::lib::fabrics::ofi
             return _inner.size();
         }
 
-        /// Rturns the sum of all region "len" in the span which corresponds to the total amount of bytes all non-contiguous buffers uses.
+        /// Returns the sum of all region "len" in the span which corresponds to the total amount of bytes all non-contiguous buffers uses.
         [[nodiscard]]
         std::size_t byteSize() const noexcept;
 
     private:
         friend class LocalRegionGroup;
-
-        using iterator = std::vector<LocalRegion>::iterator;
-        using const_iterator = std::vector<LocalRegion>::const_iterator;
 
     private:
         LocalRegionGroupSpan(std::span<LocalRegion const>, std::span<::iovec const>, std::span<void* const>);

@@ -11,7 +11,6 @@
 #include "internal/Instance.hpp"
 #include "internal/Logging.hpp"
 #include "internal/PathUtils.hpp"
-#include "mxl/dataformat.h"
 #include "mxl/mxl.h"
 
 using namespace mxl::lib;
