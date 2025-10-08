@@ -82,6 +82,7 @@ target_sources(mxl-fabrics-objects
             src/internal/FIInfo.cpp
             src/internal/FILogging.cpp
             src/internal/FIVersion.cpp
+            src/internal/ImmData.cpp
             src/internal/Initiator.cpp
             src/internal/LocalRegion.cpp
             src/internal/MemoryRegion.cpp

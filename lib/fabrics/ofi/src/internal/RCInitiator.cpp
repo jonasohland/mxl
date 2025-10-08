@@ -12,6 +12,7 @@
 #include "internal/Logging.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
+#include "ImmData.hpp"
 #include "Region.hpp"
 #include "VariantUtils.hpp"
 
@@ -201,7 +202,7 @@ namespace mxl::lib::fabrics::ofi
 
             // Post a write work item to the endpoint and increment the pending counter. When the write is complete, a completion will be posted to
             // the completion queue, after which the counter will be decremented again if the target is still in the connected state.
-            connected->ep.write(local, remote, FI_ADDR_UNSPEC, index);
+            connected->ep.write(local, remote, FI_ADDR_UNSPEC, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
             ++connected->pending;
         }
     }

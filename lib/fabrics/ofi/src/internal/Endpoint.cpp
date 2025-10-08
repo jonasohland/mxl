@@ -325,7 +325,7 @@ namespace mxl::lib::fabrics::ofi
     }
 
     void Endpoint::write(LocalRegionGroup const& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr,
-        std::optional<std::uint64_t> immData)
+        std::optional<std::uint32_t> immData)
     {
         std::uint64_t data = immData.value_or(0);
         std::uint64_t flags = FI_DELIVERY_COMPLETE;
