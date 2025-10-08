@@ -4,7 +4,7 @@
 
 #include "LocalRegion.hpp"
 #include <algorithm>
-#include <sys/uio.h>
+#include <numeric>
 #include "Exception.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -38,23 +38,35 @@ namespace mxl::lib::fabrics::ofi
         return descs;
     }
 
-    LocalRegionGroupSpan LocalRegionGroup::span(std::size_t beginIndex, std::size_t endIndex)
+    LocalRegionGroupSpan LocalRegionGroup::span(std::size_t begin, std::size_t end) const
     {
-        if (endIndex < beginIndex)
+        if (end < begin)
         {
-            throw Exception::internal("endIndex {} is smaller than beginIndex {}", endIndex, beginIndex);
+            throw Exception::internal("end {} is smaller than begin {}", end, begin);
         }
 
-        auto spanLength = endIndex - beginIndex;
+        auto spanLength = end - begin;
         if (spanLength > _inner.size())
         {
             throw Exception::internal("requested span size {} will be bigger than the actual size of the full vector {}", spanLength, _inner.size());
         }
 
-        auto begin = &_iovs[beginIndex];
-        auto desc = &_descs[beginIndex];
+        return LocalRegionGroupSpan{
+            std::span(_inner.begin() + begin, spanLength),
+            std::span(_iovs.begin() + begin, spanLength),
+            std::span(_descs.begin() + begin, spanLength),
+        };
+    }
 
-        return LocalRegionGroupSpan{begin, spanLength, desc};
+    LocalRegionGroupSpan::LocalRegionGroupSpan(std::span<LocalRegion const> region, std::span<::iovec const> iovec, std::span<void* const> desc)
+        : _inner(region)
+        , _iovec(iovec)
+        , _descs(desc)
+    {}
+
+    std::size_t LocalRegionGroupSpan::byteSize() const noexcept
+    {
+        return std::accumulate(_inner.begin(), _inner.end(), 0, [](size_t sum, auto const region) { return sum + region.len; });
     }
 
 } // namespace mxl::lib::fabrics::ofi

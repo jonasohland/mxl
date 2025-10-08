@@ -13,7 +13,9 @@
 #include "Endpoint.hpp"
 #include "Event.hpp"
 #include "Initiator.hpp"
+#include "LocalRegion.hpp"
 #include "RegisteredRegion.hpp"
+#include "RemoteRegion.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {

@@ -47,7 +47,7 @@ namespace mxl::lib::fabrics::ofi
         void addTarget(TargetInfo const& targetInfo);
         void removeTarget(TargetInfo const& targetInfo);
         void transferGrain(std::uint64_t grainIndex);
-        void transferSamples(std::uint64_t headIndex, std::size_t count);
+        void transferSamples(std::uint64_t headIndex, std::size_t count, mxlWrappedMultiBufferSlice* slices);
         bool makeProgress();
         bool makeProgressBlocking(std::chrono::steady_clock::duration);
 

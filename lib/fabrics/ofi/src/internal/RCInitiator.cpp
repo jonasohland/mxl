@@ -7,7 +7,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <algorithm>
-#include <span>
 #include <uuid.h>
 #include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
@@ -15,8 +14,10 @@
 #include "mxl/flow.h"
 #include "Domain.hpp"
 #include "Exception.hpp"
+#include "ImmData.hpp"
 #include "LocalRegion.hpp"
 #include "Region.hpp"
+#include "RemoteRegion.hpp"
 #include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -196,17 +197,15 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, uint64_t index)
+    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, std::uint64_t index)
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
+            auto immData = ImmDataGrain{index, 0}; // TODO: set the slice index
+
             // Find the remote region to which this grain should be written.
             auto const& remote = _regions[index % _regions.size()];
-
-            // Post a write work item to the endpoint and increment the pending counter. When the write is complete, a completion will be posted to
-            // the completion queue, after which the counter will be decremented again if the target is still in the connected state.
-            connected->ep.write(local, remote, FI_ADDR_UNSPEC, index);
-            ++connected->pending;
+            connected->pending += connected->ep.write(local, remote[0], immData.data());
         }
     }
 
@@ -214,21 +213,10 @@ namespace mxl::lib::fabrics::ofi
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
-            // TODO: make a function to create/parse immediate data for samples
-            auto immData = count & 0xFFFF + index & 0xFFFF << 16;
+            auto immData = ImmDataSample{index, count};
 
             auto const& remote = _regions[index % _regions.size()];
-
-            // Post a write work item to the endpoint and increment the pending counter. When the write is complete, a completion will be posted to
-            // the completion queue, after which the counter will be decremented again if the target is still in the connected state.
-            auto iovLimit = connected->ep.info()->tx_attr->iov_limit;
-            auto nbWrites = (local.size() + (iovLimit - 1)) / iovLimit;
-            for (size_t i = 0; i < nbWrites; i++)
-            {
-                // TODO: use the local span
-                connected->ep.write(local, remote, FI_ADDR_UNSPEC, immData);
-                ++connected->pending;
-            }
+            connected->pending += connected->ep.write(local, remote[0], immData.data());
         }
     }
 
@@ -348,6 +336,12 @@ namespace mxl::lib::fabrics::ofi
 
     void RCInitiator::transferGrain(std::uint64_t index)
     {
+        if (_localRegions.empty())
+        {
+            MXL_WARN("No region registered. This should not happen");
+            return;
+        }
+
         // Find the local region in which the grain with this index is stored.
         auto& localRegion = _localRegions[index % _localRegions.size()];
 
@@ -367,24 +361,24 @@ namespace mxl::lib::fabrics::ofi
             return;
         }
 
-        // Create a scatter-gather list using the headIndex, sample count, region base address, the channel count and size
+        // Create the scatter-gather list using the slices. We create at least one scatter-gather entry per channel. We potentially create an
+        // additional one per channel if 2 fragments are present (wrap-around). When a fragment is not present its size will be 0.
         std::vector<LocalRegion> sgList;
-
-        auto bufferBase = _localRegions[headIndex % _localRegions.size()].begin()->addr;
         auto desc = _localRegions.front().begin()->desc;
-
-        for (size_t i; i < 2; i++) // There's possibly 2 slices if the range wraps
+        for (auto& fragment : slices->base.fragments)
         {
-            if (slices->base.fragments[i].size > 0)
+            // check if the fragment present
+            if (fragment.size > 0)
             {
                 for (size_t chan = 0; chan < slices->count; chan++)
                 {
-                    auto chanAddr = reinterpret_cast<std::uintptr_t>(slices->base.fragments[i].pointer) + (slices->stride * chan);
-                    sgList.emplace_back(LocalRegion{.addr = chanAddr, .len = slices->base.fragments[i].size, .desc = desc});
+                    auto chanAddr = reinterpret_cast<std::uintptr_t>(fragment.pointer) + (slices->stride * chan);
+                    sgList.emplace_back(LocalRegion{.addr = chanAddr, .len = fragment.size, .desc = desc});
                 }
             }
         }
 
+        // Do the post the transfer to each targets
         for (auto& [_, target] : _targets)
         {
             target.postTransfer(sgList, headIndex, count);

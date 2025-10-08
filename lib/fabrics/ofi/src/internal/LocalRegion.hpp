@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <vector>
 #include <bits/types/struct_iovec.h>
 
@@ -82,7 +83,8 @@ namespace mxl::lib::fabrics::ofi
             return _inner.size();
         }
 
-        LocalRegionGroupSpan span(size_t beginIndex, size_t endIndex);
+        [[nodiscard]]
+        LocalRegionGroupSpan span(std::size_t beginIndex, std::size_t endIndex) const;
 
     private:
         static std::vector<::iovec> iovFromGroup(std::vector<LocalRegion> group) noexcept;
@@ -101,35 +103,38 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::iovec const* asIovec() const noexcept
         {
-            return _inner;
+            return _iovec.data();
         }
 
         [[nodiscard]]
         void* const* desc() const noexcept
         {
-            return _desc;
+            return _descs.data();
         }
 
         [[nodiscard]]
         std::size_t size() const noexcept
         {
-            return _size;
+            return _inner.size();
         }
+
+        /// Rturns the sum of all region "len" in the span which corresponds to the total amount of bytes all non-contiguous buffers uses.
+        [[nodiscard]]
+        std::size_t byteSize() const noexcept;
 
     private:
         friend class LocalRegionGroup;
 
-    private:
-        LocalRegionGroupSpan(::iovec const* begin, std::size_t size, void* const* desc)
-            : _inner(begin)
-            , _size(size)
-            , _desc(desc)
-        {}
+        using iterator = std::vector<LocalRegion>::iterator;
+        using const_iterator = std::vector<LocalRegion>::const_iterator;
 
     private:
-        ::iovec const* _inner;
-        std::size_t _size;
-        void* const* _desc;
+        LocalRegionGroupSpan(std::span<LocalRegion const>, std::span<::iovec const>, std::span<void* const>);
+
+    private:
+        std::span<LocalRegion const> _inner;
+        std::span<::iovec const> _iovec;
+        std::span<void* const> _descs;
     };
 
 }

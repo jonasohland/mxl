@@ -18,6 +18,7 @@
 #include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
 #include "internal/FlowReader.hpp"
+#include "internal/ImmData.hpp"
 #include "internal/Initiator.hpp"
 #include "internal/Provider.hpp"
 #include "internal/Region.hpp"
@@ -364,9 +365,13 @@ mxlStatus mxlFabricsTargetTryNewGrain(mxlFabricsTarget in_target, uint64_t* out_
     {
         auto target = ofi::TargetWrapper::fromAPI(in_target);
         auto res = target->read();
-        if (res.grainAvailable.has_value())
+        if (res.immData)
         {
-            *out_index = res.grainAvailable.value();
+            auto [grainIndex, sliceIndex] = ofi::ImmDataGrain{*res.immData}.unpack();
+
+            *out_index = grainIndex;
+            // TODO: sliceIndex
+
             return MXL_STATUS_OK;
         }
 
@@ -407,9 +412,13 @@ mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint64_t* 
     {
         auto target = ofi::TargetWrapper::fromAPI(in_target);
         auto res = target->readBlocking(std::chrono::milliseconds(in_timeoutMs));
-        if (res.grainAvailable)
+        if (res.immData)
         {
-            *out_index = res.grainAvailable.value();
+            auto [grainIndex, sliceIndex] = ofi::ImmDataGrain{*res.immData}.unpack();
+
+            *out_index = grainIndex;
+            // TODO: sliceIndex
+
             return MXL_STATUS_OK;
         }
 
@@ -614,6 +623,42 @@ mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInitiator in_initiator, uin
     try
     {
         ofi::InitiatorWrapper::fromAPI(in_initiator)->transferGrain(in_grainIndex);
+
+        return MXL_STATUS_OK;
+    }
+    catch (ofi::Exception& e)
+    {
+        if (e.status() == MXL_ERR_UNKNOWN)
+        {
+            MXL_ERROR("Failed to transfer grain: {}", e.what());
+        }
+
+        return e.status();
+    }
+    catch (std::exception& e)
+    {
+        MXL_ERROR("Failed to transfer grain: {}", e.what());
+        return MXL_ERR_UNKNOWN;
+    }
+    catch (...)
+    {
+        MXL_ERROR("Failed to transfer grain");
+        return MXL_ERR_UNKNOWN;
+    }
+}
+
+extern "C" MXL_EXPORT
+mxlStatus mxlFabricsInitiatorTransferSamples(mxlFabricsInitiator in_initiator, uint64_t in_index, size_t in_count,
+    mxlWrappedMultiBufferSlice* in_slices)
+{
+    if (in_initiator == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    try
+    {
+        ofi::InitiatorWrapper::fromAPI(in_initiator)->transferSamples(in_index, in_count, in_slices);
 
         return MXL_STATUS_OK;
     }

@@ -21,8 +21,8 @@ namespace mxl::lib::fabrics::ofi
         auto addr = &data;
 
         return LocalRegion{
-            .addr = reinterpret_cast<uint64_t>(reinterpret_cast<std::uintptr_t>(addr)),
-            .len = sizeof(uint64_t),
+            .addr = reinterpret_cast<std::uintptr_t>(addr),
+            .len = sizeof(data),
             .desc = nullptr,
         };
     }

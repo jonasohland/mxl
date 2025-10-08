@@ -5,6 +5,7 @@
 #include "Initiator.hpp"
 #include <cstddef>
 #include "mxl/fabrics.h"
+#include "mxl/flow.h"
 #include "Exception.hpp"
 #include "RCInitiator.hpp"
 #include "RDMInitiator.hpp"
@@ -78,14 +79,14 @@ namespace mxl::lib::fabrics::ofi
         _inner->transferGrain(grainIndex);
     }
 
-    void InitiatorWrapper::transferSamples(std::uint64_t headIndex, std::size_t count)
+    void InitiatorWrapper::transferSamples(std::uint64_t headIndex, std::size_t count, mxlWrappedMultiBufferSlice* slices)
     {
         if (!_inner)
         {
             throw Exception::invalidState("Initiator is not set up");
         }
 
-        _inner->transferSamples(headIndex, count);
+        _inner->transferSamples(headIndex, count, slices);
     }
 
     bool InitiatorWrapper::makeProgress()
