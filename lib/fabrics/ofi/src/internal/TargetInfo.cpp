@@ -20,7 +20,7 @@ namespace mxl::lib::fabrics::ofi
 
     bool TargetInfo::operator==(TargetInfo const& other) const noexcept
     {
-        return fabricAddress == other.fabricAddress && remoteRegionGroups == other.remoteRegionGroups && id == other.id;
+        return fabricAddress == other.fabricAddress && remoteRegions == other.remoteRegions && id == other.id;
     }
 
 }

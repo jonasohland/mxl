@@ -33,23 +33,6 @@ namespace mxl::lib::fabrics::ofi
         Region _region;
     };
 
-    class RegisteredRegionGroup
-    {
-    public:
-        explicit RegisteredRegionGroup(std::vector<RegisteredRegion> inner)
-            : _inner(std::move(inner))
-        {}
-
-        [[nodiscard]]
-        RemoteRegionGroup toRemote(bool useVirtualAddress) const noexcept;
-
-        [[nodiscard]]
-        LocalRegionGroup toLocal() const noexcept;
-
-    private:
-        std::vector<RegisteredRegion> _inner;
-    };
-
-    std::vector<RemoteRegionGroup> toRemote(std::vector<RegisteredRegionGroup> const& groups, bool useVirtualAddress) noexcept;
-    std::vector<LocalRegionGroup> toLocal(std::vector<RegisteredRegionGroup> const& groups) noexcept;
+    std::vector<RemoteRegion> toRemote(std::vector<RegisteredRegion> const& regions, bool useVirtualAddress) noexcept;
+    std::vector<LocalRegion> toLocal(std::vector<RegisteredRegion> const& regions) noexcept;
 }

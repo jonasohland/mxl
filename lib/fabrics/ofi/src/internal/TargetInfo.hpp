@@ -24,9 +24,9 @@ namespace mxl::lib::fabrics::ofi
     public:
         TargetInfo() = default;
 
-        TargetInfo(FabricAddress fabricAddress, std::vector<RemoteRegionGroup> regions, Endpoint::Id id = Endpoint::randomId())
+        TargetInfo(FabricAddress fabricAddress, std::vector<RemoteRegion> regions, Endpoint::Id id = Endpoint::randomId())
             : fabricAddress(std::move(fabricAddress))
-            , remoteRegionGroups(std::move(regions))
+            , remoteRegions(std::move(regions))
             , id(id)
         {}
 
@@ -39,7 +39,7 @@ namespace mxl::lib::fabrics::ofi
 
     public:
         FabricAddress fabricAddress;
-        std::vector<RemoteRegionGroup> remoteRegionGroups;
+        std::vector<RemoteRegion> remoteRegions;
         Endpoint::Id id;
     };
 
@@ -48,13 +48,13 @@ namespace mxl::lib::fabrics::ofi
     struct TargetInfoRfl
     {
         rfl::Rename<"fabricAddress", FabricAddressRfl> fabricAddress;
-        rfl::Rename<"regions", std::vector<RemoteRegionGroup>> regions;
+        rfl::Rename<"regions", std::vector<RemoteRegion>> regions;
         rfl::Rename<"identifier", std::string> identifier;
 
         static TargetInfoRfl from_class(TargetInfo const& ti)
         {
-            rfl::Rename<"regions", std::vector<RemoteRegionGroup>> rflRegions;
-            std::ranges::copy(ti.remoteRegionGroups.begin(), ti.remoteRegionGroups.end(), std::back_inserter(rflRegions.value()));
+            rfl::Rename<"regions", std::vector<RemoteRegion>> rflRegions;
+            std::ranges::copy(ti.remoteRegions.begin(), ti.remoteRegions.end(), std::back_inserter(rflRegions.value()));
             return TargetInfoRfl{
                 .fabricAddress = FabricAddressRfl::from_class(ti.fabricAddress), .regions = rflRegions, .identifier = fmt::to_string(ti.id)};
         }

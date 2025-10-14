@@ -27,7 +27,7 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    RDMInitiatorEndpoint::RDMInitiatorEndpoint(std::shared_ptr<Endpoint> ep, FabricAddress remote, std::vector<RemoteRegionGroup> remoteRegions)
+    RDMInitiatorEndpoint::RDMInitiatorEndpoint(std::shared_ptr<Endpoint> ep, FabricAddress remote, std::vector<RemoteRegion> remoteRegions)
         : _state(Idle{})
         , _ep(std::move(ep))
         , _addr(std::move(remote))
@@ -86,7 +86,7 @@ namespace mxl::lib::fabrics::ofi
             auto const& remote = _regions[index % _regions.size()];
 
             // Post a write work item to the endpoint and increment the pending counter. When the write is complete,
-            return _ep->write(local, remote[0], state->fiAddr, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
+            return _ep->write(local, remote, state->fiAddr, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
         }
 
         return 0;
@@ -117,7 +117,7 @@ namespace mxl::lib::fabrics::ofi
         if (config.regions != nullptr)
         {
             auto const mxlRegions = MxlRegions::fromAPI(config.regions);
-            domain->registerRegionGroups(mxlRegions->regionGroups(), FI_WRITE);
+            domain->registerRegions(mxlRegions->regions(), FI_WRITE);
         }
 
         auto endpoint = std::make_shared<Endpoint>(Endpoint::create(std::move(domain)));
@@ -142,7 +142,7 @@ namespace mxl::lib::fabrics::ofi
 
     void RDMInitiator::addTarget(TargetInfo const& targetInfo)
     {
-        _targets.emplace(targetInfo.id, RDMInitiatorEndpoint(_endpoint, targetInfo.fabricAddress, targetInfo.remoteRegionGroups));
+        _targets.emplace(targetInfo.id, RDMInitiatorEndpoint(_endpoint, targetInfo.fabricAddress, targetInfo.remoteRegions));
     }
 
     void RDMInitiator::removeTarget(TargetInfo const& targetInfo)
@@ -166,10 +166,15 @@ namespace mxl::lib::fabrics::ofi
         // this is a no-op.
         for (auto& [_, target] : _targets)
         {
-            pending += target.postTransfer(localRegion, index);
+            pending += target.postTransfer(localRegion.asGroup(), index);
 
             // A completion will be posted to the completion queue, after which the counter will be decremented again
         }
+    }
+
+    void RDMInitiator::transferSamples(std::uint64_t headIndex, std::size_t count)
+    {
+        // TODO:
     }
 
     // makeProgress
@@ -202,7 +207,7 @@ namespace mxl::lib::fabrics::ofi
 
     RDMInitiator::RDMInitiator(std::shared_ptr<Endpoint> ep)
         : _endpoint(std::move(ep))
-        , _localRegions(_endpoint->domain()->localRegionGroups())
+        , _localRegions(_endpoint->domain()->localRegions())
     {}
 
     bool RDMInitiator::hasPendingWork() const noexcept

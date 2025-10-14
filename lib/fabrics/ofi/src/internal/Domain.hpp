@@ -37,15 +37,15 @@ namespace mxl::lib::fabrics::ofi
         static std::shared_ptr<Domain> open(std::shared_ptr<Fabric> fabric);
 
         /// Register a list of memory region group to this domain. The domain will own the registered groups.
-        void registerRegionGroups(std::vector<RegionGroup> const& regionGroups, std::uint64_t access);
+        void registerRegions(std::vector<Region> const& regions, std::uint64_t access);
 
         /// Get the local groups associated with the registered groups to this domain.
         [[nodiscard]]
-        std::vector<LocalRegionGroup> localRegionGroups() const noexcept;
+        std::vector<LocalRegion> localRegions() const noexcept;
 
         /// Get the remote groups associated with the registered groups to this domain.
         [[nodiscard]]
-        std::vector<RemoteRegionGroup> RemoteRegionGroups() const noexcept;
+        std::vector<RemoteRegion> remoteRegions() const noexcept;
 
         [[nodiscard]]
         bool usingVirtualAddresses() const noexcept;
@@ -66,13 +66,13 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         RegisteredRegion registerRegion(Region const& region, std::uint64_t access);
         [[nodiscard]]
-        RegisteredRegionGroup registerRegionGroup(RegionGroup const& regionGroup, std::uint64_t access);
+        // RegisteredRegionGroup registerRegionGroup(RegionGroup const& regionGroup, std::uint64_t access);
 
-        Domain(::fid_domain*, std::shared_ptr<Fabric>, std::vector<RegisteredRegionGroup>);
+        Domain(::fid_domain*, std::shared_ptr<Fabric>, std::vector<RegisteredRegion>);
 
     private:
         ::fid_domain* _raw;
         std::shared_ptr<Fabric> _fabric;
-        std::vector<RegisteredRegionGroup> _registeredRegionGroups;
+        std::vector<RegisteredRegion> _registeredRegions;
     };
 }

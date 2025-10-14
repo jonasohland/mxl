@@ -115,9 +115,9 @@ mxlStatus mxlFabricsRegionsForFlowWriter(mxlFlowWriter in_writer, mxlRegions* ou
 }
 
 extern "C" MXL_EXPORT
-mxlStatus mxlFabricsRegionsFromBufferGroups(mxlFabricsMemoryRegionGroup const* in_groups, size_t in_count, mxlRegions* out_regions)
+mxlStatus mxlFabricsRegionsFromUserBuffers(mxlFabricsMemoryRegion const* in_regions, size_t in_count, mxlRegions* out_regions)
 {
-    if (in_groups == nullptr || out_regions == nullptr)
+    if (in_regions == nullptr || out_regions == nullptr)
     {
         return MXL_ERR_INVALID_ARG;
     }
@@ -125,7 +125,7 @@ mxlStatus mxlFabricsRegionsFromBufferGroups(mxlFabricsMemoryRegionGroup const* i
     try
     {
         // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
-        auto regionPtr = std::make_unique<ofi::MxlRegions>(ofi::mxlRegionsFromGroups(in_groups, in_count)).release();
+        auto regionPtr = std::make_unique<ofi::MxlRegions>(ofi::mxlRegionsFromUser(in_regions, in_count)).release();
 
         *out_regions = regionPtr->toAPI();
 
@@ -415,6 +415,108 @@ mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint16_t* 
             auto [grainIndex, sliceIndex] = ofi::ImmDataGrain{*res.immData}.unpack();
             *out_index = grainIndex;
             // TODO: sliceIndex
+
+            return MXL_STATUS_OK;
+        }
+
+        return MXL_ERR_TIMEOUT;
+    }
+
+    catch (ofi::Exception& e)
+    {
+        MXL_ERROR("Failed to try for new grain: {}", e.what());
+
+        return e.status();
+    }
+
+    catch (std::exception& e)
+    {
+        MXL_ERROR("Failed to try for new grain : {}", e.what());
+        return MXL_ERR_UNKNOWN;
+    }
+
+    catch (...)
+    {
+        MXL_ERROR("Failed to try for new grain");
+        return MXL_ERR_UNKNOWN;
+    }
+}
+
+extern "C" MXL_EXPORT
+mxlStatus mxlFabricsTargetTryNewSample(mxlFabricsTarget in_target, uint64_t* out_index, size_t* out_count)
+{
+    if (in_target == nullptr || out_index == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    try
+    {
+        auto target = ofi::TargetWrapper::fromAPI(in_target);
+        auto res = target->read();
+        if (res.immData)
+        {
+            auto [headIndex, count] = ofi::ImmDataSample{*res.immData}.unpack();
+
+            *out_index = headIndex;
+            *out_count = count;
+
+            // TODO: should the unpacking happen here or inside the target??
+
+            // channelBufferLength, sampleWordSize, channelCount, baseBufferPtr,
+            // mxlWrappedMultiBufferSlice slice = {};
+            // mxl::lib::getMultiBufferSlices(headIndex, count, 0, 0, 0, nullptr, slice);
+
+            // unpack the buffer!
+
+            return MXL_STATUS_OK;
+        }
+
+        return MXL_ERR_NOT_READY;
+    }
+
+    catch (ofi::Exception& e)
+    {
+        MXL_ERROR("Failed to try for new grain: {}", e.what());
+
+        return e.status();
+    }
+
+    catch (std::exception& e)
+    {
+        MXL_ERROR("Failed to try for new grain : {}", e.what());
+        return MXL_ERR_UNKNOWN;
+    }
+
+    catch (...)
+    {
+        MXL_ERROR("Failed to try for new grain");
+        return MXL_ERR_UNKNOWN;
+    }
+
+    return MXL_STATUS_OK;
+}
+
+extern "C" MXL_EXPORT
+mxlStatus mxlFabricsTargetWaitForNewSamples(mxlFabricsTarget in_target, uint64_t* out_index, size_t* out_count, uint16_t in_timeoutMs)
+{
+    if (in_target == nullptr || out_index == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    try
+    {
+        auto target = ofi::TargetWrapper::fromAPI(in_target);
+        auto res = target->readBlocking(std::chrono::milliseconds(in_timeoutMs));
+        if (res.immData)
+        {
+            auto [headIndex, count] = ofi::ImmDataSample{*res.immData}.unpack();
+
+            *out_index = headIndex;
+            *out_count = count;
+
+            // TODO: should the unpacking happen here or inside the target??
 
             return MXL_STATUS_OK;
         }

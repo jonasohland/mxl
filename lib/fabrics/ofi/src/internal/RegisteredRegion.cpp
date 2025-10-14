@@ -21,37 +21,19 @@ namespace mxl::lib::fabrics::ofi
         return LocalRegion{.addr = _region.base, .len = _region.size, .desc = _mr.desc()};
     }
 
-    RemoteRegionGroup RegisteredRegionGroup::toRemote(bool useVirtualAddress) const noexcept
+    std::vector<RemoteRegion> toRemote(std::vector<RegisteredRegion> const& regions, bool useVirtualAddress) noexcept
     {
-        std::vector<RemoteRegion> group;
-
-        std::ranges::transform(_inner, std::back_inserter(group), [&](RegisteredRegion const& reg) { return reg.toRemote(useVirtualAddress); });
-
-        return RemoteRegionGroup{group};
-    }
-
-    LocalRegionGroup RegisteredRegionGroup::toLocal() const noexcept
-    {
-        std::vector<LocalRegion> group;
-
-        std::ranges::transform(_inner, std::back_inserter(group), [](RegisteredRegion const& reg) { return reg.toLocal(); });
-
-        return LocalRegionGroup{group};
-    }
-
-    std::vector<RemoteRegionGroup> toRemote(std::vector<RegisteredRegionGroup> const& groups, bool useVirtualAddress) noexcept
-    {
-        std::vector<RemoteRegionGroup> remoteGroups;
+        std::vector<RemoteRegion> remoteRegions;
         std::ranges::transform(
-            groups, std::back_inserter(remoteGroups), [&](RegisteredRegionGroup const& reg) { return reg.toRemote(useVirtualAddress); });
-        return remoteGroups;
+            regions, std::back_inserter(remoteRegions), [&](RegisteredRegion const& reg) { return reg.toRemote(useVirtualAddress); });
+        return remoteRegions;
     }
 
-    std::vector<LocalRegionGroup> toLocal(std::vector<RegisteredRegionGroup> const& groups) noexcept
+    std::vector<LocalRegion> toLocal(std::vector<RegisteredRegion> const& regions) noexcept
     {
-        std::vector<LocalRegionGroup> localGroups;
-        std::ranges::transform(groups, std::back_inserter(localGroups), [](RegisteredRegionGroup const& reg) { return reg.toLocal(); });
-        return localGroups;
+        std::vector<LocalRegion> localRegions;
+        std::ranges::transform(regions, std::back_inserter(localRegions), [](RegisteredRegion const& reg) { return reg.toLocal(); });
+        return localRegions;
     }
 
 } // namespace mxl::lib::fabrics::ofi

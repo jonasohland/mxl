@@ -9,7 +9,9 @@
 #include <uuid.h>
 #include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
+#include "internal/ContinuousFlowData.hpp"
 #include "internal/Logging.hpp"
+#include "DataLayout.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
 #include "ImmData.hpp"
@@ -18,7 +20,7 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    RCInitiatorEndpoint::RCInitiatorEndpoint(Endpoint ep, FabricAddress remote, std::vector<RemoteRegionGroup> rr)
+    RCInitiatorEndpoint::RCInitiatorEndpoint(Endpoint ep, FabricAddress remote, std::vector<RemoteRegion> rr)
         : _state(Idle{.ep = std::move(ep), .idleSince = std::chrono::steady_clock::time_point{}})
         , _addr(std::move(remote))
         , _regions(std::move(rr))
@@ -193,7 +195,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, uint64_t index)
+    void RCInitiatorEndpoint::postTransfer(LocalRegion const& local, uint64_t index)
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
@@ -202,7 +204,18 @@ namespace mxl::lib::fabrics::ofi
 
             // Post a write work item to the endpoint and increment the pending counter. When the write is complete, a completion will be posted to
             // the completion queue, after which the counter will be decremented again if the target is still in the connected state.
-            connected->pending += connected->ep.write(local, remote[0], FI_ADDR_UNSPEC, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
+            connected->pending += connected->ep.write(
+                local.asGroup(), remote, FI_ADDR_UNSPEC, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
+        }
+    }
+
+    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, std::uint64_t index, std::size_t count)
+    {
+        if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
+        {
+            auto immData = ImmDataSample{index, count};
+            auto const& remote = _regions[index % _regions.size()];
+            connected->pending += connected->ep.write(local, remote, immData.data());
         }
     }
 
@@ -277,11 +290,11 @@ namespace mxl::lib::fabrics::ofi
 
         auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
+
+        auto const mxlRegions = MxlRegions::fromAPI(config.regions);
         if (config.regions != nullptr)
         {
-            auto const mxlRegions = MxlRegions::fromAPI(config.regions);
-
-            domain->registerRegionGroups(mxlRegions->regionGroups(), FI_WRITE);
+            domain->registerRegions(mxlRegions->regions(), FI_WRITE);
         }
 
         auto eq = EventQueue::open(fabric);
@@ -289,25 +302,28 @@ namespace mxl::lib::fabrics::ofi
 
         struct MakeUniqueEnabler : RCInitiator
         {
-            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::shared_ptr<CompletionQueue> cq, std::shared_ptr<EventQueue> eq)
-                : RCInitiator(std::move(domain), std::move(cq), std::move(eq))
+            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::shared_ptr<CompletionQueue> cq, std::shared_ptr<EventQueue> eq,
+                DataLayout dataLayout)
+                : RCInitiator(std::move(domain), std::move(cq), std::move(eq), std::move(dataLayout))
             {}
         };
 
-        return std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(cq), std::move(eq));
+        return std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(cq), std::move(eq), mxlRegions->dataLayout());
     }
 
-    RCInitiator::RCInitiator(std::shared_ptr<Domain> domain, std::shared_ptr<CompletionQueue> cq, std::shared_ptr<EventQueue> eq)
+    RCInitiator::RCInitiator(std::shared_ptr<Domain> domain, std::shared_ptr<CompletionQueue> cq, std::shared_ptr<EventQueue> eq,
+        DataLayout dataLayout)
         : _domain(std::move(domain))
         , _cq(std::move(cq))
         , _eq(std::move(eq))
-        , _localRegions(_domain->localRegionGroups())
+        , _dataLayout(std::move(dataLayout))
+        , _localRegions(_domain->localRegions())
     {}
 
     void RCInitiator::addTarget(TargetInfo const& targetInfo)
     {
         _targets.emplace(targetInfo.id,
-            RCInitiatorEndpoint{Endpoint::create(_domain, targetInfo.id), targetInfo.fabricAddress, targetInfo.remoteRegionGroups});
+            RCInitiatorEndpoint{Endpoint::create(_domain, targetInfo.id), targetInfo.fabricAddress, targetInfo.remoteRegions});
     }
 
     void RCInitiator::removeTarget(TargetInfo const& targetInfo)
@@ -324,6 +340,15 @@ namespace mxl::lib::fabrics::ofi
 
     void RCInitiator::transferGrain(uint64_t index)
     {
+        if (_localRegions.empty())
+        {
+            throw Exception::internal("Attempted to transfer grains with no region registered.");
+        }
+        if (!_dataLayout.isVideo())
+        {
+            throw Exception::internal("transferSamples called, but the data layout for that endpoint is not audio.");
+        }
+
         // Find the local region in which the grain with this index is stored.
         auto& localRegion = _localRegions[index % _localRegions.size()];
 
@@ -332,6 +357,53 @@ namespace mxl::lib::fabrics::ofi
         for (auto& [_, target] : _targets)
         {
             target.postTransfer(localRegion, index);
+        }
+    }
+
+    void RCInitiator::transferSamples(std::uint64_t headIndex, std::size_t count)
+    {
+        if (_localRegions.empty())
+        {
+            throw Exception::internal("Attempted to transfer grains with no region registered.");
+        }
+        if (!_dataLayout.isAudio())
+        {
+            throw Exception::internal("transferSamples called, but the data layout for that endpoint is not audio.");
+        }
+
+        auto& localRegion = _localRegions[headIndex % _localRegions.size()];
+
+        auto audioDataLayout = _dataLayout.asAudio();
+
+        mxlWrappedMultiBufferSlice slice = {};
+        getMultiBufferSlices(headIndex,
+            count,
+            audioDataLayout.samplesPerChannel,
+            audioDataLayout.bytesPerSample,
+            audioDataLayout.bytesPerSample,
+            reinterpret_cast<std::uint8_t const*>(localRegion.addr),
+            slice);
+
+        // Create the scatter-gather list using the slices. We create at least one scatter-gather entry per channel. We potentially create an
+        // additional one per channel if 2 fragments are present (wrap-around). When a fragment is not present its size will be 0.
+        std::vector<LocalRegion> sgList;
+        for (auto& fragment : slice.base.fragments)
+        {
+            // check if the fragment present
+            if (fragment.size > 0)
+            {
+                for (size_t chan = 0; chan < slice.count; chan++)
+                {
+                    auto chanAddr = reinterpret_cast<std::uintptr_t>(fragment.pointer) + (slice.stride * chan);
+                    sgList.emplace_back(LocalRegion{.addr = chanAddr, .len = fragment.size, .desc = localRegion.desc});
+                }
+            }
+        }
+
+        // Do the post the transfer to each targets
+        for (auto& [_, target] : _targets)
+        {
+            target.postTransfer(sgList, headIndex, count);
         }
     }
 

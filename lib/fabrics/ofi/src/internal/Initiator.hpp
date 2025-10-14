@@ -29,6 +29,7 @@ namespace mxl::lib::fabrics::ofi
         virtual void addTarget(TargetInfo const& targetInfo) = 0;
         virtual void removeTarget(TargetInfo const& targetInfo) = 0;
         virtual void transferGrain(std::uint64_t grainIndex) = 0;
+        virtual void transferSamples(std::uint64_t headIndex, std::size_t count) = 0;
         virtual bool makeProgress() = 0;
         virtual bool makeProgressBlocking(std::chrono::steady_clock::duration) = 0;
     };
@@ -44,6 +45,7 @@ namespace mxl::lib::fabrics::ofi
         void addTarget(TargetInfo const& targetInfo);
         void removeTarget(TargetInfo const& targetInfo);
         void transferGrain(std::uint64_t grainIndex);
+        void transferSamples(std::uint64_t headIndex, std::size_t count);
         bool makeProgress();
         bool makeProgressBlocking(std::chrono::steady_clock::duration);
 

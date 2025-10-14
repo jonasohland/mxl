@@ -27,14 +27,12 @@ namespace mxl::lib::fabrics::ofi
         , _dataLayout(dataLayout)
     {}
 
-    std::vector<RegionGroup> BouncingBuffer::getRegionGroups() const noexcept
+    std::vector<Region> BouncingBuffer::getRegions() const noexcept
     {
-        std::vector<RegionGroup> out;
+        std::vector<Region> out;
         for (auto const& entry : _buffer)
         {
-            std::vector<Region> region;
-            region.emplace_back(
-                reinterpret_cast<std::uintptr_t>(entry.data()), entry.size(), Region::Location::host()); // TODO: support for CUDA memory
+            out.emplace_back(reinterpret_cast<std::uintptr_t>(entry.data()), entry.size(), Region::Location::host()); // TODO: support for CUDA memory
         }
         return out;
     }

@@ -9,7 +9,6 @@
 #include "BouncingBuffer.hpp"
 #include "Endpoint.hpp"
 #include "QueueHelpers.hpp"
-#include "RegisteredRegion.hpp"
 #include "Target.hpp"
 #include "TargetInfo.hpp"
 
@@ -31,7 +30,6 @@ namespace mxl::lib::fabrics::ofi
 
     private:
         Endpoint _endpoint;
-        std::vector<RegisteredRegionGroup> _regRegions;
         std::unique_ptr<ImmediateDataLocation> _immData;
 
         std::optional<BouncingBuffer> _bouncingBuffer;

@@ -26,8 +26,9 @@ namespace mxl::lib::fabrics::ofi
     {
     public:
         BouncingBuffer(std::size_t nbEntries, std::size_t entrySize, DataLayout dataLayout);
+
         [[nodiscard]]
-        std::vector<RegionGroup> getRegionGroups() const noexcept;
+        std::vector<Region> getRegions() const noexcept;
 
     private:
         std::vector<BouncingBufferEntry> _buffer;

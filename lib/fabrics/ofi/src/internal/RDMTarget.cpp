@@ -55,12 +55,12 @@ namespace mxl::lib::fabrics::ofi
                 // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
                 // //TODO: find a way to calculate the number of entries required
                 bouncingBuffer = BouncingBuffer{4, bouncingBufferEntrySize, dataLayout};
-                domain->registerRegionGroups(bouncingBuffer->getRegionGroups(), FI_REMOTE_WRITE);
+                domain->registerRegions(bouncingBuffer->getRegions(), FI_REMOTE_WRITE);
             }
             else
             {
                 // media buffers are directly used as reception buffer, so register them
-                domain->registerRegionGroups(mxlRegions->regionGroups(), FI_REMOTE_WRITE);
+                domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
             }
         }
         /// TODO: this code is exactly the same for both RC and RDM target
@@ -97,7 +97,7 @@ namespace mxl::lib::fabrics::ofi
         };
 
         return {std::make_unique<MakeUniqueEnabler>(std::move(endpoint), std::move(dataRegion), std::move(bouncingBuffer)),
-            std::make_unique<TargetInfo>(std::move(localAddress), domain->RemoteRegionGroups())};
+            std::make_unique<TargetInfo>(std::move(localAddress), domain->remoteRegions())};
     }
 
     RDMTarget::RDMTarget(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData, std::optional<BouncingBuffer> bouncingBuffer)

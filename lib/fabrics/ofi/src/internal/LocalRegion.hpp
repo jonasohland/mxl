@@ -13,6 +13,7 @@
 namespace mxl::lib::fabrics::ofi
 {
     class RemoteRegionGroup;
+    class LocalRegionGroup;
     class LocalRegionGroupSpan;
 
     struct LocalRegion
@@ -20,6 +21,9 @@ namespace mxl::lib::fabrics::ofi
     public:
         [[nodiscard]]
         ::iovec toIovec() const noexcept;
+
+        [[nodiscard]]
+        LocalRegionGroup asGroup() const noexcept;
 
     public:
         std::uint64_t addr;

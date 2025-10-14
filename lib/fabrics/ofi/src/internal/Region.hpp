@@ -165,27 +165,27 @@ namespace mxl::lib::fabrics::ofi
         mxlRegions toAPI() noexcept;
 
         [[nodiscard]]
-        std::vector<RegionGroup> const& regionGroups() const noexcept;
+        std::vector<Region> const& regions() const noexcept;
 
         [[nodiscard]]
         DataLayout const& dataLayout() const noexcept;
 
     private:
         friend MxlRegions mxlRegionsFromFlow(FlowData& flow);
-        friend MxlRegions mxlRegionsFromGroups(mxlFabricsMemoryRegionGroup const* groups, size_t count);
+        friend MxlRegions mxlRegionsFromUser(mxlFabricsMemoryRegion const* regions, size_t count);
 
     private:
-        MxlRegions(std::vector<RegionGroup> regionGroups, DataLayout dataLayout)
-            : _regionGroups(std::move(regionGroups))
+        MxlRegions(std::vector<Region> regions, DataLayout dataLayout)
+            : _regions(std::move(regions))
             , _layout(std::move(dataLayout))
         {}
 
     private:
-        std::vector<RegionGroup> _regionGroups;
+        std::vector<Region> _regions;
         DataLayout _layout;
     };
 
     MxlRegions mxlRegionsFromFlow(FlowData& flow);
-    MxlRegions mxlRegionsFromGroups(mxlFabricsMemoryRegionGroup const* groups, size_t count);
+    MxlRegions mxlRegionsFromUser(mxlFabricsMemoryRegion const* regions, size_t count);
 
 }

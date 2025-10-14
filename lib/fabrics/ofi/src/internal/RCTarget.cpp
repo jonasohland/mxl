@@ -63,12 +63,12 @@ namespace mxl::lib::fabrics::ofi
                 // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
                 // //TODO: find a way to calculate the number of entries required
                 bouncingBuffer = BouncingBuffer{4, bouncingBufferEntrySize, dataLayout};
-                domain->registerRegionGroups(bouncingBuffer->getRegionGroups(), FI_REMOTE_WRITE);
+                domain->registerRegions(bouncingBuffer->getRegions(), FI_REMOTE_WRITE);
             }
             else // video
             {
                 // media buffers are directly used as reception buffer, so register them
-                domain->registerRegionGroups(mxlRegions->regionGroups(), FI_REMOTE_WRITE);
+                domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
             }
         }
         /// TODO: this code is exactly the same for both RC and RDM target
@@ -93,7 +93,7 @@ namespace mxl::lib::fabrics::ofi
         };
 
         auto localAddress = pep.localAddress();
-        auto remoteRegionGroups = domain->RemoteRegionGroups();
+        auto remoteRegionGroups = domain->remoteRegions();
 
         // Return the constructed RCTarget and associated TargetInfo for remote peers to connect.
         return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(bouncingBuffer), std::move(pep)),

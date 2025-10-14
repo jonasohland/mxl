@@ -8,11 +8,11 @@
 #include <variant>
 #include <vector>
 #include "Completion.hpp"
+#include "DataLayout.hpp"
 #include "Domain.hpp"
 #include "Endpoint.hpp"
 #include "Event.hpp"
 #include "Initiator.hpp"
-#include "RegisteredRegion.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -21,7 +21,7 @@ namespace mxl::lib::fabrics::ofi
     class RCInitiatorEndpoint
     {
     public:
-        RCInitiatorEndpoint(Endpoint, FabricAddress, std::vector<RemoteRegionGroup>);
+        RCInitiatorEndpoint(Endpoint, FabricAddress, std::vector<RemoteRegion>);
 
         /// Returns true if there is any pending events that the endpoint is waiting for, and for which
         /// the queues must be polled
@@ -51,8 +51,11 @@ namespace mxl::lib::fabrics::ofi
         /// Consume a completion that was posted to the associated completion queue.
         void consume(Completion);
 
-        /// Post a data transfer request to this endpoint.
-        void postTransfer(LocalRegionGroup const& localRegion, std::uint64_t index);
+        /// Post a grain data transfer request to this endpoint.
+        void postTransfer(LocalRegion const& localRegion, std::uint64_t index);
+
+        /// Post a sample data transfer request to this endpoint.
+        void postTransfer(LocalRegionGroup const& localRegionGroup, std::uint64_t index, std::size_t count);
 
     private:
         /// The idle state. In this state the endpoint waits to be activated. This will happen immediately if the
@@ -99,9 +102,9 @@ namespace mxl::lib::fabrics::ofi
         Idle restart(Endpoint const&);
 
     private:
-        State _state;                            /// The internal state object
-        FabricAddress _addr;                     /// The remote fabric address to connect to.
-        std::vector<RemoteRegionGroup> _regions; /// Descriptions of the remote memory regions where we need to write our grains.
+        State _state;                       /// The internal state object
+        FabricAddress _addr;                /// The remote fabric address to connect to.
+        std::vector<RemoteRegion> _regions; /// Descriptions of the remote memory regions where we need to write our grains.
     };
 
     class RCInitiator : public Initiator
@@ -123,7 +126,11 @@ namespace mxl::lib::fabrics::ofi
 
         /// Transfer a grain to all targets. This is a non-blocking operation.
         /// The transfer is complete only after makeProgress() or makeProgressBlocking() returns false.
-        void transferGrain(uint64_t grainIndex) final;
+        void transferGrain(std::uint64_t grainIndex) final;
+
+        // Transfer samples to all targets. This is a non-blocking operation.
+        /// The transfer is complete only after makeProgress() or makeProgressBlocking() returns false.
+        void transferSamples(std::uint64_t headIndex, std::size_t count) final;
 
         /// The actual work of connecting, shutting down and transferring grains is done when this function is called.
         /// This is the non blocking version. That means it will do all currently pending work, check all queues, but not wait
@@ -143,7 +150,7 @@ namespace mxl::lib::fabrics::ofi
         /// When makeing progress using blocking queue reads, this is the minimum interval at which the event queue will be read.
         constexpr static auto EQPollInterval = std::chrono::milliseconds(100);
 
-        RCInitiator(std::shared_ptr<Domain>, std::shared_ptr<CompletionQueue>, std::shared_ptr<EventQueue>);
+        RCInitiator(std::shared_ptr<Domain>, std::shared_ptr<CompletionQueue>, std::shared_ptr<EventQueue>, DataLayout dataLayout);
 
         /// Block on the completion queue with a timeout.
         void blockOnCQ(std::chrono::steady_clock::duration);
@@ -165,8 +172,8 @@ namespace mxl::lib::fabrics::ofi
         std::shared_ptr<CompletionQueue> _cq;
         std::shared_ptr<EventQueue> _eq;
 
-        std::vector<RegisteredRegionGroup> _registeredRegions;
-        std::vector<LocalRegionGroup> _localRegions;
+        DataLayout _dataLayout;
+        std::vector<LocalRegion> _localRegions;
 
         // Default initialized
         std::map<Endpoint::Id, RCInitiatorEndpoint> _targets{};

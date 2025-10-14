@@ -48,24 +48,13 @@ TEST_CASE("ofi: RegionGroups fromGroups and view", "[ofi][RegionGroups]")
                     .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
                 }};
 
-    auto inputGroups = std::array<mxlFabricsMemoryRegionGroup, 1>{
-        mxlFabricsMemoryRegionGroup{
-            .regions = inputRegion.data(),
-            .count = 1,
-        },
-    };
     // clang-format on
 
-    auto mxlRegions = mxlRegionsFromGroups(inputGroups.data(), 1);
-    auto groups = mxlRegions.regionGroups();
+    auto mxlRegions = mxlRegionsFromUser(inputRegion.data(), inputRegion.size());
+    auto region = mxlRegions.regions();
+    REQUIRE(region.size() == 1);
 
-    REQUIRE(groups.size() == 1);
-
-    auto const& group = groups[0];
-    REQUIRE(group.size() == 1);
-
-    auto const& region = group[0];
-    REQUIRE(region.base == 0x3000);
-    REQUIRE(region.size == 256);
-    REQUIRE(region.loc.isHost());
+    REQUIRE(region[0].base == 0x3000);
+    REQUIRE(region[0].size == 256);
+    REQUIRE(region[0].loc.isHost());
 }

@@ -14,6 +14,11 @@ namespace mxl::lib::fabrics::ofi
         return ::iovec{.iov_base = reinterpret_cast<void*>(addr), .iov_len = len};
     }
 
+    LocalRegionGroup LocalRegion::asGroup() const noexcept
+    {
+        return {std::vector<LocalRegion>{*this}};
+    }
+
     ::iovec const* LocalRegionGroup::asIovec() const noexcept
     {
         return _iovs.data();

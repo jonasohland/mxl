@@ -12,30 +12,21 @@ TEST_CASE("Domain - RegisteredRegion to Local Region", "[ofi][Domain][LocalRegio
 {
     auto domain = getDomain();
     auto [mxlRegions, buffers] = getHostRegionGroups();
-    auto regions = mxlRegions.regionGroups();
+    auto regions = mxlRegions.regions();
 
-    domain->registerRegionGroups(regions, FI_WRITE);
+    domain->registerRegions(regions, FI_WRITE);
 
-    auto localGroups = domain->localRegionGroups();
-    REQUIRE(localGroups.size() == 2);
+    auto localRegions = domain->localRegions();
+    REQUIRE(localRegions.size() == 4);
 
-    auto group0 = localGroups[0];
-    REQUIRE(group0.size() == 2);
-    auto region00 = group0[0];
-    REQUIRE(region00.addr == regions[0][0].base);
-    REQUIRE(region00.len == 256);
-    auto region01 = group0[1];
-    REQUIRE(region01.addr == regions[0][1].base);
-    REQUIRE(region01.len == 512);
-
-    auto group1 = localGroups[1];
-    REQUIRE(group1.size() == 2);
-    auto region10 = group1[0];
-    REQUIRE(region10.addr == regions[1][0].base);
-    REQUIRE(region10.len == 1024);
-    auto region11 = group1[1];
-    REQUIRE(region11.addr == regions[1][1].base);
-    REQUIRE(region11.len == 2048);
+    REQUIRE(localRegions[0].addr == regions[0].base);
+    REQUIRE(localRegions[0].len == 256);
+    REQUIRE(localRegions[1].addr == regions[1].base);
+    REQUIRE(localRegions[1].len == 512);
+    REQUIRE(localRegions[2].addr == regions[2].base);
+    REQUIRE(localRegions[2].len == 1024);
+    REQUIRE(localRegions[3].addr == regions[3].base);
+    REQUIRE(localRegions[3].len == 2048);
 }
 
 TEST_CASE("Domain - RegisteredRegion to Remote Region with Virtual Addresses", "[ofi][Domain][RemoteRegion][VirtAddr]")
@@ -44,30 +35,20 @@ TEST_CASE("Domain - RegisteredRegion to Remote Region with Virtual Addresses", "
     REQUIRE(domain->usingVirtualAddresses() == true);
 
     auto [mxlRegions, buffers] = getHostRegionGroups();
-    auto regions = mxlRegions.regionGroups();
+    auto regions = mxlRegions.regions();
 
-    domain->registerRegionGroups(regions, FI_WRITE);
+    domain->registerRegions(regions, FI_WRITE);
 
-    auto remoteGroups = domain->RemoteRegionGroups();
-    REQUIRE(remoteGroups.size() == 2);
-
-    auto group0 = remoteGroups[0];
-    REQUIRE(group0.size() == 2);
-    auto region00 = group0[0];
-    REQUIRE(region00.addr == regions[0][0].base);
-    REQUIRE(region00.len == 256);
-    auto region01 = group0[1];
-    REQUIRE(region01.addr == regions[0][1].base);
-    REQUIRE(region01.len == 512);
-
-    auto group1 = remoteGroups[1];
-    REQUIRE(group1.size() == 2);
-    auto region10 = group1[0];
-    REQUIRE(region10.addr == regions[1][0].base);
-    REQUIRE(region10.len == 1024);
-    auto region11 = group1[1];
-    REQUIRE(region11.addr == regions[1][1].base);
-    REQUIRE(region11.len == 2048);
+    auto remoteRegions = domain->remoteRegions();
+    REQUIRE(remoteRegions.size() == 4);
+    REQUIRE(remoteRegions[0].addr == regions[0].base);
+    REQUIRE(remoteRegions[0].len == 256);
+    REQUIRE(remoteRegions[1].addr == regions[1].base);
+    REQUIRE(remoteRegions[1].len == 512);
+    REQUIRE(remoteRegions[2].addr == regions[2].base);
+    REQUIRE(remoteRegions[2].len == 1024);
+    REQUIRE(remoteRegions[3].addr == regions[3].base);
+    REQUIRE(remoteRegions[3].len == 2048);
 }
 
 TEST_CASE("Domain - RegisteredRegion to Remote Region with Relative Addresses", "[ofi][Domain][RemoteRegion][RelativeAddr]")
@@ -76,30 +57,20 @@ TEST_CASE("Domain - RegisteredRegion to Remote Region with Relative Addresses", 
     REQUIRE(domain->usingVirtualAddresses() == false);
 
     auto [mxlRegions, buffers] = getHostRegionGroups();
-    auto regions = mxlRegions.regionGroups();
+    auto regions = mxlRegions.regions();
 
-    domain->registerRegionGroups(regions, FI_WRITE);
+    domain->registerRegions(regions, FI_WRITE);
 
-    auto remoteGroups = domain->RemoteRegionGroups();
-    REQUIRE(remoteGroups.size() == 2);
-
-    auto group0 = remoteGroups[0];
-    REQUIRE(group0.size() == 2);
-    auto region00 = group0[0];
-    REQUIRE(region00.addr == 0);
-    REQUIRE(region00.len == 256);
-    auto region01 = group0[1];
-    REQUIRE(region01.addr == 0);
-    REQUIRE(region01.len == 512);
-
-    auto group1 = remoteGroups[1];
-    REQUIRE(group1.size() == 2);
-    auto region10 = group1[0];
-    REQUIRE(region10.addr == 0);
-    REQUIRE(region10.len == 1024);
-    auto region11 = group1[1];
-    REQUIRE(region11.addr == 0);
-    REQUIRE(region11.len == 2048);
+    auto remoteRegions = domain->remoteRegions();
+    REQUIRE(remoteRegions.size() == 4);
+    REQUIRE(remoteRegions[0].addr == 0);
+    REQUIRE(remoteRegions[0].len == 256);
+    REQUIRE(remoteRegions[1].addr == 0);
+    REQUIRE(remoteRegions[1].len == 512);
+    REQUIRE(remoteRegions[2].addr == 0);
+    REQUIRE(remoteRegions[2].len == 1024);
+    REQUIRE(remoteRegions[3].addr == 0);
+    REQUIRE(remoteRegions[3].len == 2048);
 }
 
 TEST_CASE("Domain - RX CQ Data Mode", "[ofi][Domain][RxCqData]")
