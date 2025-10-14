@@ -279,7 +279,9 @@ namespace mxl::lib::fabrics::ofi
         auto domain = Domain::open(fabric);
         if (config.regions != nullptr)
         {
-            domain->registerRegionGroups(*RegionGroups::fromAPI(config.regions), FI_WRITE);
+            auto const mxlRegions = MxlRegions::fromAPI(config.regions);
+
+            domain->registerRegionGroups(mxlRegions->regionGroups(), FI_WRITE);
         }
 
         auto eq = EventQueue::open(fabric);

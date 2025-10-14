@@ -7,10 +7,13 @@
 #include <cstdint>
 #include <algorithm>
 #include <bits/types/struct_iovec.h>
+#include "internal/ContinuousFlowData.hpp"
 #include "internal/DiscreteFlowData.hpp"
 #include "internal/Flow.hpp"
+#include "mxl/dataformat.h"
 #include "mxl/flow.h"
 #include "mxl/mxl.h"
+#include "DataLayout.hpp"
 #include "Exception.hpp"
 #include "VariantUtils.hpp"
 
@@ -105,56 +108,81 @@ namespace mxl::lib::fabrics::ofi
         return iovecs;
     }
 
-    RegionGroups* RegionGroups::fromAPI(mxlRegions regions) noexcept
+    MxlRegions* MxlRegions::fromAPI(mxlRegions regions) noexcept
     {
-        return reinterpret_cast<RegionGroups*>(regions);
+        return reinterpret_cast<MxlRegions*>(regions);
     }
 
-    mxlRegions RegionGroups::toAPI() noexcept
+    mxlRegions MxlRegions::toAPI() noexcept
     {
         return reinterpret_cast<mxlRegions>(this);
     }
 
-    RegionGroups regionGroupsfromFlow(FlowData& flow)
+    std::vector<RegionGroup> const& MxlRegions::regionGroups() const noexcept
+    {
+        return _regionGroups;
+    }
+
+    DataLayout const& MxlRegions::dataLayout() const noexcept
+    {
+        return _layout;
+    }
+
+    MxlRegions mxlRegionsFromFlow(FlowData& flow)
     {
         static_assert(sizeof(GrainHeader) == 8192,
             "GrainHeader type size changed! The Fabrics API makes assumptions on the memory layout of a flow, please review the code below if the "
             "change is intended!");
 
-        if (!mxlIsDiscreteDataFormat(flow.flowInfo()->common.format))
+        if (mxlIsDiscreteDataFormat(flow.flowInfo()->common.format))
         {
-            throw Exception::make(MXL_ERR_UNKNOWN, "Non-discrete flows not supported for now");
-        }
+            auto& discreteFlow = static_cast<DiscreteFlowData&>(flow);
+            std::vector<RegionGroup> regionGroups;
 
-        auto& discreteFlow = static_cast<DiscreteFlowData&>(flow);
-
-        std::vector<RegionGroup> regionGroups;
-
-        for (std::size_t i = 0; i < discreteFlow.grainCount(); ++i)
-        {
-            auto grain = discreteFlow.grainAt(i);
-
-            auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow.grainAt(i));
-            auto grainInfoSize = sizeof(GrainHeader);
-            auto grainPayloadSize = grain->header.info.grainSize;
-
-            if (grain->header.info.payloadLocation != MXL_PAYLOAD_LOCATION_HOST_MEMORY)
+            for (std::size_t i = 0; i < discreteFlow.grainCount(); ++i)
             {
-                throw Exception::make(MXL_ERR_UNKNOWN,
-                    "GPU memory is not currently supported in the Flow API of MXL. Edit the code below when it is supported");
+                auto grain = discreteFlow.grainAt(i);
+
+                auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow.grainAt(i));
+                auto grainInfoSize = sizeof(GrainHeader);
+                auto grainPayloadSize = grain->header.info.grainSize;
+
+                if (grain->header.info.payloadLocation != MXL_PAYLOAD_LOCATION_HOST_MEMORY)
+                {
+                    throw Exception::make(MXL_ERR_UNKNOWN,
+                        "GPU memory is not currently supported in the Flow API of MXL. Edit the code below when it is supported");
+                }
+
+                auto regionGroup = RegionGroup({
+                    Region{grainInfoBaseAddr, grainInfoSize + grainPayloadSize, Region::Location::host()},
+                });
+
+                regionGroups.emplace_back(std::move(regionGroup));
             }
 
-            auto regionGroup = RegionGroup({
-                Region{grainInfoBaseAddr, grainInfoSize + grainPayloadSize, Region::Location::host()},
-            });
-
-            regionGroups.emplace_back(std::move(regionGroup));
+            return {std::move(regionGroups), DataLayout::fromVideo(false)};
         }
+        else if (mxlIsContinuousDataFormat(flow.flowInfo()->common.format))
+        {
+            auto& continuousFlow = static_cast<ContinuousFlowData&>(flow);
+            std::vector<RegionGroup> regionGroups;
 
-        return RegionGroups{std::move(regionGroups)};
+            // For the continuous flow, the data layout is a single contiguous buffer
+            regionGroups.emplace_back(RegionGroup({
+                Region{
+                       reinterpret_cast<std::uintptr_t>(continuousFlow.channelData()), continuousFlow.channelDataLength(), Region::Location::host()}
+            }));
+
+            return {std::move(regionGroups),
+                DataLayout::fromAudio(continuousFlow.channelCount(), continuousFlow.channelBufferLength(), continuousFlow.sampleWordSize())};
+        }
+        else
+        {
+            throw Exception::make(MXL_ERR_UNKNOWN, "Unsupported flow fromat {}", flow.flowInfo()->common.format);
+        }
     }
 
-    RegionGroups regionGroupsfromGroups(mxlFabricsMemoryRegionGroup const* groups, size_t count)
+    MxlRegions mxlRegionsFromGroups(mxlFabricsMemoryRegionGroup const* groups, size_t count)
     {
         std::vector<RegionGroup> outGroups;
         for (size_t i = 0; i < count; i++)
@@ -168,6 +196,6 @@ namespace mxl::lib::fabrics::ofi
             outGroups.emplace_back(std::move(outRegions));
         }
 
-        return RegionGroups{std::move(outGroups)};
+        return {std::move(outGroups), DataLayout::fromVideo(false)}; // TODO: datalayout struct definition at API level
     }
 }

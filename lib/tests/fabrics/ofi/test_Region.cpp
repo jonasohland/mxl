@@ -56,7 +56,8 @@ TEST_CASE("ofi: RegionGroups fromGroups and view", "[ofi][RegionGroups]")
     };
     // clang-format on
 
-    auto groups = regionGroupsfromGroups(inputGroups.data(), 1);
+    auto mxlRegions = mxlRegionsFromGroups(inputGroups.data(), 1);
+    auto groups = mxlRegions.regionGroups();
 
     REQUIRE(groups.size() == 1);
 

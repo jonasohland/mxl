@@ -5,7 +5,6 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
-#include <ratio>
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <mxl/fabrics.h>
@@ -85,7 +84,7 @@ TEST_CASE("Fabrics: Target and Ininitator connection", "[fabrics][connection][no
 
     // try to connect them for 5 seconds
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    std::uint64_t dummyIndex;
+    std::uint16_t dummyIndex;
     do
     {
         mxlFabricsTargetTryNewGrain(target, &dummyIndex); // make progress on target
@@ -148,7 +147,7 @@ TEST_CASE("Fabrics: Target and Ininitator connection blocking", "[fabrics][conne
 
     // try to connect them for 5 seconds
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    std::uint64_t dummyIndex;
+    std::uint16_t dummyIndex;
     do
     {
         mxlFabricsTargetWaitForNewGrain(target, &dummyIndex, std::chrono::milliseconds(20).count()); // make progress on target
@@ -213,7 +212,7 @@ TEST_CASE("Fabrics: Connectionless target and initiator nonblocking", "[fabrics]
 
     // try to have initiator ready for transfers within 5 seconds
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    std::uint64_t dummyIndex;
+    std::uint16_t dummyIndex;
     do
     {
         mxlFabricsTargetTryNewGrain(target, &dummyIndex); // make progress on target
@@ -278,7 +277,7 @@ TEST_CASE("Fabrics: Connectionless target and initiator blocking", "[fabrics][co
 
     // try to have initiator ready for transfers within 5 seconds
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    std::uint64_t dummyIndex;
+    std::uint16_t dummyIndex;
     do
     {
         mxlFabricsTargetWaitForNewGrain(target, &dummyIndex, std::chrono::milliseconds(20).count()); // make progress on target
@@ -376,7 +375,7 @@ TEST_CASE("Fabrics: RCInitiator transfer grain", "[fabrics][connected][transfer]
 
     // try to connect them for 5 seconds
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    std::uint64_t dummyIndex;
+    std::uint16_t dummyIndex;
     do
     {
         mxlFabricsTargetTryNewGrain(target, &dummyIndex); // make progress on target
@@ -515,7 +514,7 @@ TEST_CASE("Fabrics: RCInitiator transfer grain", "[fabrics][connected][transfer]
 
     // try to connect them for 5 seconds
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    std::uint64_t dummyIndex;
+    std::uint16_t dummyIndex;
     do
     {
         mxlFabricsTargetTryNewGrain(target, &dummyIndex); // make progress on target
@@ -654,7 +653,7 @@ TEST_CASE("Fabrics: RDMInitiator transfer grain", "[fabrics][ofi][connectionless
 
     // try to connect them for 5 seconds
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    std::uint64_t dummyIndex;
+    std::uint16_t dummyIndex;
     do
     {
         mxlFabricsTargetTryNewGrain(target, &dummyIndex); // make progress on target
@@ -793,7 +792,7 @@ TEST_CASE("Fabrics: RDMInitiator transfer grain", "[fabrics][ofi][connectionless
 
     // try to connect them for 5 seconds
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    std::uint64_t dummyIndex;
+    std::uint16_t dummyIndex;
     do
     {
         mxlFabricsTargetTryNewGrain(target, &dummyIndex); // make progress on target

@@ -68,8 +68,10 @@ target_sources(mxl-fabrics-objects
         PRIVATE
             src/internal/Address.cpp
             src/internal/AddressVector.cpp
+            src/internal/BouncingBuffer.cpp
             src/internal/CompletionQueue.cpp
             src/internal/Completion.cpp
+            src/internal/DataLayout.cpp
             src/internal/Domain.cpp
             src/internal/Endpoint.cpp
             src/internal/EventQueue.cpp

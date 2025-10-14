@@ -43,7 +43,7 @@ namespace mxl::lib::fabrics::ofi
         return std::make_shared<MakeSharedEnabler>(domain, std::move(fabric), std::vector<RegisteredRegionGroup>{});
     }
 
-    void Domain::registerRegionGroups(RegionGroups const& regionGroups, std::uint64_t access)
+    void Domain::registerRegionGroups(std::vector<RegionGroup> const& regionGroups, std::uint64_t access)
     {
         std::ranges::transform(
             regionGroups, std::back_inserter(_registeredRegionGroups), [&](auto const& group) { return registerRegionGroup(group, access); });

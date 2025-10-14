@@ -17,7 +17,6 @@
 #include <rfl/json.hpp>
 #include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
-#include "internal/FlowReader.hpp"
 #include "internal/ImmData.hpp"
 #include "internal/Initiator.hpp"
 #include "internal/Provider.hpp"
@@ -26,6 +25,8 @@
 #include "internal/TargetInfo.hpp"
 #include "mxl/flow.h"
 #include "mxl/platform.h"
+#include "mxl/rational.h"
+#include "mxl/time.h"
 
 namespace ofi = mxl::lib::fabrics::ofi;
 
@@ -42,7 +43,7 @@ mxlStatus mxlFabricsRegionsForFlowReader(mxlFlowReader in_reader, mxlRegions* ou
         auto reader = ::mxl::lib::to_FlowReader(in_reader);
 
         // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
-        auto regionPtr = std::make_unique<ofi::RegionGroups>(ofi::regionGroupsfromFlow(reader->getFlowData())).release();
+        auto regionPtr = std::make_unique<ofi::MxlRegions>(ofi::mxlRegionsFromFlow(reader->getFlowData())).release();
 
         *out_regions = regionPtr->toAPI();
 
@@ -84,7 +85,7 @@ mxlStatus mxlFabricsRegionsForFlowWriter(mxlFlowWriter in_writer, mxlRegions* ou
         auto reader = ::mxl::lib::to_FlowWriter(in_writer);
 
         // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
-        auto regionPtr = std::make_unique<ofi::RegionGroups>(ofi::regionGroupsfromFlow(reader->getFlowData())).release();
+        auto regionPtr = std::make_unique<ofi::MxlRegions>(ofi::mxlRegionsFromFlow(reader->getFlowData())).release();
 
         *out_regions = regionPtr->toAPI();
 
@@ -123,10 +124,8 @@ mxlStatus mxlFabricsRegionsFromBufferGroups(mxlFabricsMemoryRegionGroup const* i
 
     try
     {
-        auto regions = ofi::regionGroupsfromGroups(in_groups, in_count);
-
         // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
-        auto regionPtr = std::make_unique<ofi::RegionGroups>(regions).release();
+        auto regionPtr = std::make_unique<ofi::MxlRegions>(ofi::mxlRegionsFromGroups(in_groups, in_count)).release();
 
         *out_regions = regionPtr->toAPI();
 
@@ -165,7 +164,7 @@ mxlStatus mxlFabricsRegionsFree(mxlRegions in_regions)
 
     try
     {
-        auto regions = ofi::RegionGroups::fromAPI(in_regions);
+        auto regions = ofi::MxlRegions::fromAPI(in_regions);
         delete regions;
 
         return MXL_STATUS_OK;
@@ -354,7 +353,7 @@ mxlStatus mxlFabricsTargetSetup(mxlFabricsTarget in_target, mxlTargetConfig* in_
 }
 
 extern "C" MXL_EXPORT
-mxlStatus mxlFabricsTargetTryNewGrain(mxlFabricsTarget in_target, uint64_t* out_index)
+mxlStatus mxlFabricsTargetTryNewGrain(mxlFabricsTarget in_target, uint16_t* out_index)
 {
     if (in_target == nullptr || out_index == nullptr)
     {
@@ -400,7 +399,7 @@ mxlStatus mxlFabricsTargetTryNewGrain(mxlFabricsTarget in_target, uint64_t* out_
 }
 
 extern "C" MXL_EXPORT
-mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint64_t* out_index, uint16_t in_timeoutMs)
+mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint16_t* out_index, uint16_t in_timeoutMs)
 {
     if (in_target == nullptr || out_index == nullptr)
     {
@@ -883,6 +882,20 @@ mxlStatus mxlFabricsFreeTargetInfo(mxlTargetInfo in_info)
         MXL_ERROR("Failed to destroy target info object");
         return MXL_ERR_UNKNOWN;
     }
+
+    return MXL_STATUS_OK;
+}
+
+extern "C" MXL_EXPORT
+mxlStatus mxlFabricsRecoverGrainIndex(mxlRational const* editRate, uint16_t in_index, uint64_t* out_index)
+{
+    if (out_index == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    auto currentGrainIndex = mxlGetCurrentIndex(editRate);
+    *out_index = (currentGrainIndex & 0xFFFF'FFFF'FFFF'0000) | (in_index & 0xFFFF);
 
     return MXL_STATUS_OK;
 }

@@ -11,7 +11,8 @@ using namespace mxl::lib::fabrics::ofi;
 TEST_CASE("Domain - RegisteredRegion to Local Region", "[ofi][Domain][LocalRegion]")
 {
     auto domain = getDomain();
-    auto [regions, buffers] = getHostRegionGroups();
+    auto [mxlRegions, buffers] = getHostRegionGroups();
+    auto regions = mxlRegions.regionGroups();
 
     domain->registerRegionGroups(regions, FI_WRITE);
 
@@ -42,7 +43,8 @@ TEST_CASE("Domain - RegisteredRegion to Remote Region with Virtual Addresses", "
     auto domain = getDomain(true);
     REQUIRE(domain->usingVirtualAddresses() == true);
 
-    auto [regions, buffers] = getHostRegionGroups();
+    auto [mxlRegions, buffers] = getHostRegionGroups();
+    auto regions = mxlRegions.regionGroups();
 
     domain->registerRegionGroups(regions, FI_WRITE);
 
@@ -73,7 +75,8 @@ TEST_CASE("Domain - RegisteredRegion to Remote Region with Relative Addresses", 
     auto domain = getDomain(false);
     REQUIRE(domain->usingVirtualAddresses() == false);
 
-    auto [regions, buffers] = getHostRegionGroups();
+    auto [mxlRegions, buffers] = getHostRegionGroups();
+    auto regions = mxlRegions.regionGroups();
 
     domain->registerRegionGroups(regions, FI_WRITE);
 

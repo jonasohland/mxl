@@ -6,6 +6,7 @@
 
 #include <memory>
 #include "mxl/fabrics.h"
+#include "BouncingBuffer.hpp"
 #include "Endpoint.hpp"
 #include "QueueHelpers.hpp"
 #include "RegisteredRegion.hpp"
@@ -23,7 +24,7 @@ namespace mxl::lib::fabrics::ofi
         Target::ReadResult readBlocking(std::chrono::steady_clock::duration timeout) final;
 
     private:
-        RDMTarget(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData);
+        RDMTarget(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData, std::optional<BouncingBuffer> bouncingBuffer);
 
         template<QueueReadMode>
         Target::ReadResult makeProgress(std::chrono::steady_clock::duration timeout);
@@ -32,5 +33,7 @@ namespace mxl::lib::fabrics::ofi
         Endpoint _endpoint;
         std::vector<RegisteredRegionGroup> _regRegions;
         std::unique_ptr<ImmediateDataLocation> _immData;
+
+        std::optional<BouncingBuffer> _bouncingBuffer;
     };
 }

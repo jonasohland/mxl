@@ -7,10 +7,10 @@
 #include <memory>
 #include <variant>
 #include "mxl/fabrics.h"
+#include "BouncingBuffer.hpp"
 #include "Endpoint.hpp"
 #include "PassiveEndpoint.hpp"
 #include "QueueHelpers.hpp"
-#include "RegisteredRegion.hpp"
 #include "Target.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -44,14 +44,14 @@ namespace mxl::lib::fabrics::ofi
         using State = std::variant<WaitForConnectionRequest, WaitForConnection, Connected>;
 
     private:
-        RCTarget(std::shared_ptr<Domain> domain, PassiveEndpoint pep);
+        RCTarget(std::shared_ptr<Domain> domain, std::optional<BouncingBuffer> bouncingBuffer, PassiveEndpoint pep);
 
         template<QueueReadMode>
         Target::ReadResult makeProgress(std::chrono::steady_clock::duration timeout);
 
     private:
         std::shared_ptr<Domain> _domain;
-        std::vector<RegisteredRegionGroup> _regRegions;
+        std::optional<BouncingBuffer> _bouncingBuffer;
 
         State _state;
     };

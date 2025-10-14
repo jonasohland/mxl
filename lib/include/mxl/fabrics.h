@@ -8,6 +8,7 @@
 #include <mxl/mxl.h>
 #include "mxl/flow.h"
 #include "mxl/platform.h"
+#include "mxl/rational.h"
 
 #define MXL_FABRICS_UNUSED(x) (void)x
 
@@ -74,6 +75,13 @@ extern "C"
         bool deviceSupport;                 // Require support of transfers involving device memory.
     } mxlInitiatorConfig;
 
+    typedef struct mxlFabricsAudioConfig_t
+    {
+        uint32_t channelCount;
+        uint32_t samplesPerChan;
+        uint8_t bytesPerSample;
+    } mxlFabricsAudioConfig;
+
     typedef enum mxlFabricsMemoryRegionType_t
     {
         MXL_MEMORY_REGION_TYPE_HOST = 0,
@@ -98,6 +106,8 @@ extern "C"
         mxlFabricsMemoryRegion* regions;
         size_t count;
     } mxlFabricsMemoryRegionGroup;
+
+    // TODO: include data layout (probably in a mxlFabricsMemoryRegionGroups struct)
 
     /**
      * Get the backing memory regions of a flow associated with a flow reader.
@@ -189,21 +199,23 @@ extern "C"
     /**
      * Non-blocking accessor for a flow grain at a specific index.
      * \param in_target A valid fabrics target
-     * \param out_index The index of the grain that is ready, if any.
+     * \param out_index The index of the grain that is ready, if any. \see note for more information.
      * \return The result code. MXL_ERR_NOT_READY if no grain was available at the time of the call, and the call should be retried. \see mxlStatus
+     * \note The returned `out_index` is only the 16 LSB of the actual grain index. An application can use the current time to recover the actual
+     * grainIndex.
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsTargetTryNewGrain(mxlFabricsTarget in_target, uint64_t* out_index);
+    mxlStatus mxlFabricsTargetTryNewGrain(mxlFabricsTarget in_target, uint16_t* out_index);
 
     /**
      * Blocking accessor for a flow grain at a specific index.
      * \param in_target A valid fabrics target
-     * \param out_index The index of the grain that is ready, if any.
+     * \param out_index The index of the grain that is ready, if any. \see mxlFabricTargetTryNewGrain note for more information
      * \param in_timeoutMs How long should we wait for the grain (in milliseconds)
      * \return The result code. MXL_ERR_NOT_READY if no grain was available before the timeout. \see mxlStatus
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint64_t* out_index, uint16_t in_timeoutMs);
+    mxlStatus mxlFabricsTargetWaitForNewGrain(mxlFabricsTarget in_target, uint16_t* out_index, uint16_t in_timeoutMs);
 
     /**
      * Create a fabrics initiator instance.
@@ -325,6 +337,14 @@ extern "C"
      */
     MXL_EXPORT
     mxlStatus mxlFabricsFreeTargetInfo(mxlTargetInfo in_info);
+
+    /**
+     * Recover the actual grain index by using the 16LSB index received from `mxlFabricsTargetTryNewGrain` or `mxlFabricsTargetWaitForNewGrain` and
+     * the current time.
+     * \param in_index Grain index 16LSB received
+     * \param out_index The actual grain index.
+     */
+    mxlStatus mxlFabricsRecoverGrainIndex(mxlRational const* editRate, uint16_t in_index, uint64_t* out_index);
 
 #ifdef __cplusplus
 }

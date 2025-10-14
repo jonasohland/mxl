@@ -69,7 +69,7 @@ namespace mxl::lib::fabrics::ofi
         return domain;
     }
 
-    inline std::pair<RegionGroups, InnerRegionsGroups> getHostRegionGroups()
+    inline std::pair<MxlRegions, InnerRegionsGroups> getHostRegionGroups()
     {
         auto innerRegions = InnerRegionsGroups{
             {
@@ -125,6 +125,6 @@ namespace mxl::lib::fabrics::ofi
         };
         // clang-format on
 
-        return {regionGroupsfromGroups(inputGroups.data(), inputGroups.size()), innerRegions};
+        return {mxlRegionsFromGroups(inputGroups.data(), inputGroups.size()), innerRegions};
     }
 }

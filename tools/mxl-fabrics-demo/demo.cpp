@@ -18,6 +18,7 @@
 #include "../../lib/src/internal/FlowParser.hpp"
 #include "../../lib/src/internal/Logging.hpp"
 #include "CLI/CLI.hpp"
+#include "mxl/rational.h"
 
 /*
     Example how to use:
@@ -302,8 +303,9 @@ private:
 class AppTarget
 {
 public:
-    AppTarget(Config config)
+    AppTarget(Config config, mxlRational rate)
         : _config(std::move(config))
+        , _rate(std::move(rate))
     {}
 
     ~AppTarget()
@@ -459,13 +461,14 @@ public:
     mxlStatus run()
     {
         mxlGrainInfo dummyGrainInfo;
-        uint64_t grainIndex = 0;
+        uint16_t partialGrainIndex = 0;
+        uint64_t grainIndex;
         uint8_t* dummyPayload;
         mxlStatus status;
 
         while (!g_exit_requested)
         {
-            status = mxlFabricsTargetWaitForNewGrain(_target, &grainIndex, 200);
+            status = mxlFabricsTargetWaitForNewGrain(_target, &partialGrainIndex, 200);
             if (status == MXL_ERR_TIMEOUT)
             {
                 // No completion before a timeout was triggered, most likely a problem upstream.
@@ -482,6 +485,12 @@ public:
             {
                 MXL_ERROR("Failed to wait for grain with status '{}'", static_cast<int>(status));
                 return status;
+            }
+
+            status = mxlFabricsRecoverGrainIndex(&_rate, partialGrainIndex, &grainIndex);
+            if (status != MXL_STATUS_OK)
+            {
+                MXL_ERROR("Failed to recover grain index with status '{}'", static_cast<int>(status));
             }
 
             // Here we open so that we can commit, we are not going to modify the grain as it was already modified by the initiator.
@@ -508,6 +517,7 @@ public:
 
 private:
     Config _config;
+    mxlRational _rate;
 
     mxlInstance _instance;
     mxlFabricsInstance _fabricsInstance;
@@ -614,6 +624,7 @@ int main(int argc, char** argv)
         mxl::lib::FlowParser descriptorParser{flowDescriptor};
 
         auto flowId = uuids::to_string(descriptorParser.getId());
+        auto rate = descriptorParser.getGrainRate();
 
         auto app = AppTarget{
             Config{
@@ -623,6 +634,7 @@ int main(int argc, char** argv)
                    .service = service,
                    .provider = mxlProvider,
                    },
+            rate
         };
 
         if (status = app.setup(flowDescriptor); status != MXL_STATUS_OK)

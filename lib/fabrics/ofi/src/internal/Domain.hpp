@@ -37,7 +37,7 @@ namespace mxl::lib::fabrics::ofi
         static std::shared_ptr<Domain> open(std::shared_ptr<Fabric> fabric);
 
         /// Register a list of memory region group to this domain. The domain will own the registered groups.
-        void registerRegionGroups(RegionGroups const& regionGroups, std::uint64_t access);
+        void registerRegionGroups(std::vector<RegionGroup> const& regionGroups, std::uint64_t access);
 
         /// Get the local groups associated with the registered groups to this domain.
         [[nodiscard]]
