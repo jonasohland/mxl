@@ -747,6 +747,41 @@ mxlStatus mxlFabricsInitiatorTransferGrain(mxlFabricsInitiator in_initiator, uin
 }
 
 extern "C" MXL_EXPORT
+mxlStatus mxlFabricsInitiatorTransferSamples(mxlFabricsInitiator in_initiator, uint64_t in_index, size_t in_count)
+{
+    if (in_initiator == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    try
+    {
+        ofi::InitiatorWrapper::fromAPI(in_initiator)->transferSamples(in_index, in_count);
+
+        return MXL_STATUS_OK;
+    }
+    catch (ofi::Exception& e)
+    {
+        if (e.status() == MXL_ERR_UNKNOWN)
+        {
+            MXL_ERROR("Failed to transfer grain: {}", e.what());
+        }
+
+        return e.status();
+    }
+    catch (std::exception& e)
+    {
+        MXL_ERROR("Failed to transfer grain: {}", e.what());
+        return MXL_ERR_UNKNOWN;
+    }
+    catch (...)
+    {
+        MXL_ERROR("Failed to transfer grain");
+        return MXL_ERR_UNKNOWN;
+    }
+}
+
+extern "C" MXL_EXPORT
 mxlStatus mxlFabricsInitiatorMakeProgressNonBlocking(mxlFabricsInitiator in_initiator)
 {
     if (in_initiator == nullptr)

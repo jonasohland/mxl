@@ -209,13 +209,12 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, std::uint64_t index, std::size_t count)
+    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& localRegionGroup, std::uint64_t index, std::size_t count)
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
-            auto immData = ImmDataSample{index, count};
             auto const& remote = _regions[index % _regions.size()];
-            connected->pending += connected->ep.write(local, remote, immData.data());
+            connected->pending += connected->ep.write(localRegionGroup, remote, ImmDataSample{index, count}.data());
         }
     }
 
@@ -286,16 +285,16 @@ namespace mxl::lib::fabrics::ofi
         }
 
         auto info = *fabricInfoList.begin();
-        MXL_DEBUG("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
-
         auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
 
-        auto const mxlRegions = MxlRegions::fromAPI(config.regions);
-        if (config.regions != nullptr)
+        if (config.regions == nullptr)
         {
-            domain->registerRegions(mxlRegions->regions(), FI_WRITE);
+            throw Exception::invalidArgument("config.regions must not be null");
         }
+
+        auto const mxlRegions = MxlRegions::fromAPI(config.regions);
+        domain->registerRegions(mxlRegions->regions(), FI_WRITE);
 
         auto eq = EventQueue::open(fabric);
         auto cq = CompletionQueue::open(domain);
@@ -346,7 +345,7 @@ namespace mxl::lib::fabrics::ofi
         }
         if (!_dataLayout.isVideo())
         {
-            throw Exception::internal("transferSamples called, but the data layout for that endpoint is not audio.");
+            throw Exception::internal("transferGrain called, but the data layout for that endpoint is not video.");
         }
 
         // Find the local region in which the grain with this index is stored.
@@ -364,7 +363,7 @@ namespace mxl::lib::fabrics::ofi
     {
         if (_localRegions.empty())
         {
-            throw Exception::internal("Attempted to transfer grains with no region registered.");
+            throw Exception::internal("Attempted to transfer samples with no region registered.");
         }
         if (!_dataLayout.isAudio())
         {

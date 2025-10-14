@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 #include "DataLayout.hpp"
+#include "LocalRegion.hpp"
 #include "Region.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -18,6 +19,8 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         std::size_t size() const noexcept;
 
+        void unpackAudio(LocalRegion& region) const noexcept;
+
     private:
         std::vector<std::uint8_t> _entry;
     };
@@ -29,6 +32,9 @@ namespace mxl::lib::fabrics::ofi
 
         [[nodiscard]]
         std::vector<Region> getRegions() const noexcept;
+
+        // Copy the bouncing buffer entry to the LocalRegion following the internal data layout
+        void unpack(std::size_t entryIndex, LocalRegion& region) const;
 
     private:
         std::vector<BouncingBufferEntry> _buffer;

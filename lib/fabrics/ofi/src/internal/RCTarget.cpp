@@ -50,26 +50,28 @@ namespace mxl::lib::fabrics::ofi
         auto fabric = Fabric::open(*fabricInfoList.begin());
         auto domain = Domain::open(fabric);
 
-        std::optional<BouncingBuffer> bouncingBuffer;
-        if (config.regions != nullptr)
+        if (config.regions == nullptr)
         {
-            auto const mxlRegions = MxlRegions::fromAPI(config.regions);
+            throw Exception::invalidArgument("config.regions must not be null");
+        }
 
-            // Check if we need to use a bounce buffer.
-            if (auto dataLayout = mxlRegions->dataLayout(); dataLayout.isAudio()) // audio
-            {
-                auto audioLayout = dataLayout.asAudio();
-                auto bouncingBufferEntrySize = audioLayout.channelCount * audioLayout.samplesPerChannel * audioLayout.bytesPerSample;
-                // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
-                // //TODO: find a way to calculate the number of entries required
-                bouncingBuffer = BouncingBuffer{4, bouncingBufferEntrySize, dataLayout};
-                domain->registerRegions(bouncingBuffer->getRegions(), FI_REMOTE_WRITE);
-            }
-            else // video
-            {
-                // media buffers are directly used as reception buffer, so register them
-                domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
-            }
+        auto const mxlRegions = MxlRegions::fromAPI(config.regions);
+        std::optional<BouncingBuffer> bouncingBuffer;
+
+        // Check if we need to use a bounce buffer.
+        if (auto dataLayout = mxlRegions->dataLayout(); dataLayout.isAudio()) // audio
+        {
+            auto audioLayout = dataLayout.asAudio();
+            auto bouncingBufferEntrySize = audioLayout.channelCount * audioLayout.samplesPerChannel * audioLayout.bytesPerSample;
+            // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
+            // //TODO: find a way to calculate the number of entries required
+            bouncingBuffer = BouncingBuffer{4, bouncingBufferEntrySize, dataLayout};
+            domain->registerRegions(bouncingBuffer->getRegions(), FI_REMOTE_WRITE);
+        }
+        else // video
+        {
+            // media buffers are directly used as reception buffer, so register them
+            domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
         }
         /// TODO: this code is exactly the same for both RC and RDM target
 
@@ -199,6 +201,13 @@ namespace mxl::lib::fabrics::ofi
                                 // the immmediate data (in our case the grain index), will be returned in the registered region.
                                 state.ep.recv(state.immData->toLocalRegion());
                             }
+                            // TODO: this code should be in the "protocol" implementation
+                            if (_bouncingBuffer)
+                            {
+                                // TODO: find a way to get the bouncingBufferEntry index
+                                _bouncingBuffer->unpack(0, _domain->localRegions().front());
+                            }
+                            // TODO: this code should be in the "protocol" implementation
                         }
                         else
                         {

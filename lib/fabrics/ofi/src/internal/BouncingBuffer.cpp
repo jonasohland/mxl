@@ -2,6 +2,8 @@
 #include <cstddef>
 #include <cstdint>
 #include "DataLayout.hpp"
+#include "Exception.hpp"
+#include "LocalRegion.hpp"
 #include "Region.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -21,6 +23,11 @@ namespace mxl::lib::fabrics::ofi
         return _entry.size();
     }
 
+    void BouncingBufferEntry::unpackAudio(LocalRegion& region) const noexcept
+    {
+        // TODO:
+    }
+
     BouncingBuffer::BouncingBuffer(std::size_t nbEntries, std::size_t entrySize, DataLayout dataLayout)
 
         : _buffer(std::vector<BouncingBufferEntry>(nbEntries, BouncingBufferEntry{entrySize}))
@@ -35,5 +42,17 @@ namespace mxl::lib::fabrics::ofi
             out.emplace_back(reinterpret_cast<std::uintptr_t>(entry.data()), entry.size(), Region::Location::host()); // TODO: support for CUDA memory
         }
         return out;
+    }
+
+    void BouncingBuffer::unpack(std::size_t entryIndex, LocalRegion& region) const
+    {
+        if (_dataLayout.isAudio())
+        {
+            _buffer.at(entryIndex).unpackAudio(region);
+        }
+        else if (_dataLayout.isVideo())
+        {
+            throw Exception::internal("Unpacking bouncing buffer for video datalayout is unsupported yet.");
+        }
     }
 }

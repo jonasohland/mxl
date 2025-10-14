@@ -4,22 +4,26 @@
 
 #include "RDMInitiator.hpp"
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <utility>
 #include <variant>
 #include <rdma/fabric.h>
+#include "internal/ContinuousFlowData.hpp"
 #include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
 #include "Address.hpp"
 #include "AddressVector.hpp"
 #include "CompletionQueue.hpp"
+#include "DataLayout.hpp"
 #include "Endpoint.hpp"
 #include "Exception.hpp"
 #include "Fabric.hpp"
 #include "FIInfo.hpp"
 #include "ImmData.hpp"
+#include "LocalRegion.hpp"
 #include "Provider.hpp"
 #include "Region.hpp"
 #include "TargetInfo.hpp"
@@ -78,7 +82,7 @@ namespace mxl::lib::fabrics::ofi
             std::move(_state));
     }
 
-    std::size_t RDMInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, uint64_t index)
+    std::size_t RDMInitiatorEndpoint::postTransfer(LocalRegion const& localRegion, uint64_t index)
     {
         if (auto state = std::get_if<Added>(&_state); state != nullptr)
         {
@@ -86,7 +90,18 @@ namespace mxl::lib::fabrics::ofi
             auto const& remote = _regions[index % _regions.size()];
 
             // Post a write work item to the endpoint and increment the pending counter. When the write is complete,
-            return _ep->write(local, remote, state->fiAddr, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
+            return _ep->write(localRegion.asGroup(), remote, state->fiAddr, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
+        }
+
+        return 0;
+    }
+
+    std::size_t RDMInitiatorEndpoint::postTransfer(LocalRegionGroup const& localRegionGroup, std::uint64_t index, std::size_t count)
+    {
+        if (auto state = std::get_if<Added>(&_state); state != nullptr)
+        {
+            auto const& remote = _regions[index % _regions.size()];
+            return _ep->write(localRegionGroup, remote, state->fiAddr, ImmDataSample{index, count}.data());
         }
 
         return 0;
@@ -110,15 +125,16 @@ namespace mxl::lib::fabrics::ofi
         }
 
         auto info = *fabricInfoList.begin();
-        MXL_DEBUG("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
-
         auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
-        if (config.regions != nullptr)
+
+        if (config.regions == nullptr)
         {
-            auto const mxlRegions = MxlRegions::fromAPI(config.regions);
-            domain->registerRegions(mxlRegions->regions(), FI_WRITE);
+            throw Exception::invalidArgument("config.regions must not be null");
         }
+
+        auto const mxlRegions = MxlRegions::fromAPI(config.regions);
+        domain->registerRegions(mxlRegions->regions(), FI_WRITE);
 
         auto endpoint = std::make_shared<Endpoint>(Endpoint::create(std::move(domain)));
 
@@ -132,12 +148,12 @@ namespace mxl::lib::fabrics::ofi
 
         struct MakeUniqueEnabler : RDMInitiator
         {
-            MakeUniqueEnabler(std::shared_ptr<Endpoint> ep)
-                : RDMInitiator(std::move(ep))
+            MakeUniqueEnabler(std::shared_ptr<Endpoint> ep, DataLayout dataLayout)
+                : RDMInitiator(std::move(ep), std::move(dataLayout))
             {}
         };
 
-        return std::make_unique<MakeUniqueEnabler>(std::move(endpoint));
+        return std::make_unique<MakeUniqueEnabler>(std::move(endpoint), mxlRegions->dataLayout());
     }
 
     void RDMInitiator::addTarget(TargetInfo const& targetInfo)
@@ -159,6 +175,16 @@ namespace mxl::lib::fabrics::ofi
 
     void RDMInitiator::transferGrain(uint64_t index)
     {
+        // TODO: most of the code is a copy of RCInitiator
+        if (_localRegions.empty())
+        {
+            throw Exception::internal("Attempted to transfer grains with no region registered.");
+        }
+        if (!_dataLayout.isVideo())
+        {
+            throw Exception::internal("transferGrain called, but the data layout for that endpoint is not video.");
+        }
+
         // Find the local region in which the grain with this index is stored.
         auto& localRegion = _localRegions[index % _localRegions.size()];
 
@@ -166,7 +192,7 @@ namespace mxl::lib::fabrics::ofi
         // this is a no-op.
         for (auto& [_, target] : _targets)
         {
-            pending += target.postTransfer(localRegion.asGroup(), index);
+            pending += target.postTransfer(localRegion, index);
 
             // A completion will be posted to the completion queue, after which the counter will be decremented again
         }
@@ -174,7 +200,50 @@ namespace mxl::lib::fabrics::ofi
 
     void RDMInitiator::transferSamples(std::uint64_t headIndex, std::size_t count)
     {
-        // TODO:
+        // TODO: most of the code is a copy of RCInitiator
+        if (_localRegions.empty())
+        {
+            throw Exception::internal("Attempted to transfer samples with no region registered.");
+        }
+        if (!_dataLayout.isAudio())
+        {
+            throw Exception::internal("transferSamples called, but the data layout for that endpoint is not audio.");
+        }
+
+        auto& localRegion = _localRegions[headIndex % _localRegions.size()];
+
+        auto audioDataLayout = _dataLayout.asAudio();
+
+        mxlWrappedMultiBufferSlice slice = {};
+        getMultiBufferSlices(headIndex,
+            count,
+            audioDataLayout.samplesPerChannel,
+            audioDataLayout.bytesPerSample,
+            audioDataLayout.bytesPerSample,
+            reinterpret_cast<std::uint8_t const*>(localRegion.addr),
+            slice);
+
+        // Create the scatter-gather list using the slices. We create at least one scatter-gather entry per channel. We potentially create an
+        // additional one per channel if 2 fragments are present (wrap-around). When a fragment is not present its size will be 0.
+        std::vector<LocalRegion> sgList;
+        for (auto& fragment : slice.base.fragments)
+        {
+            // check if the fragment present
+            if (fragment.size > 0)
+            {
+                for (size_t chan = 0; chan < slice.count; chan++)
+                {
+                    auto chanAddr = reinterpret_cast<std::uintptr_t>(fragment.pointer) + (slice.stride * chan);
+                    sgList.emplace_back(LocalRegion{.addr = chanAddr, .len = fragment.size, .desc = localRegion.desc});
+                }
+            }
+        }
+
+        // Do the post the transfer to each targets
+        for (auto& [_, target] : _targets)
+        {
+            pending += target.postTransfer(sgList, headIndex, count);
+        }
     }
 
     // makeProgress
@@ -205,9 +274,10 @@ namespace mxl::lib::fabrics::ofi
         return hasPendingWork();
     }
 
-    RDMInitiator::RDMInitiator(std::shared_ptr<Endpoint> ep)
+    RDMInitiator::RDMInitiator(std::shared_ptr<Endpoint> ep, DataLayout dataLayout)
         : _endpoint(std::move(ep))
         , _localRegions(_endpoint->domain()->localRegions())
+        , _dataLayout(dataLayout)
     {}
 
     bool RDMInitiator::hasPendingWork() const noexcept

@@ -150,7 +150,7 @@ namespace mxl::lib::fabrics::ofi
         /**
          * Push a remote write work request to the endpoint work queue. When the write is complete, a Completion::Data will be pushed to the
          * completion queue associated with the endpoint. Before a write request can be made, the endpoint must have beed enabled,
-         * \param localGroup Source memory regions to write from
+         * \param localRegionGroup Source memory regions to write from
          * \param remoteRegion Destination memory region to write to
          * \param destAddr The destination address of the target endpoint. This is unused when using connected endpoints.
          * \param 64 bits of user data that will be available in the completion entry associated with this transfer.
@@ -158,7 +158,7 @@ namespace mxl::lib::fabrics::ofi
          * \note This function automatically handles splitting the request in multiple requests if the localGroup size exceeds the iov limit supported
          * by the endpoint.
          */
-        std::size_t write(LocalRegionGroup const& localGroup, RemoteRegion const& remoteRegion, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
+        std::size_t write(LocalRegionGroup const& localRegionGroup, RemoteRegion const& remoteRegion, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
             std::optional<std::uint32_t> immData = std::nullopt);
 
         /*

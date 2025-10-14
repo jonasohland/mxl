@@ -11,6 +11,7 @@
 #include <rdma/fabric.h>
 #include "mxl/fabrics.h"
 #include "Address.hpp"
+#include "DataLayout.hpp"
 #include "Endpoint.hpp"
 #include "Initiator.hpp"
 #include "TargetInfo.hpp"
@@ -39,7 +40,10 @@ namespace mxl::lib::fabrics::ofi
         void shutdown();
 
         /// Post a data transfer request to this endpoint.
-        std::size_t postTransfer(LocalRegionGroup const& localRegion, uint64_t index);
+        std::size_t postTransfer(LocalRegion const& localRegion, uint64_t index);
+
+        /// Post a sample data transfer request to this endpoint.
+        std::size_t postTransfer(LocalRegionGroup const& localRegionGroup, std::uint64_t index, std::size_t count);
 
     private:
         /// The idle state. In this state the endpoint waits to be activated.
@@ -81,7 +85,7 @@ namespace mxl::lib::fabrics::ofi
         bool makeProgressBlocking(std::chrono::steady_clock::duration) final;
 
     private:
-        RDMInitiator(std::shared_ptr<Endpoint>);
+        RDMInitiator(std::shared_ptr<Endpoint>, DataLayout dataLayout);
 
         /// Returns true if any of the endpoints contained in this initiator have pending work.
         [[nodiscard]]
@@ -109,6 +113,7 @@ namespace mxl::lib::fabrics::ofi
         std::shared_ptr<Endpoint> _endpoint;
 
         std::vector<LocalRegion> _localRegions;
+        DataLayout _dataLayout;
 
         std::map<Endpoint::Id, RDMInitiatorEndpoint> _targets;
 
