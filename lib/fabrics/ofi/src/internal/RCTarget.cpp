@@ -124,7 +124,7 @@ namespace mxl::lib::fabrics::ofi
                         return RCTarget::WaitForConnection{std::move(endpoint)};
                     }
 
-                    return state;
+                    return WaitForConnectionRequest{.pep = std::move(state.pep)};
                 },
                 [&](WaitForConnection state) -> State
                 {
@@ -150,7 +150,7 @@ namespace mxl::lib::fabrics::ofi
                         return Connected{.ep = std::move(state.ep), .immData = std::move(dataRegion)};
                     }
 
-                    return state;
+                    return WaitForConnection{std::move(state.ep)};
                 },
                 [&](RCTarget::Connected state) -> State
                 {
@@ -183,7 +183,7 @@ namespace mxl::lib::fabrics::ofi
                         }
                     }
 
-                    return state;
+                    return Connected{.ep = std::move(state.ep), .immData = std::move(state.immData)};
                 }},
             std::move(_state));
 
