@@ -101,6 +101,7 @@ namespace mxl::lib::fabrics::ofi
             case FI_LOG_TRACE: return spdlog::level::trace;
             case FI_LOG_INFO:  return spdlog::level::info;
             case FI_LOG_DEBUG: return spdlog::level::debug;
+            default:           return spdlog::level::warn;
         }
     }
 
