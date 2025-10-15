@@ -43,6 +43,11 @@ RUN dnf install -y \
     libasan \
     libtsan \
     libubsan \
+    gstreamer1-devel \
+    gstreamer1-plugins-base-tools \
+    gstreamer1-plugins-base-devel \
+    gstreamer1-plugins-good \
+    gstreamer1-plugins-bad-free \
     bison \
     flex \
     librdmacm-devel \
