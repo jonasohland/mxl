@@ -7,7 +7,7 @@
 #include <memory>
 #include <variant>
 #include "mxl/fabrics.h"
-#include "BouncingBuffer.hpp"
+#include "AudioBounceBuffer.hpp"
 #include "Endpoint.hpp"
 #include "PassiveEndpoint.hpp"
 #include "QueueHelpers.hpp"
@@ -44,14 +44,14 @@ namespace mxl::lib::fabrics::ofi
         using State = std::variant<WaitForConnectionRequest, WaitForConnection, Connected>;
 
     private:
-        RCTarget(std::shared_ptr<Domain> domain, std::optional<BouncingBuffer> bouncingBuffer, PassiveEndpoint pep);
+        RCTarget(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer, PassiveEndpoint pep);
 
         template<QueueReadMode>
         Target::ReadResult makeProgress(std::chrono::steady_clock::duration timeout);
 
     private:
         std::shared_ptr<Domain> _domain;
-        std::optional<BouncingBuffer> _bouncingBuffer;
+        std::optional<AudioBounceBuffer> _bounceBuffer;
 
         State _state;
     };

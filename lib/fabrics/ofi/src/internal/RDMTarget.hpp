@@ -6,7 +6,7 @@
 
 #include <memory>
 #include "mxl/fabrics.h"
-#include "BouncingBuffer.hpp"
+#include "AudioBounceBuffer.hpp"
 #include "Endpoint.hpp"
 #include "QueueHelpers.hpp"
 #include "Target.hpp"
@@ -23,7 +23,7 @@ namespace mxl::lib::fabrics::ofi
         Target::ReadResult readBlocking(std::chrono::steady_clock::duration timeout) final;
 
     private:
-        RDMTarget(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData, std::optional<BouncingBuffer> bouncingBuffer);
+        RDMTarget(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData, std::optional<AudioBounceBuffer> bouncingBuffer);
 
         template<QueueReadMode>
         Target::ReadResult makeProgress(std::chrono::steady_clock::duration timeout);
@@ -32,6 +32,6 @@ namespace mxl::lib::fabrics::ofi
         Endpoint _endpoint;
         std::unique_ptr<ImmediateDataLocation> _immData;
 
-        std::optional<BouncingBuffer> _bouncingBuffer;
+        std::optional<AudioBounceBuffer> _bouncingBuffer;
     };
 }

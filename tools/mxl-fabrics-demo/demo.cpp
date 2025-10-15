@@ -6,9 +6,11 @@
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <uuid.h>
 #include <CLI/CLI.hpp>
+#include <fmt/format.h>
 #include <mxl/fabrics.h>
 #include <mxl/flow.h>
 #include <mxl/mxl.h>
@@ -36,7 +38,7 @@ struct Config
     std::string domain;
 
     // flow configuration
-    std::string flowID;
+    mxl::lib::FlowParser flowParser;
 
     // endpoint configuration
     std::optional<std::string> node;
@@ -118,7 +120,7 @@ public:
         }
 
         // Create a flow reader for the given flow id.
-        status = mxlCreateFlowReader(_instance, _config.flowID.c_str(), "", &_reader);
+        status = mxlCreateFlowReader(_instance, uuids::to_string(_config.flowParser.getId()).c_str(), "", &_reader);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to create flow reader with status '{}'", static_cast<int>(status));
@@ -346,7 +348,7 @@ public:
 
         if (_flowExits)
         {
-            if (status = mxlDestroyFlow(_instance, _config.flowID.c_str()); status != MXL_STATUS_OK)
+            if (status = mxlDestroyFlow(_instance, uuids::to_string(_config.flowParser.getId()).c_str()); status != MXL_STATUS_OK)
             {
                 MXL_ERROR("Failed to destroy flow with status '{}'", static_cast<int>(status));
             }
@@ -387,7 +389,7 @@ public:
         _flowExits = true;
 
         // Create a flow writer for the given flow id.
-        status = mxlCreateFlowWriter(_instance, _config.flowID.c_str(), "", &_writer);
+        status = mxlCreateFlowWriter(_instance, uuids::to_string(_config.flowParser.getId()).c_str(), "", &_writer);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to create flow writer with status '{}'", static_cast<int>(status));
@@ -540,10 +542,15 @@ int main(int argc, char** argv)
     domainOpt->required(true);
     domainOpt->check(CLI::ExistingDirectory);
 
-    std::string flowConf;
-    app.add_option("-f, --flow",
-        flowConf,
-        "The flow ID when used as an initiator. The json file which contains the NMOS Flow configuration when used as a target.");
+    std::optional<std::string> videoFlowConf;
+    app.add_option("-v, --video",
+        videoFlowConf,
+        "The video flow ID when used as an initiator. The json file which contains the NMOS Flow configuration when used as a target.");
+
+    std::optional<std::string> audioFlowConf;
+    app.add_option("-a, --audio",
+        audioFlowConf,
+        "The audio flow ID when used as an initiator. The json file which contains the NMOS Flow configuration when used as a target.");
 
     bool runAsInitiator;
     auto runAsInitiatorOpt = app.add_flag("-i,--initiator",
@@ -584,14 +591,39 @@ int main(int argc, char** argv)
         return status;
     }
 
+    std::string flowConf;
+    if (videoFlowConf)
+    {
+        flowConf = *videoFlowConf;
+    }
+    else if (audioFlowConf)
+    {
+        flowConf = *audioFlowConf;
+    }
+    else
+    {
+        throw std::invalid_argument("");
+    }
+
     if (runAsInitiator)
     {
         MXL_INFO("Running as initiator");
 
+        // Flow already exists, let's recover flowParser struct from it. flowConf here in this context represents the Flow UUID
+        auto path = fmt::format("{}/{}.mxl-flow/.json", domain, flowConf);
+        std::ifstream file(path, std::ios::in | std::ios::binary);
+        if (!file)
+        {
+            MXL_ERROR("Failed to open file: '{}'", flowConf);
+            return MXL_ERR_INVALID_ARG;
+        }
+        std::string flowDescriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+        mxl::lib::FlowParser descriptorParser{flowDescriptor};
+
         auto app = AppInitator{
             Config{
                    .domain = domain,
-                   .flowID = flowConf,
+                   .flowParser = flowDescriptor,
                    .node = node,
                    .service = service,
                    .provider = mxlProvider,
@@ -629,7 +661,7 @@ int main(int argc, char** argv)
         auto app = AppTarget{
             Config{
                    .domain = domain,
-                   .flowID = flowId,
+                   .flowParser = flowDescriptor,
                    .node = node,
                    .service = service,
                    .provider = mxlProvider,

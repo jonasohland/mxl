@@ -456,18 +456,10 @@ mxlStatus mxlFabricsTargetTryNewSample(mxlFabricsTarget in_target, uint64_t* out
         auto res = target->read();
         if (res.immData)
         {
-            auto [headIndex, count] = ofi::ImmDataSample{*res.immData}.unpack();
+            auto [_, headIndex, count] = ofi::ImmDataSample{*res.immData}.unpack();
 
             *out_index = headIndex;
             *out_count = count;
-
-            // TODO: should the unpacking happen here or inside the target??
-
-            // channelBufferLength, sampleWordSize, channelCount, baseBufferPtr,
-            // mxlWrappedMultiBufferSlice slice = {};
-            // mxl::lib::getMultiBufferSlices(headIndex, count, 0, 0, 0, nullptr, slice);
-
-            // unpack the buffer!
 
             return MXL_STATUS_OK;
         }
@@ -511,12 +503,10 @@ mxlStatus mxlFabricsTargetWaitForNewSamples(mxlFabricsTarget in_target, uint64_t
         auto res = target->readBlocking(std::chrono::milliseconds(in_timeoutMs));
         if (res.immData)
         {
-            auto [headIndex, count] = ofi::ImmDataSample{*res.immData}.unpack();
+            auto [_, headIndex, count] = ofi::ImmDataSample{*res.immData}.unpack();
 
             *out_index = headIndex;
             *out_count = count;
-
-            // TODO: should the unpacking happen here or inside the target??
 
             return MXL_STATUS_OK;
         }

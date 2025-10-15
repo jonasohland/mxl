@@ -53,7 +53,8 @@ namespace mxl::lib::fabrics::ofi
         /// Remote endpoint was added to the address vector, in this state we can write to the remote endpoint.
         struct Added
         {
-            ::fi_addr_t fiAddr; // Address index in address vector
+            ::fi_addr_t fiAddr;       // Address index in address vector
+            std::uint64_t entryIndex; /// When a bounce buffer is used, this corresponds to the bounce buffer entry
         };
 
         /// The endpoint is done and can be evicted from the initiator.

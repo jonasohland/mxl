@@ -55,7 +55,7 @@ namespace mxl::lib::fabrics::ofi
                 [&](Idle) -> State
                 {
                     auto fiAddr = _ep->addressVector()->insert(_addr);
-                    return Added{.fiAddr = fiAddr};
+                    return Added{.fiAddr = fiAddr, .entryIndex = 0};
                 },
                 [](Added state) -> State { return state; },
                 [](Done state) -> State { return state; },
@@ -101,7 +101,9 @@ namespace mxl::lib::fabrics::ofi
         if (auto state = std::get_if<Added>(&_state); state != nullptr)
         {
             auto const& remote = _regions[index % _regions.size()];
-            return _ep->write(localRegionGroup, remote, state->fiAddr, ImmDataSample{index, count}.data());
+            auto nbWrites = _ep->write(localRegionGroup, remote, state->fiAddr, ImmDataSample{state->entryIndex, index, count}.data());
+            state->entryIndex = (state->entryIndex + 1) % 4; // TODO: should get the 4 from the bounce buffer
+            return nbWrites;
         }
 
         return 0;
