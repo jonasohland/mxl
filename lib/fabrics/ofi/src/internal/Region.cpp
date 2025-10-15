@@ -59,7 +59,7 @@ namespace mxl::lib::fabrics::ofi
         return std::holds_alternative<Host>(_inner);
     }
 
-    Region::Location Region::Location::fromAPI(mxlFabricsMemoryRegionLocation loc) noexcept
+    Region::Location Region::Location::fromAPI(mxlFabricsMemoryRegionLocation loc)
     {
         switch (loc.type)
         {

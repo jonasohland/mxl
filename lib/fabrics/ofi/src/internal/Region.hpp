@@ -24,7 +24,7 @@ namespace mxl::lib::fabrics::ofi
         public:
             static Location host() noexcept;
             static Location cuda(int deviceId) noexcept;
-            static Location fromAPI(mxlFabricsMemoryRegionLocation loc) noexcept;
+            static Location fromAPI(mxlFabricsMemoryRegionLocation loc);
 
             /// Return the device id. For host location 0 is returned.
             [[nodiscard]]

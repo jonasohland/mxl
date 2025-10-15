@@ -7,6 +7,8 @@
 #include <chrono>
 #include <optional>
 #include <utility>
+#include <fmt/base.h>
+#include <fmt/color.h>
 #include "Completion.hpp"
 #include "Endpoint.hpp"
 #include "Event.hpp"
@@ -22,6 +24,8 @@ namespace mxl::lib::fabrics::ofi
     template<QueueReadMode qrm>
     std::pair<std::optional<Completion>, std::optional<Event>> readEndpointQueues(Endpoint& ep, std::chrono::steady_clock::duration timeout)
     {
+        static_assert(qrm == QueueReadMode::Blocking || qrm == QueueReadMode::NonBlocking, "Unsupported queue behaviour parameter");
+
         std::pair<std::optional<Completion>, std::optional<Event>> result;
 
         if constexpr (qrm == QueueReadMode::Blocking)
@@ -32,10 +36,6 @@ namespace mxl::lib::fabrics::ofi
         {
             result = ep.readQueues();
         }
-        else
-        {
-            static_assert(false, "Unsupported queue behaviour parameter");
-        }
 
         return result;
     }
@@ -43,6 +43,8 @@ namespace mxl::lib::fabrics::ofi
     template<QueueReadMode qrm>
     std::optional<Event> readEventQueue(EventQueue& eq, std::chrono::steady_clock::duration timeout)
     {
+        static_assert(qrm == QueueReadMode::Blocking || qrm == QueueReadMode::NonBlocking, "Unsupported queue behaviour parameter");
+
         std::optional<Event> event;
 
         if constexpr (qrm == QueueReadMode::Blocking)
@@ -53,10 +55,6 @@ namespace mxl::lib::fabrics::ofi
         {
             event = eq.read();
         }
-        else
-        {
-            static_assert(false, "Unsupported queue behaviour parameter");
-        }
 
         return event;
     }
@@ -64,6 +62,8 @@ namespace mxl::lib::fabrics::ofi
     template<QueueReadMode qrm>
     std::optional<Completion> readCompletionQueue(CompletionQueue& eq, std::chrono::steady_clock::duration timeout)
     {
+        static_assert(qrm == QueueReadMode::Blocking || qrm == QueueReadMode::NonBlocking, "Unsupported queue behaviour parameter");
+
         std::optional<Completion> completion;
 
         if constexpr (qrm == QueueReadMode::Blocking)
@@ -73,10 +73,6 @@ namespace mxl::lib::fabrics::ofi
         else if constexpr (qrm == QueueReadMode::NonBlocking)
         {
             completion = eq.read();
-        }
-        else
-        {
-            static_assert(false, "Unsupported queue behaviour parameter");
         }
 
         return completion;
