@@ -2,15 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <csignal>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <optional>
+#include <thread>
 #include <uuid.h>
 #include <CLI/CLI.hpp>
+#include <fmt/format.h>
+#include <glib-object.h>
 #include <gst/app/gstappsink.h>
+#include <gst/audio/audio.h>
 #include <gst/gst.h>
+#include <gst/gstelement.h>
 #include <mxl/flow.h>
 #include <mxl/mxl.h>
 #include <mxl/time.h>
 #include "../../lib/src/internal/FlowParser.hpp"
 #include "../../lib/src/internal/Logging.hpp"
+#include "mxl/dataformat.h"
+#include "mxl/rational.h"
 
 std::sig_atomic_t volatile g_exit_requested = 0;
 
@@ -19,13 +30,39 @@ void signal_handler(int)
     g_exit_requested = 1;
 }
 
-struct GstreamerPipelineConfig
+struct VideoPipelineConfig
 {
     uint64_t frame_width{1920};
     uint64_t frame_height{1080};
     mxlRational frame_rate{30, 1};
     uint64_t pattern{0};
     std::string textoverlay{"EBU DMF MXL"};
+
+    std::string display() const noexcept
+    {
+        return fmt::format("frame_width={} frame_height={} frame_rate={}/{} pattern={} textoverlay={}",
+            frame_width,
+            frame_height,
+            frame_rate.numerator,
+            frame_rate.denominator,
+            pattern,
+            textoverlay);
+    }
+};
+
+struct AudioPipelineConfig
+{
+    mxlRational rate{48000, 1};
+    std::size_t channelCount{2};
+    double freq{440.0};
+    uint64_t samplesPerBatch{1024};
+    uint64_t wave{0};
+    uint64_t offset{0};
+
+    std::string display() const noexcept
+    {
+        return fmt::format("rate={} channelCount={} freq={} samplesPerBatch={} wave={}", rate.numerator, channelCount, freq, samplesPerBatch, wave);
+    }
 };
 
 static std::unordered_map<std::string, uint64_t> const pattern_map = {
@@ -56,11 +93,36 @@ static std::unordered_map<std::string, uint64_t> const pattern_map = {
     {"colors",            24}  // Colors
 };
 
-class GstreamerPipeline final
+static std::unordered_map<std::string, uint64_t> const wave_map = {
+    {"sine",           0 }, // Sine
+    {"square",         1 }, // Square
+    {"saw",            2 }, // Saw
+    {"triangle",       3 }, // Triangle
+    {"silence",        4 }, // Silence
+    {"white-noise",    5 }, // White uniform noise
+    {"pink-noise",     6 }, // Pink noise
+    {"sine-table",     7 }, // Sine Table
+    {"ticks",          8 }, // Periodic Ticks
+    {"gaussian-noise", 9 }, // White Gaussian noise
+    {"red-noise",      10}, // Red (brownian) noise
+    {"blue-noise",     11}, // Blue noise
+    {"violet-noise",   12}, // Violet noise
+};
+
+class GstreamerPipeline
 {
 public:
-    GstreamerPipeline(GstreamerPipelineConfig const& config)
+    virtual void start() = 0;
+    virtual GstSample* pullSample() = 0;
+};
+
+class VideoPipeline final : public GstreamerPipeline
+{
+public:
+    VideoPipeline(VideoPipelineConfig const& config)
     {
+        MXL_INFO("Creating Videopipeline with config: {}", config.display());
+
         gst_init(nullptr, nullptr);
 
         _videotestsrc = gst_element_factory_make("videotestsrc", "videotestsrc");
@@ -143,7 +205,7 @@ public:
         }
     }
 
-    ~GstreamerPipeline()
+    ~VideoPipeline()
     {
         if (_pipeline)
         {
@@ -199,12 +261,12 @@ public:
         }
     }
 
-    void start()
+    void start() final
     {
         gst_element_set_state(_pipeline, GST_STATE_PLAYING);
     }
 
-    GstSample* pullSample()
+    GstSample* pullSample() final
     {
         return gst_app_sink_pull_sample(GST_APP_SINK(_appsink));
     }
@@ -219,6 +281,339 @@ private:
     GstElement* _pipeline{nullptr};
 };
 
+class AudioPipeline final : public GstreamerPipeline
+{
+public:
+    AudioPipeline(AudioPipelineConfig const& config)
+    {
+        MXL_INFO("Creating Audiopipeline with config: {}", config.display());
+
+        gst_init(nullptr, nullptr);
+
+        _audiotestsrc = gst_element_factory_make("audiotestsrc", "audiotestsrc");
+        if (!_audiotestsrc)
+        {
+            throw std::runtime_error("Gstreamer: 'audiotestsrc' could not be created.");
+        }
+
+        g_object_set(_audiotestsrc,
+            "is-live",
+            TRUE,
+            "wave",
+            config.wave,
+            "freq",
+            config.freq,
+            "samplesperbuffer",
+            config.samplesPerBatch,
+            "timestamp-offset",
+            config.offset,
+            nullptr);
+
+        _audioconvert = gst_element_factory_make("audioconvert", "audioconvert");
+        if (!_audioconvert)
+        {
+            throw std::runtime_error("Gstreamer: 'audioconvert' could not be created.");
+        }
+
+        _appsink = gst_element_factory_make("appsink", "appsink");
+        if (!_appsink)
+        {
+            throw std::runtime_error("Gstreamer: 'appsink' could not be created.");
+        }
+
+        guint64 channelMask{gst_audio_channel_get_fallback_mask(config.channelCount)};
+        // Configure appsink
+        g_object_set(G_OBJECT(_appsink),
+            "caps",
+            gst_caps_new_simple("audio/x-raw",
+                "format",
+                G_TYPE_STRING,
+                "F32LE",
+                "rate",
+                G_TYPE_INT,
+                config.rate.numerator,
+                "channels",
+                G_TYPE_INT,
+                config.channelCount,
+                "layout",
+                G_TYPE_STRING,
+                "non-interleaved",
+                "channel-mask",
+                GST_TYPE_BITMASK,
+                channelMask,
+                nullptr),
+            "max-buffers",
+            16,
+            nullptr);
+
+        // Create the empty pipeline
+        _pipeline = gst_pipeline_new("sink-pipeline");
+        if (!_pipeline)
+        {
+            throw std::runtime_error("Gstreamer: 'pipeline' could not be created.");
+        }
+
+        // Build the pipeline
+        gst_bin_add_many(GST_BIN(_pipeline), _audiotestsrc, _audioconvert, _appsink, nullptr);
+        if (!_pipeline)
+        {
+            throw std::runtime_error("Gstreamer: could not add elements to the pipeline");
+        }
+        if (gst_element_link_many(_audiotestsrc, _audioconvert, _appsink, nullptr) != TRUE)
+        {
+            throw std::runtime_error("Gstreamer: elements could not be linked.");
+        }
+    }
+
+    ~AudioPipeline()
+    {
+        if (_pipeline)
+        {
+            gst_element_set_state(_pipeline, GST_STATE_NULL);
+            gst_object_unref(_pipeline);
+        }
+        if (_audiotestsrc)
+        {
+            if (GST_OBJECT_REFCOUNT_VALUE(_audiotestsrc) > 0)
+            {
+                gst_object_unref(_audiotestsrc);
+            }
+        }
+
+        if (_audioconvert)
+        {
+            if (GST_OBJECT_REFCOUNT_VALUE(_audioconvert) > 0)
+            {
+                gst_object_unref(_audioconvert);
+            }
+        }
+
+        if (_appsink)
+        {
+            if (GST_OBJECT_REFCOUNT_VALUE(_appsink))
+            {
+                gst_object_unref(_appsink);
+            }
+        }
+    }
+
+    void start() final
+    {
+        gst_element_set_state(_pipeline, GST_STATE_PLAYING);
+    }
+
+    GstSample* pullSample() final
+    {
+        return gst_app_sink_pull_sample(GST_APP_SINK(_appsink));
+    }
+
+private:
+    GstElement* _audiotestsrc{nullptr};
+    GstElement* _audioconvert{nullptr};
+    GstElement* _appsink{nullptr};
+    GstElement* _pipeline{nullptr};
+};
+
+class MxlWriter
+{
+public:
+    MxlWriter(std::string const& domain, std::string const& flow_descriptor, std::string const& flowID)
+    {
+        _instance = mxlCreateInstance(domain.c_str(), "");
+        if (_instance == nullptr)
+        {
+            throw std::runtime_error("Failed to create MXL instance");
+        }
+
+        mxlStatus ret;
+
+        // Create the flow
+        ret = mxlCreateFlow(_instance, flow_descriptor.c_str(), nullptr, &_flowInfo);
+        if (ret != MXL_STATUS_OK)
+        {
+            throw std::runtime_error("Failed to create flow with status '" + std::to_string(static_cast<int>(ret)) + "'");
+        }
+
+        // Create the flow writer
+        if (mxlCreateFlowWriter(_instance, flowID.c_str(), "", &_writer) != MXL_STATUS_OK)
+        {
+            throw std::runtime_error("Failed to create flow writer");
+        }
+    }
+
+    ~MxlWriter()
+    {
+        if (_writer != nullptr)
+        {
+            mxlReleaseFlowWriter(_instance, _writer);
+        }
+
+        if (_flowOpened)
+        {
+            mxlDestroyFlow(_instance, uuids::to_string(_flowID).c_str());
+        }
+
+        if (_instance != nullptr)
+        {
+            mxlDestroyInstance(_instance);
+        }
+    }
+
+    int run(mxl::lib::FlowParser const& descriptorParser, GstreamerPipeline& gst_pipeline)
+    {
+        gst_pipeline.start();
+
+        if (mxlIsDiscreteDataFormat(_flowInfo.common.format))
+        {
+            return runDiscreteFlow(dynamic_cast<VideoPipeline&>(gst_pipeline), descriptorParser.getGrainRate());
+        }
+        else
+        {
+            return runContinuousFlow(dynamic_cast<AudioPipeline&>(gst_pipeline), descriptorParser.getGrainRate());
+        }
+    }
+
+private:
+    int runDiscreteFlow(VideoPipeline& gst_pipeline, mxlRational const& frame_rate)
+    {
+        GstSample* gst_sample;
+        GstBuffer* gst_buffer;
+        uint64_t grain_index;
+
+        while (!g_exit_requested)
+        {
+            gst_sample = gst_pipeline.pullSample();
+            if (gst_sample)
+            {
+                grain_index = mxlGetCurrentIndex(&frame_rate);
+
+                gst_buffer = gst_sample_get_buffer(gst_sample);
+                if (gst_buffer)
+                {
+                    gst_buffer_ref(gst_buffer);
+
+                    GstMapInfo map_info;
+                    if (gst_buffer_map(gst_buffer, &map_info, GST_MAP_READ))
+                    {
+                        /// Open the grain.
+                        mxlGrainInfo gInfo;
+                        uint8_t* mxl_buffer = nullptr;
+
+                        /// Open the grain for writing.
+                        if (mxlFlowWriterOpenGrain(_writer, grain_index, &gInfo, &mxl_buffer) != MXL_STATUS_OK)
+                        {
+                            MXL_ERROR("Failed to open grain at index '{}'", grain_index);
+                            break;
+                        }
+
+                        ::memcpy(mxl_buffer, map_info.data, gInfo.grainSize);
+
+                        gInfo.commitedSize = gInfo.grainSize;
+                        if (mxlFlowWriterCommitGrain(_writer, &gInfo) != MXL_STATUS_OK)
+                        {
+                            MXL_ERROR("Failed to open grain at index '{}'", grain_index);
+                            break;
+                        }
+
+                        gst_buffer_unmap(gst_buffer, &map_info);
+                    }
+                    gst_buffer_unref(gst_buffer);
+                }
+
+                gst_sample_unref(gst_sample);
+
+                auto ns = mxlGetNsUntilIndex(grain_index++, &frame_rate);
+                mxlSleepForNs(ns);
+            }
+        }
+
+        return 0;
+    }
+
+    int runContinuousFlow(AudioPipeline& gst_pipeline, mxlRational const& rate)
+    {
+        GstSample* gst_sample;
+        GstBuffer* gst_buffer;
+        uint64_t headIndex = 0;
+
+        bool first{true};
+
+        while (!g_exit_requested)
+        {
+            gst_sample = gst_pipeline.pullSample();
+            if (gst_sample)
+            {
+                // MXL_INFO("headIndex -> calculated={}  rate={}/{}", headIndex, rate.numerator, rate.denominator);
+
+                gst_buffer = gst_sample_get_buffer(gst_sample);
+                if (gst_buffer)
+                {
+                    gst_buffer_ref(gst_buffer);
+
+                    GstMapInfo map_info;
+                    if (gst_buffer_map(gst_buffer, &map_info, GST_MAP_READ))
+                    {
+                        if (first)
+                        {
+                            headIndex = mxlGetCurrentIndex(&rate);
+                            first = false;
+                            MXL_INFO("Starting at index {} rate={}/{}", headIndex, rate.numerator, rate.denominator);
+                        }
+
+                        auto nbSamplesPerChan = map_info.size / (4 * _flowInfo.continuous.channelCount);
+
+                        mxlMutableWrappedMultiBufferSlice payloadBuffersSlices;
+                        if (mxlFlowWriterOpenSamples(_writer, headIndex, nbSamplesPerChan, &payloadBuffersSlices))
+                        {
+                            MXL_ERROR("Failed to open grain at index '{}'", headIndex);
+                            break;
+                        }
+
+                        std::uintptr_t offset = 0;
+                        for (auto& fragment : payloadBuffersSlices.base.fragments)
+                        {
+                            if (fragment.size != 0)
+                            {
+                                auto dst = fragment.pointer;
+                                auto src = map_info.data + offset;
+                                ::memcpy(dst, src, fragment.size);
+                                offset += fragment.size;
+                            }
+                        }
+                        // MXL_INFO("Writing range -> {}:{}", headIndex, headIndex + nbSamplesPerChan);
+                        if (mxlFlowWriterCommitSamples(_writer) != MXL_STATUS_OK)
+                        {
+                            MXL_ERROR("Failed to open grain at index '{}'", headIndex);
+                            break;
+                        }
+
+                        headIndex += nbSamplesPerChan;
+
+                        gst_buffer_unmap(gst_buffer, &map_info);
+                    }
+                    gst_buffer_unref(gst_buffer);
+                }
+
+                gst_sample_unref(gst_sample);
+
+                // if (!first)
+                // {
+                //     auto ns = mxlGetNsUntilIndex(headIndex, &rate);
+                //     mxlSleepForNs(ns);
+                // }
+            }
+        }
+        return 0;
+    }
+
+private:
+    mxlInstance _instance;
+    mxlFlowWriter _writer;
+    mxlFlowInfo _flowInfo;
+    uuids::uuid _flowID;
+    bool _flowOpened;
+};
+
 int main(int argc, char** argv)
 {
     std::signal(SIGINT, &signal_handler);
@@ -226,9 +621,26 @@ int main(int argc, char** argv)
 
     CLI::App app("mxl-gst-videotestsrc");
 
-    std::string flowConfigFile;
-    auto flowConfigFileOpt = app.add_option("-f, --flow-config-file", flowConfigFile, "The json file which contains the NMOS Flow configuration");
-    flowConfigFileOpt->required(true);
+    std::optional<std::string> videoFlowConfigFile;
+    auto videoFlowConfigFileOpt = app.add_option(
+        "-v, --video-config-file", videoFlowConfigFile, "The json file which contains the Video NMOS Flow configuration");
+    videoFlowConfigFileOpt->default_val(std::nullopt);
+
+    std::optional<std::string> audioFlowConfigFile;
+    auto audioFlowConfigFileOpt = app.add_option(
+        "-a, --audio-config-file", audioFlowConfigFile, "The json file which contains the Audio NMOS Flow configuration");
+    audioFlowConfigFileOpt->default_val(std::nullopt);
+
+    uint64_t samplesPerBatch;
+    auto samplesPerBatchOpt = app.add_option("-s, --samples-per-batch", samplesPerBatch, "Number of audio samples per batch");
+    samplesPerBatchOpt->default_val(1024);
+
+    uint64_t audioTimestampOffset;
+    auto audioTimestampOffsetOpt = app.add_option("-o, --audio-timestamp-offset",
+        audioTimestampOffset,
+        "Audio timestamp offset in ns (default 0ms). Use this to align audio and video. When using audio and video together, a value of "
+        "1e9/frame_rate is recommended.");
+    audioTimestampOffsetOpt->default_val(0);
 
     std::string domain;
     auto domainOpt = app.add_option("-d,--domain", domain, "The MXL domain directory");
@@ -248,117 +660,83 @@ int main(int argc, char** argv)
 
     CLI11_PARSE(app, argc, argv);
 
-    std::ifstream file(flowConfigFile, std::ios::in | std::ios::binary);
-    if (!file)
-    {
-        MXL_ERROR("Failed to open file: '{}'", flowConfigFile);
-        return EXIT_FAILURE;
-    }
-    std::string flow_descriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
-    mxl::lib::FlowParser descriptor_parser{flow_descriptor};
-
-    auto frame_rate = descriptor_parser.getGrainRate();
-    auto flowID = uuids::to_string(descriptor_parser.getId());
-
-    GstreamerPipelineConfig gst_config{
-        .frame_width = static_cast<uint64_t>(descriptor_parser.get<double>("frame_width")),
-        .frame_height = static_cast<uint64_t>(descriptor_parser.get<double>("frame_height")),
-        .frame_rate = frame_rate,
-        .pattern = pattern_map.at(pattern),
-        .textoverlay = textOverlay,
-    };
-
-    GstreamerPipeline gst_pipeline(gst_config);
-
-    mxlStatus ret;
     int exit_status = EXIT_SUCCESS;
 
-    auto instance = mxlCreateInstance(domain.c_str(), "");
-    if (instance == nullptr)
+    std::vector<std::thread> threads;
+
+    if (videoFlowConfigFile)
     {
-        MXL_ERROR("Failed to create MXL instance");
-        exit_status = EXIT_FAILURE;
-        goto mxl_cleanup;
-    }
-
-    // Create the flow
-    mxlFlowInfo fInfo;
-    ret = mxlCreateFlow(instance, flow_descriptor.c_str(), nullptr, &fInfo);
-    if (ret != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to create flow with status '{}'", static_cast<int>(ret));
-        exit_status = EXIT_FAILURE;
-        goto mxl_cleanup;
-    }
-
-    // Create the flow writer
-    mxlFlowWriter writer;
-    if (mxlCreateFlowWriter(instance, flowID.c_str(), "", &writer) != MXL_STATUS_OK)
-    {
-        MXL_ERROR("Failed to create flow write");
-        exit_status = EXIT_FAILURE;
-        goto mxl_cleanup;
-    }
-
-    gst_pipeline.start();
-
-    GstSample* gst_sample;
-    GstBuffer* gst_buffer;
-    uint64_t grain_index;
-
-    while (!g_exit_requested)
-    {
-        gst_sample = gst_pipeline.pullSample();
-        if (gst_sample)
-        {
-            grain_index = mxlGetCurrentIndex(&frame_rate);
-
-            gst_buffer = gst_sample_get_buffer(gst_sample);
-            if (gst_buffer)
+        threads.emplace_back(
+            [&]()
             {
-                gst_buffer_ref(gst_buffer);
-
-                GstMapInfo map_info;
-                if (gst_buffer_map(gst_buffer, &map_info, GST_MAP_READ))
+                std::ifstream file(*videoFlowConfigFile, std::ios::in | std::ios::binary);
+                if (!file)
                 {
-                    /// Open the grain.
-                    mxlGrainInfo gInfo;
-                    uint8_t* mxl_buffer = nullptr;
-                    /// Open the grain for writing.
-                    if (mxlFlowWriterOpenGrain(writer, grain_index, &gInfo, &mxl_buffer) != MXL_STATUS_OK)
-                    {
-                        MXL_ERROR("Failed to open grain at index '{}'", grain_index);
-                        break;
-                    }
-
-                    ::memcpy(mxl_buffer, map_info.data, gInfo.grainSize);
-
-                    gInfo.commitedSize = gInfo.grainSize;
-                    if (mxlFlowWriterCommitGrain(writer, &gInfo) != MXL_STATUS_OK)
-                    {
-                        MXL_ERROR("Failed to open grain at index '{}'", grain_index);
-                        break;
-                    }
-
-                    gst_buffer_unmap(gst_buffer, &map_info);
+                    MXL_ERROR("Failed to open file: '{}'", *videoFlowConfigFile);
+                    return EXIT_FAILURE;
                 }
-                gst_buffer_unref(gst_buffer);
-            }
+                std::string flow_descriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+                mxl::lib::FlowParser descriptor_parser{flow_descriptor};
 
-            gst_sample_unref(gst_sample);
+                auto frame_rate = descriptor_parser.getGrainRate();
+                auto flowID = uuids::to_string(descriptor_parser.getId());
 
-            auto ns = mxlGetNsUntilIndex(grain_index++, &frame_rate);
-            mxlSleepForNs(ns);
-        }
+                VideoPipelineConfig gst_config{
+                    .frame_width = static_cast<uint64_t>(descriptor_parser.get<double>("frame_width")),
+                    .frame_height = static_cast<uint64_t>(descriptor_parser.get<double>("frame_height")),
+                    .frame_rate = frame_rate,
+                    .pattern = pattern_map.at(pattern),
+                    .textoverlay = textOverlay,
+                };
+
+                VideoPipeline gst_pipeline(gst_config);
+
+                auto mxlWriter = MxlWriter(domain, flow_descriptor, flowID);
+                mxlWriter.run(flow_descriptor, gst_pipeline);
+
+                MXL_INFO("Video pipeline finished");
+                return 0;
+            });
     }
 
-mxl_cleanup:
-    if (instance != nullptr)
+    if (audioFlowConfigFile)
     {
-        // clean-up mxl objects
-        mxlReleaseFlowWriter(instance, writer);
-        mxlDestroyFlow(instance, flowID.c_str());
-        mxlDestroyInstance(instance);
+        threads.emplace_back(
+            [&]()
+            {
+                std::ifstream file(*audioFlowConfigFile, std::ios::in | std::ios::binary);
+                if (!file)
+                {
+                    MXL_ERROR("Failed to open file: '{}'", *audioFlowConfigFile);
+                    return EXIT_FAILURE;
+                }
+                std::string flow_descriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
+                mxl::lib::FlowParser descriptor_parser{flow_descriptor};
+
+                auto flowID = uuids::to_string(descriptor_parser.getId());
+
+                AudioPipelineConfig gst_config{
+                    .rate = descriptor_parser.getGrainRate(),
+                    .channelCount = descriptor_parser.getChannelCount(),
+                    .freq = 440.0,
+                    .samplesPerBatch = samplesPerBatch,
+                    .wave = wave_map.at("sine"),
+                    .offset = audioTimestampOffset,
+                };
+
+                AudioPipeline gst_pipeline(gst_config);
+
+                auto mxlWriter = MxlWriter(domain, flow_descriptor, flowID);
+                mxlWriter.run(flow_descriptor, gst_pipeline);
+
+                MXL_INFO("Audio pipeline finished");
+                return 0;
+            });
+    }
+
+    for (auto& t : threads)
+    {
+        t.join();
     }
 
     return exit_status;
