@@ -4,8 +4,8 @@
 
 #include "RCTarget.hpp"
 #include <cstdint>
+#include <mxl-internal/Logging.hpp>
 #include <rdma/fabric.h>
-#include "internal/Logging.hpp"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types

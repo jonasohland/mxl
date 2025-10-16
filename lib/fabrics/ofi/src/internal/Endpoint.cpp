@@ -9,12 +9,12 @@
 #include <utility>
 #include <uuid.h>
 #include <bits/types/struct_iovec.h>
+#include <mxl-internal/Logging.hpp>
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_endpoint.h>
 #include <rdma/fi_errno.h>
 #include <rdma/fi_rma.h>
-#include "internal/Logging.hpp"
 #include "Address.hpp"
 #include "CompletionQueue.hpp"
 #include "Domain.hpp"

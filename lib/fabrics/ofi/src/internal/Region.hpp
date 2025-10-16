@@ -10,8 +10,8 @@
 #include <vector>
 #include <uuid.h>
 #include <bits/types/struct_iovec.h>
+#include <mxl-internal/FlowData.hpp>
 #include <rdma/fi_domain.h>
-#include "internal/FlowData.hpp"
 #include "mxl/fabrics.h"
 
 namespace mxl::lib::fabrics::ofi

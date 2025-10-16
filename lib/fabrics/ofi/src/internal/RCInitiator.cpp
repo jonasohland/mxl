@@ -7,9 +7,9 @@
 #include <cstdint>
 #include <algorithm>
 #include <uuid.h>
+#include <mxl-internal/Logging.hpp>
 #include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
-#include "internal/Logging.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
 #include "ImmData.hpp"

@@ -5,11 +5,11 @@
 #include "MemoryRegion.hpp"
 #include <cstdint>
 #include <random>
+#include <sys/mman.h>
 #include <bits/types/struct_iovec.h>
+#include <mxl-internal/Logging.hpp>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
-#include <sys/mman.h>
-#include "internal/Logging.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
 #include "Region.hpp"
@@ -21,7 +21,8 @@ namespace mxl::lib::fabrics::ofi
     {
         switch (loc.iface())
         {
-            case FI_HMEM_CUDA: {
+            case FI_HMEM_CUDA:
+            {
                 attr.device.cuda = loc.id();
                 return;
             }

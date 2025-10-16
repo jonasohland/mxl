@@ -31,7 +31,8 @@ target_sources(mxl-fabrics-tests
 target_link_libraries(mxl-fabrics-tests
         PRIVATE
             mxl
-            mxl-objects
+            mxl-internal
+            mxl-headers
             mxl-fabrics
             mxl-fabrics-objects
             Catch2::Catch2WithMain

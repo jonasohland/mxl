@@ -8,9 +8,9 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <mxl-internal/Logging.hpp>
 #include <rdma/fi_eq.h>
 #include <rdma/fi_errno.h>
-#include "internal/Logging.hpp"
 #include "Exception.hpp"
 #include "Fabric.hpp"
 

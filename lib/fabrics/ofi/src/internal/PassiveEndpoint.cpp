@@ -6,10 +6,10 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <mxl-internal/Logging.hpp>
 #include <rdma/fabric.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_endpoint.h>
-#include "internal/Logging.hpp"
 #include "EventQueue.hpp"
 #include "Exception.hpp"
 #include "Fabric.hpp"

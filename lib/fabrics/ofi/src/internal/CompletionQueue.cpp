@@ -6,10 +6,10 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <sys/types.h>
+#include <mxl-internal/Logging.hpp>
 #include <rdma/fi_eq.h>
 #include <rdma/fi_errno.h>
-#include <sys/types.h>
-#include "internal/Logging.hpp"
 #include "Completion.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"

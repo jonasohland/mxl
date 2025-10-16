@@ -5,7 +5,7 @@
 #pragma once
 
 #include <list>
-#include <internal/Instance.hpp>
+#include <mxl-internal/Instance.hpp>
 #include <mxl/fabrics.h>
 #include "Initiator.hpp"
 #include "Target.hpp"

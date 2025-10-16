@@ -15,7 +15,8 @@ target_link_libraries(mxl-fabrics-demo
         PRIVATE
             mxl
             mxl-fabrics
-            mxl-objects
+            mxl-internal
+            mxl-headers
             stduuid
             CLI11::CLI11
             spdlog::spdlog

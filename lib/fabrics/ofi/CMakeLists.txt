@@ -33,7 +33,7 @@ set_target_properties(mxl-fabrics-objects
 
 target_link_libraries(mxl-fabrics
     PUBLIC
-        mxl-objects
+        mxl-headers
         mxl-internal
 )
 
@@ -51,7 +51,8 @@ set_target_properties(mxl-fabrics-objects
 
 target_link_libraries(mxl-fabrics-objects
         PUBLIC
-            mxl-objects
+            mxl-headers
+            mxl-internal
             mxl
     )
 
@@ -65,6 +66,12 @@ target_link_libraries(mxl-fabrics
         PkgConfig::libfabric
         reflectcpp::reflectcpp
 )
+
+target_link_libraries(mxl-fabrics-objects
+        PRIVATE
+            PkgConfig::libfabric
+            reflectcpp::reflectcpp
+    )
 
 target_sources(mxl-fabrics-objects
         PRIVATE

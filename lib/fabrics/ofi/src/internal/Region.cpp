@@ -7,8 +7,8 @@
 #include <cstdint>
 #include <algorithm>
 #include <bits/types/struct_iovec.h>
-#include "internal/DiscreteFlowData.hpp"
-#include "internal/Flow.hpp"
+#include <mxl-internal/DiscreteFlowData.hpp>
+#include <mxl-internal/Flow.hpp>
 #include "mxl/flow.h"
 #include "mxl/mxl.h"
 #include "Exception.hpp"
@@ -73,7 +73,10 @@ namespace mxl::lib::fabrics::ofi
     {
         return std::visit(overloaded{[](std::monostate) -> std::string { throw Exception::invalidState("Region type is not set"); },
                               [](Location::Host const&) -> std::string { return "host"; },
-                              [&](Location::Cuda const&) -> std::string { return fmt::format("cuda, id={}", id()); }},
+                              [&](Location::Cuda const&) -> std::string
+                              {
+                                  return fmt::format("cuda, id={}", id());
+                              }},
             _inner);
     }
 

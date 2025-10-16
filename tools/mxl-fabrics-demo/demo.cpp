@@ -8,16 +8,16 @@
 #include <optional>
 #include <string>
 #include <uuid.h>
+#include <sys/types.h>
 #include <CLI/CLI.hpp>
+#include <mxl-internal/FlowParser.hpp>
+#include <mxl-internal/Logging.hpp>
 #include <mxl/fabrics.h>
 #include <mxl/flow.h>
 #include <mxl/mxl.h>
 #include <mxl/time.h>
-#include <sys/types.h>
-#include "../../lib/fabrics/ofi/src/internal/Base64.hpp"
-#include "../../lib/src/internal/FlowParser.hpp"
-#include "../../lib/src/internal/Logging.hpp"
 #include "CLI/CLI.hpp"
+#include "../../lib/fabrics/ofi/src/internal/Base64.hpp"
 
 /*
     Example how to use:
@@ -256,7 +256,7 @@ public:
             }
             while (status == MXL_ERR_NOT_READY);
 
-            if (grainInfo.commitedSize != grainInfo.grainSize)
+            if (grainInfo.validSlices != grainInfo.totalSlices)
             {
                 // partial commit, we will need to work on the same grain again.
                 continue;
@@ -500,7 +500,11 @@ public:
                 return status;
             }
 
-            MXL_INFO("Comitted grain with index={} commitedSize={} grainSize={}", grainIndex, dummyGrainInfo.commitedSize, dummyGrainInfo.grainSize);
+            MXL_INFO("Comitted grain with index={} validSlices={} totalSlices={}, grainSize={}",
+                grainIndex,
+                dummyGrainInfo.validSlices,
+                dummyGrainInfo.totalSlices,
+                dummyGrainInfo.grainSize);
         }
 
         return MXL_STATUS_OK;

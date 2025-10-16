@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "FabricsInstance.hpp"
-#include <internal/Logging.hpp>
+#include <mxl-internal/Logging.hpp>
 #include "mxl/fabrics.h"
 #include "Exception.hpp"
 #include "FILogging.hpp"

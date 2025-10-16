@@ -5,11 +5,11 @@
 #include "AddressVector.hpp"
 #include <memory>
 #include <utility>
+#include <sys/types.h>
+#include <mxl-internal/Logging.hpp>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
 #include <rdma/fi_errno.h>
-#include <sys/types.h>
-#include "internal/Logging.hpp"
 #include "Exception.hpp"
 
 namespace mxl::lib::fabrics::ofi

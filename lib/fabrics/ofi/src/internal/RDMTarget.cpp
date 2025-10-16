@@ -5,8 +5,8 @@
 #include "RDMTarget.hpp"
 #include <cstdint>
 #include <memory>
+#include <mxl-internal/Logging.hpp>
 #include <rdma/fabric.h>
-#include "internal/Logging.hpp"
 #include "AddressVector.hpp"
 #include "Exception.hpp"
 #include "FIInfo.hpp"

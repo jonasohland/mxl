@@ -8,8 +8,8 @@
 #include <memory>
 #include <utility>
 #include <variant>
+#include <mxl-internal/Logging.hpp>
 #include <rdma/fabric.h>
-#include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
 #include "Address.hpp"
