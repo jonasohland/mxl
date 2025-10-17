@@ -543,8 +543,6 @@ private:
             gst_sample = gst_pipeline.pullSample();
             if (gst_sample)
             {
-                // MXL_INFO("headIndex -> calculated={}  rate={}/{}", headIndex, rate.numerator, rate.denominator);
-
                 gst_buffer = gst_sample_get_buffer(gst_sample);
                 if (gst_buffer)
                 {
@@ -570,17 +568,20 @@ private:
                         }
 
                         std::uintptr_t offset = 0;
-                        for (auto& fragment : payloadBuffersSlices.base.fragments)
+                        for (uint64_t chan = 0; chan < payloadBuffersSlices.count; ++chan)
                         {
-                            if (fragment.size != 0)
+                            for (auto& fragment : payloadBuffersSlices.base.fragments)
                             {
-                                auto dst = fragment.pointer;
-                                auto src = map_info.data + offset;
-                                ::memcpy(dst, src, fragment.size);
-                                offset += fragment.size;
+                                if (fragment.size != 0)
+                                {
+                                    auto dst = reinterpret_cast<std::uint8_t*>(fragment.pointer) + (chan * payloadBuffersSlices.stride);
+                                    auto src = map_info.data + offset;
+                                    ::memcpy(dst, src, fragment.size);
+                                    offset += fragment.size;
+                                }
                             }
                         }
-                        // MXL_INFO("Writing range -> {}:{}", headIndex, headIndex + nbSamplesPerChan);
+
                         if (mxlFlowWriterCommitSamples(_writer) != MXL_STATUS_OK)
                         {
                             MXL_ERROR("Failed to open grain at index '{}'", headIndex);
@@ -596,11 +597,11 @@ private:
 
                 gst_sample_unref(gst_sample);
 
-                // if (!first)
-                // {
-                //     auto ns = mxlGetNsUntilIndex(headIndex, &rate);
-                //     mxlSleepForNs(ns);
-                // }
+                if (!first)
+                {
+                    auto ns = mxlGetNsUntilIndex(headIndex, &rate);
+                    mxlSleepForNs(ns);
+                }
             }
         }
         return 0;
