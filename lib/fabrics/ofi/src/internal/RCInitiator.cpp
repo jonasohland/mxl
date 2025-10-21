@@ -9,8 +9,8 @@
 #include <uuid.h>
 #include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
-#include "internal/ContinuousFlowData.hpp"
 #include "internal/Logging.hpp"
+#include "AudioBounceBuffer.hpp"
 #include "DataLayout.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
@@ -131,7 +131,7 @@ namespace mxl::lib::fabrics::ofi
                     {
                         MXL_INFO("Endpoint is now connected");
 
-                        return Connected{.ep = std::move(state.ep), .pending = 0};
+                        return Connected{.ep = std::move(state.ep), .entryIndex = 0, .pending = 0};
                     }
                     else if (ev.isShutdown())
                     {
@@ -209,13 +209,13 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, std::uint64_t index, std::size_t count)
+    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& localRegionGroup, std::uint64_t index, std::size_t count)
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
-            auto immData = ImmDataSample{index, count};
             auto const& remote = _regions[index % _regions.size()];
-            connected->pending += connected->ep.write(local, remote, immData.data());
+            connected->pending += connected->ep.write(localRegionGroup, remote, ImmDataSample{connected->entryIndex, index, count}.data());
+            connected->entryIndex = (connected->entryIndex + 1) % 4; // TODO: should be using the NUMBER_OF_ENTRIES from AudioBounceBuffer
         }
     }
 
@@ -286,16 +286,16 @@ namespace mxl::lib::fabrics::ofi
         }
 
         auto info = *fabricInfoList.begin();
-        MXL_DEBUG("{}", fi_tostr(info.raw(), FI_TYPE_INFO));
-
         auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
 
-        auto const mxlRegions = MxlRegions::fromAPI(config.regions);
-        if (config.regions != nullptr)
+        if (config.regions == nullptr)
         {
-            domain->registerRegions(mxlRegions->regions(), FI_WRITE);
+            throw Exception::invalidArgument("config.regions must not be null");
         }
+
+        auto const mxlRegions = MxlRegions::fromAPI(config.regions);
+        domain->registerRegions(mxlRegions->regions(), FI_WRITE);
 
         auto eq = EventQueue::open(fabric);
         auto cq = CompletionQueue::open(domain);
@@ -346,7 +346,7 @@ namespace mxl::lib::fabrics::ofi
         }
         if (!_dataLayout.isVideo())
         {
-            throw Exception::internal("transferSamples called, but the data layout for that endpoint is not audio.");
+            throw Exception::internal("transferGrain called, but the data layout for that endpoint is not video.");
         }
 
         // Find the local region in which the grain with this index is stored.
@@ -364,7 +364,7 @@ namespace mxl::lib::fabrics::ofi
     {
         if (_localRegions.empty())
         {
-            throw Exception::internal("Attempted to transfer grains with no region registered.");
+            throw Exception::internal("Attempted to transfer samples with no region registered.");
         }
         if (!_dataLayout.isAudio())
         {
@@ -375,30 +375,7 @@ namespace mxl::lib::fabrics::ofi
 
         auto audioDataLayout = _dataLayout.asAudio();
 
-        mxlWrappedMultiBufferSlice slice = {};
-        getMultiBufferSlices(headIndex,
-            count,
-            audioDataLayout.samplesPerChannel,
-            audioDataLayout.bytesPerSample,
-            audioDataLayout.bytesPerSample,
-            reinterpret_cast<std::uint8_t const*>(localRegion.addr),
-            slice);
-
-        // Create the scatter-gather list using the slices. We create at least one scatter-gather entry per channel. We potentially create an
-        // additional one per channel if 2 fragments are present (wrap-around). When a fragment is not present its size will be 0.
-        std::vector<LocalRegion> sgList;
-        for (auto& fragment : slice.base.fragments)
-        {
-            // check if the fragment present
-            if (fragment.size > 0)
-            {
-                for (size_t chan = 0; chan < slice.count; chan++)
-                {
-                    auto chanAddr = reinterpret_cast<std::uintptr_t>(fragment.pointer) + (slice.stride * chan);
-                    sgList.emplace_back(LocalRegion{.addr = chanAddr, .len = fragment.size, .desc = localRegion.desc});
-                }
-            }
-        }
+        auto sgList = AudioBounceBuffer::scatterGatherList(audioDataLayout, headIndex, count, localRegion);
 
         // Do the post the transfer to each targets
         for (auto& [_, target] : _targets)

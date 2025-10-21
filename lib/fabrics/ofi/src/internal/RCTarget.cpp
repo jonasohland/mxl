@@ -8,9 +8,10 @@
 #include <rdma/fabric.h>
 #include "internal/Logging.hpp"
 #include "mxl/mxl.h"
-#include "BouncingBuffer.hpp"
+#include "AudioBounceBuffer.hpp"
 #include "Exception.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
+#include "ImmData.hpp"
 #include "Region.hpp"
 #include "VariantUtils.hpp"
 
@@ -50,26 +51,28 @@ namespace mxl::lib::fabrics::ofi
         auto fabric = Fabric::open(*fabricInfoList.begin());
         auto domain = Domain::open(fabric);
 
-        std::optional<BouncingBuffer> bouncingBuffer;
-        if (config.regions != nullptr)
+        if (config.regions == nullptr)
         {
-            auto const mxlRegions = MxlRegions::fromAPI(config.regions);
+            throw Exception::invalidArgument("config.regions must not be null");
+        }
 
-            // Check if we need to use a bounce buffer.
-            if (auto dataLayout = mxlRegions->dataLayout(); dataLayout.isAudio()) // audio
-            {
-                auto audioLayout = dataLayout.asAudio();
-                auto bouncingBufferEntrySize = audioLayout.channelCount * audioLayout.samplesPerChannel * audioLayout.bytesPerSample;
-                // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
-                // //TODO: find a way to calculate the number of entries required
-                bouncingBuffer = BouncingBuffer{4, bouncingBufferEntrySize, dataLayout};
-                domain->registerRegions(bouncingBuffer->getRegions(), FI_REMOTE_WRITE);
-            }
-            else // video
-            {
-                // media buffers are directly used as reception buffer, so register them
-                domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
-            }
+        auto const mxlRegions = MxlRegions::fromAPI(config.regions);
+        std::optional<AudioBounceBuffer> bounceBuffer;
+
+        // Check if we need to use a bounce buffer.
+        if (auto dataLayout = mxlRegions->dataLayout(); dataLayout.isAudio()) // audio
+        {
+            auto audioLayout = dataLayout.asAudio();
+            // auto bouncingBufferEntrySize = audioLayout.channelCount * audioLayout.samplesPerChannel * audioLayout.bytesPerSample;
+            // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
+            // //TODO: find a way to calculate the number of entries required
+            bounceBuffer = AudioBounceBuffer{audioLayout};
+            domain->registerRegions(bounceBuffer->getRegions(), FI_REMOTE_WRITE);
+        }
+        else // video
+        {
+            // media buffers are directly used as reception buffer, so register them
+            domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
         }
         /// TODO: this code is exactly the same for both RC and RDM target
 
@@ -87,8 +90,8 @@ namespace mxl::lib::fabrics::ofi
         // Helper struct to enable the std::make_unique function to access the private constructor of this class
         struct MakeUniqueEnabler : RCTarget
         {
-            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::optional<BouncingBuffer> bouncingBuffer, PassiveEndpoint pep)
-                : RCTarget(std::move(domain), std::move(bouncingBuffer), std::move(pep))
+            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer, PassiveEndpoint pep)
+                : RCTarget(std::move(domain), std::move(bounceBuffer), std::move(pep))
             {}
         };
 
@@ -96,13 +99,13 @@ namespace mxl::lib::fabrics::ofi
         auto remoteRegionGroups = domain->remoteRegions();
 
         // Return the constructed RCTarget and associated TargetInfo for remote peers to connect.
-        return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(bouncingBuffer), std::move(pep)),
+        return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(bounceBuffer), std::move(pep)),
             std::make_unique<TargetInfo>(std::move(localAddress), std::move(remoteRegionGroups))};
     }
 
-    RCTarget::RCTarget(std::shared_ptr<Domain> domain, std::optional<BouncingBuffer> bouncingBuffer, PassiveEndpoint ep)
+    RCTarget::RCTarget(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer, PassiveEndpoint ep)
         : _domain(std::move(domain))
-        , _bouncingBuffer(std::move(bouncingBuffer))
+        , _bounceBuffer(std::move(bounceBuffer))
         , _state(WaitForConnectionRequest{std::move(ep)})
     {}
 
@@ -199,6 +202,13 @@ namespace mxl::lib::fabrics::ofi
                                 // the immmediate data (in our case the grain index), will be returned in the registered region.
                                 state.ep.recv(state.immData->toLocalRegion());
                             }
+                            // TODO: this code should be in the "protocol" implementation
+                            if (_bounceBuffer)
+                            {
+                                auto [entryIndex, headIndex, count] = ImmDataSample{*result.immData}.unpack();
+                                _bounceBuffer->unpack(entryIndex, headIndex, count, _domain->localRegions().front());
+                            }
+                            // TODO: this code should be in the "protocol" implementation
                         }
                         else
                         {

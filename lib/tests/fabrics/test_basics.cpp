@@ -265,7 +265,7 @@ TEST_CASE("Fabrics: Connectionless target and initiator blocking", "[fabrics][co
     auto targetConfig = mxlTargetConfig{
         .endpointAddress = mxlEndpointAddress{.node = "target", .service = "test-blocking"},
         .provider = MXL_SHARING_PROVIDER_SHM,
-        .regions = nullptr,
+        .regions = targetRegions,
         .deviceSupport = false
     };
     // Retrieve the target info from the target setup
@@ -283,7 +283,7 @@ TEST_CASE("Fabrics: Connectionless target and initiator blocking", "[fabrics][co
     auto initiatorConfig = mxlInitiatorConfig{
         .endpointAddress = mxlEndpointAddress{.node = "initiator", .service = "test-blocking"},
         .provider = MXL_SHARING_PROVIDER_SHM,
-        .regions = nullptr,
+        .regions = initiatorRegions,
         .deviceSupport = false
     };
     REQUIRE(mxlFabricsInitiatorSetup(initiator, &initiatorConfig) == MXL_STATUS_OK);

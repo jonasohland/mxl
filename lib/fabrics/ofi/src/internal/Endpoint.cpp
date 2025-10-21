@@ -324,14 +324,13 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
-    size_t Endpoint::write(LocalRegionGroup const& localGroup, RemoteRegion const& remoteRegion, ::fi_addr_t destAddr,
+    size_t Endpoint::write(LocalRegionGroup const& localRegionGroup, RemoteRegion const& remoteRegion, ::fi_addr_t destAddr,
         std::optional<std::uint32_t> immData)
     {
         // In this function we will potentially post more than a single write transfer. This occurs if the iov limit supported by the endpoint is
         // smaller than the number of local region in the local region group. In that case, we need to perform multiple transfers. Only the last
         // transfer is posted with immediate data to signal completion to the target. If multiple writes are posted, we also need to add and offset to
         // the remote region for each request otherwise we overwrite the indices.
-
         std::uint64_t data = immData.value_or(0);
         std::uint64_t flags = FI_DELIVERY_COMPLETE;
 
@@ -339,14 +338,14 @@ namespace mxl::lib::fabrics::ofi
         auto remoteOffset = 0;
 
         auto iovLimit = _info->tx_attr->iov_limit;
-        auto nbWrites = (localGroup.size() + (iovLimit - 1)) / iovLimit;
+        auto nbWrites = (localRegionGroup.size() + (iovLimit - 1)) / iovLimit;
 
         for (std::size_t i = 0; i < nbWrites; i++)
         {
             auto begin = i * iovLimit;
-            auto end = begin + std::min(iovLimit, localGroup.size() - begin);
+            auto end = begin + std::min(iovLimit, localRegionGroup.size() - begin);
 
-            auto localGroupSpan = localGroup.span(begin, end);
+            auto localGroupSpan = localRegionGroup.span(begin, end);
             // check if we would bust the remote region
             if ((remoteOffset + localGroupSpan.byteSize()) > remoteRegion.len)
             {

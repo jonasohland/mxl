@@ -77,7 +77,8 @@ namespace mxl::lib::fabrics::ofi
         struct Connected
         {
             Endpoint ep;
-            std::size_t pending; /// The number of currently pending write requests.
+            std::uint64_t entryIndex; /// When a bounce buffer is used, this corresponds to the bounce buffer entry
+            std::size_t pending;      /// The number of currently pending write requests.
         };
 
         /// The shutdown state. The endpoint is shutting down and is waiting for a Event::Shutdown event.

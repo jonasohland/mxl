@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <tuple>
 #include <utility>
 
 namespace mxl::lib::fabrics::ofi
@@ -35,10 +36,10 @@ namespace mxl::lib::fabrics::ofi
     {
     public:
         ImmDataSample(std::uint32_t data) noexcept;
-        ImmDataSample(std::uint64_t headIndex, std::size_t count) noexcept;
+        ImmDataSample(std::size_t entryIndex, std::uint64_t headIndex, std::size_t count) noexcept;
 
         [[nodiscard]]
-        std::pair<std::uint64_t, std::size_t> unpack() const noexcept;
+        std::tuple<std::size_t, std::uint16_t, std::size_t> unpack() const noexcept;
         [[nodiscard]]
         std::uint32_t data() const noexcept;
 
@@ -47,11 +48,13 @@ namespace mxl::lib::fabrics::ofi
         {
             struct
             {
-                std::uint16_t headIndex;
-                std::uint16_t count;
+                std::uint32_t entryIndex : 2;  // enough for 4 out-standing entries
+                std::uint32_t headIndex  : 15; // Sample index associated with the transfer (enough for ~340ms @ 96KHz)
+                std::uint32_t count      : 15; // Enough for ~340ms @ 96KHz
             };
 
             uint32_t data;
         } _inner;
     };
+
 }

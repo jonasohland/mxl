@@ -10,7 +10,7 @@
 #include <rdma/fabric.h>
 #include "internal/Logging.hpp"
 #include "AddressVector.hpp"
-#include "BouncingBuffer.hpp"
+#include "AudioBounceBuffer.hpp"
 #include "Exception.hpp"
 #include "FIInfo.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
@@ -43,26 +43,29 @@ namespace mxl::lib::fabrics::ofi
 
         auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
-        std::optional<BouncingBuffer> bouncingBuffer;
-        if (config.regions != nullptr)
+        if (config.regions == nullptr)
         {
-            auto const mxlRegions = MxlRegions::fromAPI(config.regions);
-
-            if (auto dataLayout = mxlRegions->dataLayout(); dataLayout.isAudio())
-            {
-                auto audioLayout = dataLayout.asAudio();
-                auto bouncingBufferEntrySize = audioLayout.channelCount * audioLayout.samplesPerChannel * audioLayout.bytesPerSample;
-                // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
-                // //TODO: find a way to calculate the number of entries required
-                bouncingBuffer = BouncingBuffer{4, bouncingBufferEntrySize, dataLayout};
-                domain->registerRegions(bouncingBuffer->getRegions(), FI_REMOTE_WRITE);
-            }
-            else
-            {
-                // media buffers are directly used as reception buffer, so register them
-                domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
-            }
+            throw Exception::invalidArgument("config.regions must not be null");
         }
+
+        auto const mxlRegions = MxlRegions::fromAPI(config.regions);
+        std::optional<AudioBounceBuffer> bouncingBuffer;
+
+        if (auto dataLayout = mxlRegions->dataLayout(); dataLayout.isAudio())
+        {
+            auto audioLayout = dataLayout.asAudio();
+            // auto bouncingBufferEntrySize = audioLayout.channelCount * audioLayout.samplesPerChannel * audioLayout.bytesPerSample;
+            // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
+            // //TODO: find a way to calculate the number of entries required
+            bouncingBuffer = AudioBounceBuffer{audioLayout};
+            domain->registerRegions(bouncingBuffer->getRegions(), FI_REMOTE_WRITE);
+        }
+        else
+        {
+            // media buffers are directly used as reception buffer, so register them
+            domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
+        }
+
         /// TODO: this code is exactly the same for both RC and RDM target
 
         auto endpoint = Endpoint::create(domain);
@@ -91,7 +94,7 @@ namespace mxl::lib::fabrics::ofi
 
         struct MakeUniqueEnabler : RDMTarget
         {
-            MakeUniqueEnabler(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData, std::optional<BouncingBuffer> bouncingBuffer)
+            MakeUniqueEnabler(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData, std::optional<AudioBounceBuffer> bouncingBuffer)
                 : RDMTarget(std::move(endpoint), std::move(immData), std::move(bouncingBuffer))
             {}
         };
@@ -100,7 +103,7 @@ namespace mxl::lib::fabrics::ofi
             std::make_unique<TargetInfo>(std::move(localAddress), domain->remoteRegions())};
     }
 
-    RDMTarget::RDMTarget(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData, std::optional<BouncingBuffer> bouncingBuffer)
+    RDMTarget::RDMTarget(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData, std::optional<AudioBounceBuffer> bouncingBuffer)
         : _endpoint(std::move(endpoint))
         , _immData(std::move(immData))
         , _bouncingBuffer(std::move(bouncingBuffer))

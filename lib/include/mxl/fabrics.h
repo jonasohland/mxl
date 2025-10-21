@@ -217,20 +217,22 @@ extern "C"
      * \param out_index The head index of the samples that is ready, if any.
      * \param out_count The number of samples in each channels that are ready
      * \return The result code. MXL_ERR_NOT_READY if no samples are available at the time of the call, and the call should be retried. \see mxlStatus
+     * \note The returned `out_index` is only the 15 LSB of the actual sample index. An application can use the current time to recover the actual
+     * sample index.
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsTargetTryNewSamples(mxlFabricsTarget in_target, uint64_t* out_index, size_t* out_count);
+    mxlStatus mxlFabricsTargetTryNewSamples(mxlFabricsTarget in_target, uint16_t* out_index, size_t* out_count);
 
     /**
      * Blocking accessor for a flow grain at a specific index.
      * \param in_target A valid fabrics target
-     * \param out_index The head index of the samples that is ready, if any.
-     * \param out_count The number of samples in each channels that are ready
+     * \param out_index The head index of the samples that is ready, if any.  \see mxlFabricTargetTryNewGrain note for more information
+     * \param out_count The number of samples in each channels that are ready.
      * \param in_timeoutMs How long should we wait for new samples (in milliseconds)
      * \return The result code. MXL_ERR_NOT_READY if no grain was available before the timeout. \see mxlStatus
      */
     MXL_EXPORT
-    mxlStatus mxlFabricsTargetWaitForNewSamples(mxlFabricsTarget in_target, uint64_t* out_index, size_t* out_count, uint16_t in_timeoutMs);
+    mxlStatus mxlFabricsTargetWaitForNewSamples(mxlFabricsTarget in_target, uint16_t* out_index, size_t* out_count, uint16_t in_timeoutMs);
 
     /**
      * Create a fabrics initiator instance.
@@ -370,6 +372,14 @@ extern "C"
      * \param out_index The actual grain index.
      */
     mxlStatus mxlFabricsRecoverGrainIndex(mxlRational const* editRate, uint16_t in_index, uint64_t* out_index);
+
+    /**
+     * Recover the actual sample index by using the 15LSB index received from `mxlFabricsTargetTryNewSamples` or `mxlFabricsTargetWaitForNewSamples`
+     * and the current time.
+     * \param in_index Grain index 15LSB received
+     * \param out_index The actual sample index.
+     */
+    mxlStatus mxlFabricsRecoverSampleIndex(mxlRational const* editRate, uint16_t in_index, uint64_t* out_index);
 
 #ifdef __cplusplus
 }

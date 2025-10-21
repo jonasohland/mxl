@@ -22,6 +22,7 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::iovec toIovec() const noexcept;
 
+        /// The returned LocalRegionGroup will contain this single LocalRegion.
         [[nodiscard]]
         LocalRegionGroup asGroup() const noexcept;
 
@@ -31,6 +32,7 @@ namespace mxl::lib::fabrics::ofi
         void* desc;
     };
 
+    /// Used when the user wants to transfer many non-contiguous regions in a single transfer.
     class LocalRegionGroup
     {
     public:
