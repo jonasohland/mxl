@@ -324,7 +324,7 @@ namespace mxl::lib::fabrics::ofi
         return _raw;
     }
 
-    void Endpoint::write(LocalRegionGroup const& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr,
+    void Endpoint::writeImpl(::iovec const* msgIov, std::size_t iovCount, void** desc, ::fi_rma_iov const* rmaIov, ::fi_addr_t destAddr,
         std::optional<std::uint32_t> immData)
     {
         std::uint64_t data = immData.value_or(0);
@@ -332,17 +332,33 @@ namespace mxl::lib::fabrics::ofi
         flags |= immData.has_value() ? FI_REMOTE_CQ_DATA : 0;
 
         ::fi_msg_rma msg = {
-            .msg_iov = localGroup.asIovec(),
-            .desc = const_cast<void**>(localGroup.desc()),
-            .iov_count = localGroup.size(),
+            .msg_iov = msgIov,
+            .desc = desc,
+            .iov_count = iovCount,
             .addr = destAddr,
-            .rma_iov = remoteGroup.asRmaIovs(),
-            .rma_iov_count = remoteGroup.size(),
+            .rma_iov = rmaIov,
+            .rma_iov_count = 1,
             .context = _raw,
             .data = data,
         };
 
         fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
+    }
+
+    void Endpoint::write(LocalRegion const& local, RemoteRegion const& remote, ::fi_addr_t destAddr, std::optional<std::uint32_t> immData)
+    {
+        std::vector<void*> descs{local.desc};
+
+        auto msgIov = local.toIovec();
+        auto rmaIov = remote.toRmaIov();
+
+        return writeImpl(&msgIov, 1, descs.data(), &rmaIov, destAddr, immData);
+    }
+
+    void Endpoint::write(LocalRegionGroup const& localGroup, RemoteRegion const& remote, ::fi_addr_t destAddr, std::optional<std::uint32_t> immData)
+    {
+        auto rmaIov = remote.toRmaIov();
+        return writeImpl(localGroup.asIovec(), localGroup.size(), const_cast<void**>(localGroup.desc()), &rmaIov, destAddr, immData);
     }
 
     void Endpoint::recv(LocalRegion region)

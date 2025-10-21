@@ -41,29 +41,20 @@ TEST_CASE("ofi: RegionGroup view and iovec conversion", "[ofi][RegionGroup]")
 TEST_CASE("ofi: RegionGroups fromGroups and view", "[ofi][RegionGroups]")
 {
     // clang-format off
-    auto inputRegion = std::array<mxlFabricsMemoryRegion, 1>{
+    auto inputRegions = std::array<mxlFabricsMemoryRegion, 1>{
                 mxlFabricsMemoryRegion{
                     .addr = 0x3000,
                     .size = 256,
                     .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
                 }};
 
-    auto inputGroups = std::array<mxlFabricsMemoryRegionGroup, 1>{
-        mxlFabricsMemoryRegionGroup{
-            .regions = inputRegion.data(),
-            .count = 1,
-        },
-    };
     // clang-format on
 
-    auto groups = regionGroupsfromGroups(inputGroups.data(), 1);
+    auto mxlRegions = mxlRegionsFromUser(inputRegions.data(), 1);
 
-    REQUIRE(groups.size() == 1);
+    REQUIRE(mxlRegions.regions().size() == 1);
 
-    auto const& group = groups[0];
-    REQUIRE(group.size() == 1);
-
-    auto const& region = group[0];
+    auto const& region = mxlRegions.regions()[0];
     REQUIRE(region.base == 0x3000);
     REQUIRE(region.size == 256);
     REQUIRE(region.loc.isHost());

@@ -5,7 +5,7 @@
 include(GNUInstallDirs)
 
 find_package(PkgConfig)
-find_package(reflectcpp CONFIG REQUIRED)
+find_package(picojson REQUIRED)
 
 pkg_check_modules(libfabric REQUIRED IMPORTED_TARGET libfabric)
 
@@ -46,7 +46,7 @@ target_include_directories(mxl-fabrics-objects
 target_link_libraries(mxl-fabrics-objects
         PRIVATE
             PkgConfig::libfabric
-            reflectcpp::reflectcpp
+            picojson::picojson
     )
 
 target_link_libraries(mxl-fabrics-objects

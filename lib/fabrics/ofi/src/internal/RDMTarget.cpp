@@ -39,9 +39,12 @@ namespace mxl::lib::fabrics::ofi
 
         auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
-        if (config.regions != nullptr)
+
+        auto mxlRegions = MxlRegions::fromAPI(config.regions);
+
+        if (mxlRegions && !mxlRegions->regions().empty())
         {
-            domain->registerRegionGroups(*RegionGroups::fromAPI(config.regions), FI_REMOTE_WRITE);
+            domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
         }
 
         auto endpoint = Endpoint::create(domain);
@@ -76,7 +79,7 @@ namespace mxl::lib::fabrics::ofi
         };
 
         return {std::make_unique<MakeUniqueEnabler>(std::move(endpoint), std::move(dataRegion)),
-            std::make_unique<TargetInfo>(std::move(localAddress), domain->RemoteRegionGroups())};
+            std::make_unique<TargetInfo>(std::move(localAddress), domain->remoteRegions())};
     }
 
     RDMTarget::RDMTarget(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData)

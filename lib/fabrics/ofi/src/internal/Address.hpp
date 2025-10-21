@@ -4,11 +4,11 @@
 
 #pragma once
 
+#include <cstdint>
+#include <string>
 #include <vector>
-#include <rfl.hpp>
 #include <rdma/fabric.h>
 #include <rdma/fi_domain.h>
-#include <sys/types.h>
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -66,31 +66,4 @@ namespace mxl::lib::fabrics::ofi
         std::vector<std::uint8_t> _inner;
     };
 
-    struct FabricAddressRfl
-    {
-    public:
-        static FabricAddressRfl from_class(FabricAddress const& fa)
-        {
-            return FabricAddressRfl{.addr = fa.toBase64()};
-        }
-
-        [[nodiscard]]
-        FabricAddress to_class() const
-        {
-            return FabricAddress::fromBase64(addr.get());
-        }
-
-    public:
-        rfl::Field<"addr", std::string> addr;
-    };
-}
-
-namespace rfl::parsing
-{
-    namespace ofi = mxl::lib::fabrics::ofi;
-
-    template<class ReaderType, class WriterType, class ProcessorsType>
-    struct Parser<ReaderType, WriterType, ofi::FabricAddress, ProcessorsType>
-        : public rfl::parsing::CustomParser<ReaderType, WriterType, ProcessorsType, ofi::FabricAddress, ofi::FabricAddressRfl>
-    {};
 }

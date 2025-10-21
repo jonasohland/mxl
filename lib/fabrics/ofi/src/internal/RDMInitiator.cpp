@@ -27,7 +27,7 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    RDMInitiatorEndpoint::RDMInitiatorEndpoint(std::shared_ptr<Endpoint> ep, FabricAddress remote, std::vector<RemoteRegionGroup> remoteRegions)
+    RDMInitiatorEndpoint::RDMInitiatorEndpoint(std::shared_ptr<Endpoint> ep, FabricAddress remote, std::vector<RemoteRegion> remoteRegions)
         : _state(Idle{})
         , _ep(std::move(ep))
         , _addr(std::move(remote))
@@ -78,7 +78,7 @@ namespace mxl::lib::fabrics::ofi
             std::move(_state));
     }
 
-    void RDMInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, uint64_t index)
+    void RDMInitiatorEndpoint::postTransfer(LocalRegion const& local, uint64_t index)
     {
         if (auto state = std::get_if<Added>(&_state); state != nullptr)
         {
@@ -112,9 +112,12 @@ namespace mxl::lib::fabrics::ofi
 
         auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
-        if (config.regions != nullptr)
+
+        auto mxlRegions = MxlRegions::fromAPI(config.regions);
+
+        if (mxlRegions && !mxlRegions->regions().empty())
         {
-            domain->registerRegionGroups(*RegionGroups::fromAPI(config.regions), FI_WRITE);
+            domain->registerRegions(mxlRegions->regions(), FI_WRITE);
         }
 
         auto endpoint = std::make_shared<Endpoint>(Endpoint::create(std::move(domain)));
@@ -139,7 +142,7 @@ namespace mxl::lib::fabrics::ofi
 
     void RDMInitiator::addTarget(TargetInfo const& targetInfo)
     {
-        _targets.emplace(targetInfo.id, RDMInitiatorEndpoint(_endpoint, targetInfo.fabricAddress, targetInfo.remoteRegionGroups));
+        _targets.emplace(targetInfo.id, RDMInitiatorEndpoint(_endpoint, targetInfo.fabricAddress, targetInfo.remoteRegions));
     }
 
     void RDMInitiator::removeTarget(TargetInfo const& targetInfo)
@@ -200,7 +203,7 @@ namespace mxl::lib::fabrics::ofi
 
     RDMInitiator::RDMInitiator(std::shared_ptr<Endpoint> ep)
         : _endpoint(std::move(ep))
-        , _localRegions(_endpoint->domain()->localRegionGroups())
+        , _localRegions(_endpoint->domain()->localRegions())
     {}
 
     bool RDMInitiator::hasPendingWork() const noexcept

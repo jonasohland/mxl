@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <rdma/fabric.h>
 #include "mxl/fabrics.h"
@@ -21,7 +22,7 @@ namespace mxl::lib::fabrics::ofi
     class RDMInitiatorEndpoint
     {
     public:
-        RDMInitiatorEndpoint(std::shared_ptr<Endpoint> ep, FabricAddress, std::vector<RemoteRegionGroup>);
+        RDMInitiatorEndpoint(std::shared_ptr<Endpoint> ep, FabricAddress, std::vector<RemoteRegion>);
 
         /// Returns true if the endpoint is idle and could be actived.
         [[nodiscard]]
@@ -39,7 +40,7 @@ namespace mxl::lib::fabrics::ofi
         void shutdown();
 
         /// Post a data transfer request to this endpoint.
-        void postTransfer(LocalRegionGroup const& localRegion, uint64_t index);
+        void postTransfer(LocalRegion const& localRegion, uint64_t index);
 
     private:
         /// The idle state. In this state the endpoint waits to be activated.
@@ -63,7 +64,7 @@ namespace mxl::lib::fabrics::ofi
         std::shared_ptr<Endpoint> _ep; // The endpoint used to post transfer with. There is only one endpoint shared for all targets in constrast to
                                        // the RCInitiator where each target will have their own endppint.
         FabricAddress _addr;           // The remote fabric address to transfer payloads to
-        std::vector<RemoteRegionGroup> _regions; /// Descriptions of the remote memory regions where we need to write our grains.
+        std::vector<RemoteRegion> _regions; /// Descriptions of the remote memory regions where we need to write our grains.
     };
 
     class RDMInitiator : public Initiator
@@ -107,7 +108,7 @@ namespace mxl::lib::fabrics::ofi
     private:
         std::shared_ptr<Endpoint> _endpoint;
 
-        std::vector<LocalRegionGroup> _localRegions;
+        std::vector<LocalRegion> _localRegions;
 
         std::map<Endpoint::Id, RDMInitiatorEndpoint> _targets;
 

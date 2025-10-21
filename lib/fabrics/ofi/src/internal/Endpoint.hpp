@@ -149,12 +149,23 @@ namespace mxl::lib::fabrics::ofi
         /**
          * Push a remote write work request to the endpoint work queue. When the write is complete, a Completion::Data will be pushed to the
          * completion queue associated with the endpoint. Before a write request can be made, the endpoint must have beed enabled,
-         * \param localGroup Source memory regions to write from
+         * \param local Source memory region to write from
          * \param remoteGroup Destination memory regions to write to
          * \param destAddr The destination address of the target endpoint. This is unused when using connected endpoints.
          * \param 64 bits of user data that will be available in the completion entry associated with this transfer.
          */
-        void write(LocalRegionGroup const& localGroup, RemoteRegionGroup const& remoteGroup, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
+        void write(LocalRegion const& local, RemoteRegion const& remote, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
+            std::optional<std::uint32_t> immData = std::nullopt);
+
+        /**
+         * Push a remote write work request to the endpoint work queue. When the write is complete, a Completion::Data will be pushed to the
+         * completion queue associated with the endpoint. Before a write request can be made, the endpoint must have beed enabled,
+         * \param localGroup Source memory regions to write from (scatter-gather version)
+         * \param remoteGroup Destination memory regions to write to
+         * \param destAddr The destination address of the target endpoint. This is unused when using connected endpoints.
+         * \param 64 bits of user data that will be available in the completion entry associated with this transfer.
+         */
+        void write(LocalRegionGroup const& localGroup, RemoteRegion const& remote, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
             std::optional<std::uint32_t> immData = std::nullopt);
 
         /*
@@ -177,6 +188,10 @@ namespace mxl::lib::fabrics::ofi
         ::fid_ep const* raw() const noexcept;
 
     private:
+        /// Internal implementation of the  remote write request
+        void writeImpl(::iovec const* msgIov, std::size_t iovCount, void** desc, ::fi_rma_iov const* rmaIov, ::fi_addr_t destAddr,
+            std::optional<std::uint32_t> immData);
+
         /// Close the endpoint and release all resources. Called from the destructor and the move assignment operator.
         void close();
 

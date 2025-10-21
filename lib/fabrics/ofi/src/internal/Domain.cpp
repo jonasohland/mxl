@@ -16,10 +16,10 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    Domain::Domain(::fid_domain* raw, std::shared_ptr<Fabric> fabric, std::vector<RegisteredRegionGroup> registeredRegionGroups)
+    Domain::Domain(::fid_domain* raw, std::shared_ptr<Fabric> fabric, std::vector<RegisteredRegion> registeredRegions)
         : _raw(raw)
         , _fabric(std::move(fabric))
-        , _registeredRegionGroups(std::move(registeredRegionGroups))
+        , _registeredRegions(std::move(registeredRegions))
     {}
 
     Domain::~Domain()
@@ -35,28 +35,27 @@ namespace mxl::lib::fabrics::ofi
 
         struct MakeSharedEnabler : public Domain
         {
-            MakeSharedEnabler(::fid_domain* domain, std::shared_ptr<Fabric> fabric, std::vector<RegisteredRegionGroup> registerRegionGroups)
-                : Domain(domain, std::move(fabric), std::move(registerRegionGroups))
+            MakeSharedEnabler(::fid_domain* domain, std::shared_ptr<Fabric> fabric, std::vector<RegisteredRegion> registerRegions)
+                : Domain(domain, std::move(fabric), std::move(registerRegions))
             {}
         };
 
-        return std::make_shared<MakeSharedEnabler>(domain, std::move(fabric), std::vector<RegisteredRegionGroup>{});
+        return std::make_shared<MakeSharedEnabler>(domain, std::move(fabric), std::vector<RegisteredRegion>{});
     }
 
-    void Domain::registerRegionGroups(RegionGroups const& regionGroups, std::uint64_t access)
+    void Domain::registerRegions(std::vector<Region> const& regions, std::uint64_t access)
     {
-        std::ranges::transform(
-            regionGroups, std::back_inserter(_registeredRegionGroups), [&](auto const& group) { return registerRegionGroup(group, access); });
+        std::ranges::transform(regions, std::back_inserter(_registeredRegions), [&](auto const& region) { return registerRegion(region, access); });
     }
 
-    std::vector<LocalRegionGroup> Domain::localRegionGroups() const noexcept
+    std::vector<LocalRegion> Domain::localRegions() const noexcept
     {
-        return toLocal(_registeredRegionGroups);
+        return toLocal(_registeredRegions);
     }
 
-    std::vector<RemoteRegionGroup> Domain::RemoteRegionGroups() const noexcept
+    std::vector<RemoteRegion> Domain::remoteRegions() const noexcept
     {
-        return toRemote(_registeredRegionGroups, usingVirtualAddresses());
+        return toRemote(_registeredRegions, usingVirtualAddresses());
     }
 
     bool Domain::usingVirtualAddresses() const noexcept
@@ -74,16 +73,9 @@ namespace mxl::lib::fabrics::ofi
         return RegisteredRegion{MemoryRegion::reg(*this, region, access), region};
     }
 
-    RegisteredRegionGroup Domain::registerRegionGroup(RegionGroup const& regionGroup, std::uint64_t access)
-    {
-        std::vector<RegisteredRegion> out;
-        std::ranges::transform(regionGroup, std::back_inserter(out), [&](auto const& region) { return registerRegion(region, access); });
-        return RegisteredRegionGroup{std::move(out)};
-    }
-
     void Domain::close()
     {
-        _registeredRegionGroups.clear();
+        _registeredRegions.clear();
 
         if (_raw != nullptr)
         {
@@ -95,7 +87,7 @@ namespace mxl::lib::fabrics::ofi
     Domain::Domain(Domain&& other) noexcept
         : _raw(other._raw)
         , _fabric(std::move(other._fabric))
-        , _registeredRegionGroups(std::move(other._registeredRegionGroups))
+        , _registeredRegions(std::move(other._registeredRegions))
     {
         other._raw = nullptr;
     }
@@ -108,7 +100,7 @@ namespace mxl::lib::fabrics::ofi
         other._raw = nullptr;
 
         _fabric = std::move(other._fabric);
-        _registeredRegionGroups = std::move(other._registeredRegionGroups);
+        _registeredRegions = std::move(other._registeredRegions);
 
         return *this;
     }

@@ -155,64 +155,35 @@ namespace mxl::lib::fabrics::ofi
         std::vector<::iovec> _iovecs;
     };
 
-    class RegionGroups
+    class MxlRegions
     {
     public:
-        using iterator = std::vector<RegionGroup>::iterator;
-        using const_iterator = std::vector<RegionGroup>::const_iterator;
-
-    public:
-        explicit RegionGroups(std::vector<RegionGroup> inner)
-            : _inner(std::move(inner))
-        {}
-
-        static RegionGroups* fromAPI(mxlRegions) noexcept;
+        static MxlRegions* fromAPI(mxlRegions) noexcept;
         [[nodiscard]]
         mxlRegions toAPI() noexcept;
 
-        iterator begin()
-        {
-            return _inner.begin();
-        }
-
-        iterator end()
-        {
-            return _inner.end();
-        }
-
         [[nodiscard]]
-        const_iterator begin() const
-        {
-            return _inner.cbegin();
-        }
+        std::vector<Region> const& regions() const noexcept;
 
-        [[nodiscard]]
-        const_iterator end() const
-        {
-            return _inner.cend();
-        }
-
-        RegionGroup& operator[](std::size_t index)
-        {
-            return _inner[index];
-        }
-
-        RegionGroup const& operator[](std::size_t index) const
-        {
-            return _inner[index];
-        }
-
-        [[nodiscard]]
-        size_t size() const noexcept
-        {
-            return _inner.size();
-        }
+        // [[nodiscard]]
+        // DataLayout const& dataLayout() const noexcept;
 
     private:
-        std::vector<RegionGroup> _inner;
+        friend MxlRegions mxlRegionsFromFlow(FlowData& flow);
+        friend MxlRegions mxlRegionsFromUser(mxlFabricsMemoryRegion const* regions, size_t count);
+
+    private:
+        MxlRegions(std::vector<Region> regions /*,  DataLayout dataLayout*/)
+            : _regions(std::move(regions))
+        // , _layout(std::move(dataLayout))
+        {}
+
+    private:
+        std::vector<Region> _regions;
+        // DataLayout _layout;
     };
 
-    RegionGroups regionGroupsfromFlow(FlowData& flow);
-    RegionGroups regionGroupsfromGroups(mxlFabricsMemoryRegionGroup const* groups, size_t count);
+    MxlRegions mxlRegionsFromFlow(FlowData& flow);
+    MxlRegions mxlRegionsFromUser(mxlFabricsMemoryRegion const* groups, size_t count);
 
 }

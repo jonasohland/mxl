@@ -46,9 +46,12 @@ namespace mxl::lib::fabrics::ofi
         // See fi_domain(3) and fi_fabric(3) for more complete information about these concepts.
         auto fabric = Fabric::open(*fabricInfoList.begin());
         auto domain = Domain::open(fabric);
-        if (config.regions != nullptr)
+
+        auto const mxlRegions = MxlRegions::fromAPI(config.regions);
+
+        if (mxlRegions && !mxlRegions->regions().empty())
         {
-            domain->registerRegionGroups(*RegionGroups::fromAPI(config.regions), FI_REMOTE_WRITE);
+            domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
         }
 
         // Create a passive endpoint. A passive endpoint can be viewed like a bound TCP socket listening for
@@ -71,11 +74,11 @@ namespace mxl::lib::fabrics::ofi
         };
 
         auto localAddress = pep.localAddress();
-        auto remoteRegionGroups = domain->RemoteRegionGroups();
+        auto remoteRegions = domain->remoteRegions();
 
         // Return the constructed RCTarget and associated TargetInfo for remote peers to connect.
         return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(pep)),
-            std::make_unique<TargetInfo>(std::move(localAddress), std::move(remoteRegionGroups))};
+            std::make_unique<TargetInfo>(std::move(localAddress), std::move(remoteRegions))};
     }
 
     RCTarget::RCTarget(std::shared_ptr<Domain> domain, PassiveEndpoint ep)
