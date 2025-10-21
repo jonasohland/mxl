@@ -581,13 +581,6 @@ private:
                                 {
                                     auto dst = reinterpret_cast<std::uint8_t*>(fragment.pointer) + (chan * payloadBuffersSlices.stride);
                                     auto src = map_info.data + offset;
-                                    MXL_INFO("offset={} size={} map_info.size={} dst={:p} src={:p} stride={:x}",
-                                        offset,
-                                        fragment.size,
-                                        map_info.size,
-                                        (void*)dst,
-                                        (void*)src,
-                                        payloadBuffersSlices.stride);
                                     ::memcpy(dst, src, fragment.size);
                                     offset += fragment.size;
                                 }
@@ -736,7 +729,7 @@ int main(int argc, char** argv)
                 AudioPipeline gst_pipeline(gst_config);
 
                 auto mxlWriter = MxlWriter(domain, flow_descriptor);
-                mxlWriter.run(flow_descriptor, gst_pipeline);
+                mxlWriter.run(descriptor_parser, gst_pipeline);
 
                 MXL_INFO("Audio pipeline finished");
                 return 0;

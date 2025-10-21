@@ -41,7 +41,7 @@ namespace mxl::lib::fabrics::ofi
         std::mt19937_64 gen(rd());
         std::uniform_int_distribution<uint64_t> dist(0, UINT64_MAX);
 
-        MXL_DEBUG("Registering memory region with address 0x{}, size {} and location {}",
+        MXL_INFO("Registering memory region with address 0x{}, size {} and location {}",
             reinterpret_cast<void*>(region.base),
             region.size,
             region.loc.toString());

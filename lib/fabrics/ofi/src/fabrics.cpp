@@ -516,20 +516,20 @@ mxlStatus mxlFabricsTargetWaitForNewSamples(mxlFabricsTarget in_target, uint16_t
 
     catch (ofi::Exception& e)
     {
-        MXL_ERROR("Failed to try for new grain: {}", e.what());
+        MXL_ERROR("Failed to try for new samples: {}", e.what());
 
         return e.status();
     }
 
     catch (std::exception& e)
     {
-        MXL_ERROR("Failed to try for new grain : {}", e.what());
+        MXL_ERROR("Failed to try for new samples : {}", e.what());
         return MXL_ERR_UNKNOWN;
     }
 
     catch (...)
     {
-        MXL_ERROR("Failed to try for new grain");
+        MXL_ERROR("Failed to try for new samples");
         return MXL_ERR_UNKNOWN;
     }
 }

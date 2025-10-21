@@ -161,6 +161,9 @@ namespace mxl::lib::fabrics::ofi
         std::size_t write(LocalRegionGroup const& localRegionGroup, RemoteRegion const& remoteRegion, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
             std::optional<std::uint32_t> immData = std::nullopt);
 
+        std::size_t send(LocalRegionGroup const& localRegionGroup, ::fi_addr_t destAddr = FI_ADDR_UNSPEC,
+            std::optional<std::uint32_t> immData = std::nullopt);
+
         /*
          * Push a recv work request to the endpoint work queue. In the MXL context the memory region passed here is not the memory
          * to which the graines will be written, but instead a memory region of exact sizeof(uint64_t) bytes to which the grain index

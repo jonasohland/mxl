@@ -213,7 +213,7 @@ namespace mxl::lib::fabrics::ofi
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
-            auto const& remote = _regions[index % _regions.size()];
+            auto const& remote = _regions[connected->entryIndex % _regions.size()];
             connected->pending += connected->ep.write(localRegionGroup, remote, ImmDataSample{connected->entryIndex, index, count}.data());
             connected->entryIndex = (connected->entryIndex + 1) % 4; // TODO: should be using the NUMBER_OF_ENTRIES from AudioBounceBuffer
         }
@@ -239,6 +239,7 @@ namespace mxl::lib::fabrics::ofi
                         MXL_WARN("Received a completion but no transfer was pending");
                         return connectedState;
                     }
+                    MXL_INFO("Received completion!");
 
                     --connectedState.pending;
 
@@ -371,7 +372,7 @@ namespace mxl::lib::fabrics::ofi
             throw Exception::internal("transferSamples called, but the data layout for that endpoint is not audio.");
         }
 
-        auto& localRegion = _localRegions[headIndex % _localRegions.size()];
+        auto& localRegion = _localRegions.front();
 
         auto audioDataLayout = _dataLayout.asAudio();
 

@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <vector>
 #include "internal/ContinuousFlowData.hpp"
+#include "internal/Logging.hpp"
 #include "DataLayout.hpp"
 #include "LocalRegion.hpp"
 
@@ -82,7 +83,7 @@ namespace mxl::lib::fabrics::ofi
             count,
             layout.samplesPerChannel,
             layout.bytesPerSample,
-            layout.bytesPerSample,
+            layout.channelCount,
             reinterpret_cast<std::uint8_t const*>(localRegion.addr),
             slice);
 

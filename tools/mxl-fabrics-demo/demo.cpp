@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <csignal>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
@@ -106,6 +107,8 @@ public:
 
     mxlStatus setup(std::string targetInfoStr)
     {
+        MXL_INFO("TargetInfo -> {}", targetInfoStr);
+
         _instance = mxlCreateInstance(_config.domain.c_str(), "");
         if (_instance == nullptr)
         {
@@ -313,23 +316,26 @@ public:
         // Extract the FlowInfo structure.
 
         mxlStatus status;
-        mxlGrainInfo grainInfo;
         mxlWrappedMultiBufferSlice slice;
 
         std::uint64_t headIndex = flow_info.continuous.headIndex;
+        std::size_t batchSize = 1024; // TODO: use flow_info.continuous.syncBatchSize instead.
 
         while (!g_exit_requested)
         {
-            auto status = mxlFlowReaderGetSamples(_reader, headIndex, flow_info.continuous.syncBatchSize, &slice);
+            auto status = mxlFlowReaderGetSamples(_reader, headIndex, batchSize, &slice);
             if (status == MXL_ERR_OUT_OF_RANGE_TOO_LATE)
             {
-                // We are too late.. time travel!
-                // grainIndex = mxlGetCurrentIndex(&flow_info.discrete.grainRate);
+                // We are too late.. time travel to the last headIndex commited!
+                mxlFlowInfo info;
+                mxlFlowReaderGetInfo(_reader, &info);
+                headIndex = info.continuous.headIndex;
+                MXL_INFO("Too late! new headIndex={}", headIndex);
                 continue;
             }
             if (status == MXL_ERR_OUT_OF_RANGE_TOO_EARLY)
             {
-                // We are too early somehow.. retry the same grain later.
+                // We are too early somehow.. retry the same samples later.
                 continue;
             }
             if (status == MXL_ERR_TIMEOUT)
@@ -346,9 +352,10 @@ public:
             }
 
             // Okay the samples are ready, we can transfer it to the targets.
-            status = mxlFabricsInitiatorTransferSamples(_initiator, headIndex, flow_info.continuous.syncBatchSize);
+            status = mxlFabricsInitiatorTransferSamples(_initiator, headIndex, batchSize);
             if (status == MXL_ERR_NOT_READY)
             {
+                MXL_INFO("not ready..");
                 continue;
             }
             if (status != MXL_STATUS_OK)
@@ -372,14 +379,9 @@ public:
             }
             while (status == MXL_ERR_NOT_READY);
 
-            if (grainInfo.commitedSize != grainInfo.grainSize)
-            {
-                // partial commit, we will need to work on the same grain again.
-                continue;
-            }
-
-            // If we get here, we have transfered the grain completely, we can work on the next grain.
-            headIndex += flow_info.continuous.syncBatchSize;
+            // If we get here, we have transfered the samples, we can work on the next samples.
+            headIndex += batchSize;
+            mxlSleepForNs(mxlGetNsUntilIndex(headIndex, &flow_info.continuous.sampleRate));
         }
 
         status = mxlFabricsInitiatorRemoveTarget(_initiator, _targetInfo);

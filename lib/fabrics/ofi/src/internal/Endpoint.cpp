@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "Endpoint.hpp"
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -355,6 +356,7 @@ namespace mxl::lib::fabrics::ofi
             }
 
             remoteRmaIov.addr = remoteRegion.addr + remoteOffset;
+            remoteRmaIov.len = localGroupSpan.byteSize();
 
             // check if it is the last transfer, if it is, we post the request with immediate data
             if (i == nbWrites - 1)
@@ -362,9 +364,24 @@ namespace mxl::lib::fabrics::ofi
                 flags |= immData ? FI_REMOTE_CQ_DATA : 0;
             }
 
+            MXL_INFO("local.size={} remote.addr={} remote.size={} remote.key={} flags={}",
+                localGroupSpan.size(),
+                remoteRmaIov.addr,
+                remoteRmaIov.len,
+                remoteRmaIov.key,
+                flags);
+            for (std::size_t i = 0; i < localGroupSpan.size(); i++)
+            {
+                MXL_INFO("local.addr={} local.len={} local.desc={:p}",
+                    localGroupSpan.asIovec()[i].iov_base,
+                    localGroupSpan.asIovec()[i].iov_len,
+                    localGroupSpan.desc()[i]);
+            }
+
             ::fi_msg_rma msg = {
                 .msg_iov = localGroupSpan.asIovec(),
-                .desc = const_cast<void**>(localGroupSpan.desc()),
+                // .desc = const_cast<void**>(localGroupSpan.desc()),
+                .desc = nullptr,
                 .iov_count = localGroupSpan.size(),
                 .addr = destAddr,
                 .rma_iov = &remoteRmaIov,
@@ -376,6 +393,55 @@ namespace mxl::lib::fabrics::ofi
             fiCall(::fi_writemsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
 
             remoteOffset += localGroupSpan.byteSize();
+        }
+
+        return nbWrites;
+    }
+
+    size_t Endpoint::send(LocalRegionGroup const& localRegionGroup, ::fi_addr_t destAddr, std::optional<std::uint32_t> immData)
+    {
+        // In this function we will potentially post more than a single write transfer. This occurs if the iov limit supported by the endpoint is
+        // smaller than the number of local region in the local region group. In that case, we need to perform multiple transfers. Only the last
+        // transfer is posted with immediate data to signal completion to the target. If multiple writes are posted, we also need to add and offset to
+        // the remote region for each request otherwise we overwrite the indices.
+        std::uint64_t data = immData.value_or(0);
+        std::uint64_t flags = FI_DELIVERY_COMPLETE;
+
+        auto iovLimit = _info->tx_attr->iov_limit;
+        auto nbWrites = (localRegionGroup.size() + (iovLimit - 1)) / iovLimit;
+
+        for (std::size_t i = 0; i < nbWrites; i++)
+        {
+            auto begin = i * iovLimit;
+            auto end = begin + std::min(iovLimit, localRegionGroup.size() - begin);
+
+            auto localGroupSpan = localRegionGroup.span(begin, end);
+
+            // check if it is the last transfer, in that case we post the request with immediate data
+            if (i == nbWrites - 1)
+            {
+                flags |= immData ? FI_REMOTE_CQ_DATA : 0;
+            }
+
+            MXL_INFO("local.size={} flags={}", localGroupSpan.size(), flags);
+            for (std::size_t i = 0; i < localGroupSpan.size(); i++)
+            {
+                MXL_INFO("local.addr={} local.len={} local.desc={:p}",
+                    localGroupSpan.asIovec()[i].iov_base,
+                    localGroupSpan.asIovec()[i].iov_len,
+                    localGroupSpan.desc()[i]);
+            }
+
+            ::fi_msg msg = {
+                .msg_iov = localGroupSpan.asIovec(),
+                .desc = const_cast<void**>(localGroupSpan.desc()),
+                .iov_count = localGroupSpan.size(),
+                .addr = destAddr,
+                .context = _raw,
+                .data = data,
+            };
+
+            fiCall(::fi_sendmsg, "Failed to push rma write to work queue.", _raw, &msg, flags);
         }
 
         return nbWrites;

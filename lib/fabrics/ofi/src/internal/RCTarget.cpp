@@ -62,6 +62,7 @@ namespace mxl::lib::fabrics::ofi
         // Check if we need to use a bounce buffer.
         if (auto dataLayout = mxlRegions->dataLayout(); dataLayout.isAudio()) // audio
         {
+            MXL_INFO("Audio Data Layout. Creating a bounce buffer");
             auto audioLayout = dataLayout.asAudio();
             // auto bouncingBufferEntrySize = audioLayout.channelCount * audioLayout.samplesPerChannel * audioLayout.bytesPerSample;
             // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
@@ -191,6 +192,7 @@ namespace mxl::lib::fabrics::ofi
                     {
                         if (auto dataEntry = completion.value().tryData(); dataEntry)
                         {
+                            MXL_INFO("received a completion!");
                             // The written grain index is sent as immediate data, and was returned
                             // from the completion queue.
                             result.immData = dataEntry->data();
