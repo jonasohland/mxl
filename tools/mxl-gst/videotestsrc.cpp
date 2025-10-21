@@ -417,7 +417,7 @@ private:
 class MxlWriter
 {
 public:
-    MxlWriter(std::string const& domain, std::string const& flow_descriptor, std::string const& flowID)
+    MxlWriter(std::string const& domain, std::string const& flow_descriptor)
     {
         _instance = mxlCreateInstance(domain.c_str(), "");
         if (_instance == nullptr)
@@ -433,6 +433,9 @@ public:
         {
             throw std::runtime_error("Failed to create flow with status '" + std::to_string(static_cast<int>(ret)) + "'");
         }
+        _flowOpened = true;
+
+        auto flowID = uuids::to_string(uuids::uuid(_flowInfo.common.id));
 
         // Create the flow writer
         if (mxlCreateFlowWriter(_instance, flowID.c_str(), "", &_writer) != MXL_STATUS_OK)
@@ -450,7 +453,9 @@ public:
 
         if (_flowOpened)
         {
-            mxlDestroyFlow(_instance, uuids::to_string(_flowID).c_str());
+            auto flowID = uuids::to_string(uuids::uuid(_flowInfo.common.id));
+            MXL_INFO("Destroying flow -> {}", flowID);
+            mxlDestroyFlow(_instance, flowID.c_str());
         }
 
         if (_instance != nullptr)
@@ -576,6 +581,13 @@ private:
                                 {
                                     auto dst = reinterpret_cast<std::uint8_t*>(fragment.pointer) + (chan * payloadBuffersSlices.stride);
                                     auto src = map_info.data + offset;
+                                    MXL_INFO("offset={} size={} map_info.size={} dst={:p} src={:p} stride={:x}",
+                                        offset,
+                                        fragment.size,
+                                        map_info.size,
+                                        (void*)dst,
+                                        (void*)src,
+                                        payloadBuffersSlices.stride);
                                     ::memcpy(dst, src, fragment.size);
                                     offset += fragment.size;
                                 }
@@ -611,7 +623,6 @@ private:
     mxlInstance _instance;
     mxlFlowWriter _writer;
     mxlFlowInfo _flowInfo;
-    uuids::uuid _flowID;
     bool _flowOpened;
 };
 
@@ -622,15 +633,15 @@ int main(int argc, char** argv)
 
     CLI::App app("mxl-gst-videotestsrc");
 
-    std::optional<std::string> videoFlowConfigFile;
+    std::string videoFlowConfigFile;
     auto videoFlowConfigFileOpt = app.add_option(
         "-v, --video-config-file", videoFlowConfigFile, "The json file which contains the Video NMOS Flow configuration");
-    videoFlowConfigFileOpt->default_val(std::nullopt);
+    videoFlowConfigFileOpt->default_val("");
 
-    std::optional<std::string> audioFlowConfigFile;
+    std::string audioFlowConfigFile;
     auto audioFlowConfigFileOpt = app.add_option(
         "-a, --audio-config-file", audioFlowConfigFile, "The json file which contains the Audio NMOS Flow configuration");
-    audioFlowConfigFileOpt->default_val(std::nullopt);
+    audioFlowConfigFileOpt->default_val("");
 
     uint64_t samplesPerBatch;
     auto samplesPerBatchOpt = app.add_option("-s, --samples-per-batch", samplesPerBatch, "Number of audio samples per batch");
@@ -665,22 +676,21 @@ int main(int argc, char** argv)
 
     std::vector<std::thread> threads;
 
-    if (videoFlowConfigFile)
+    if (!videoFlowConfigFile.empty())
     {
         threads.emplace_back(
             [&]()
             {
-                std::ifstream file(*videoFlowConfigFile, std::ios::in | std::ios::binary);
+                std::ifstream file(videoFlowConfigFile, std::ios::in | std::ios::binary);
                 if (!file)
                 {
-                    MXL_ERROR("Failed to open file: '{}'", *videoFlowConfigFile);
+                    MXL_ERROR("Failed to open file: '{}'", videoFlowConfigFile);
                     return EXIT_FAILURE;
                 }
                 std::string flow_descriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
                 mxl::lib::FlowParser descriptor_parser{flow_descriptor};
 
                 auto frame_rate = descriptor_parser.getGrainRate();
-                auto flowID = uuids::to_string(descriptor_parser.getId());
 
                 VideoPipelineConfig gst_config{
                     .frame_width = static_cast<uint64_t>(descriptor_parser.get<double>("frame_width")),
@@ -692,7 +702,7 @@ int main(int argc, char** argv)
 
                 VideoPipeline gst_pipeline(gst_config);
 
-                auto mxlWriter = MxlWriter(domain, flow_descriptor, flowID);
+                auto mxlWriter = MxlWriter(domain, flow_descriptor);
                 mxlWriter.run(flow_descriptor, gst_pipeline);
 
                 MXL_INFO("Video pipeline finished");
@@ -700,21 +710,19 @@ int main(int argc, char** argv)
             });
     }
 
-    if (audioFlowConfigFile)
+    if (!audioFlowConfigFile.empty())
     {
         threads.emplace_back(
             [&]()
             {
-                std::ifstream file(*audioFlowConfigFile, std::ios::in | std::ios::binary);
+                std::ifstream file(audioFlowConfigFile, std::ios::in | std::ios::binary);
                 if (!file)
                 {
-                    MXL_ERROR("Failed to open file: '{}'", *audioFlowConfigFile);
+                    MXL_ERROR("Failed to open file: '{}'", audioFlowConfigFile);
                     return EXIT_FAILURE;
                 }
                 std::string flow_descriptor{std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()};
                 mxl::lib::FlowParser descriptor_parser{flow_descriptor};
-
-                auto flowID = uuids::to_string(descriptor_parser.getId());
 
                 AudioPipelineConfig gst_config{
                     .rate = descriptor_parser.getGrainRate(),
@@ -727,7 +735,7 @@ int main(int argc, char** argv)
 
                 AudioPipeline gst_pipeline(gst_config);
 
-                auto mxlWriter = MxlWriter(domain, flow_descriptor, flowID);
+                auto mxlWriter = MxlWriter(domain, flow_descriptor);
                 mxlWriter.run(flow_descriptor, gst_pipeline);
 
                 MXL_INFO("Audio pipeline finished");

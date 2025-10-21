@@ -36,10 +36,10 @@ namespace mxl::lib::fabrics::ofi
     {
     public:
         ImmDataSample(std::uint32_t data) noexcept;
-        ImmDataSample(std::uint64_t entryIndex, std::uint64_t headIndex, std::size_t count) noexcept;
+        ImmDataSample(std::size_t entryIndex, std::uint64_t headIndex, std::size_t count) noexcept;
 
         [[nodiscard]]
-        std::tuple<std::uint64_t, std::uint64_t, std::size_t> unpack() const noexcept;
+        std::tuple<std::size_t, std::uint16_t, std::size_t> unpack() const noexcept;
         [[nodiscard]]
         std::uint32_t data() const noexcept;
 

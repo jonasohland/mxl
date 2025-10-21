@@ -41,7 +41,7 @@ namespace mxl::lib::fabrics::ofi
         _inner.count = count;
     }
 
-    std::tuple<std::uint64_t, std::uint64_t, std::size_t> ImmDataSample::unpack() const noexcept
+    std::tuple<std::size_t, std::uint16_t, std::size_t> ImmDataSample::unpack() const noexcept
     {
         static_assert(AudioBounceBuffer::NUMBER_OF_ENTRIES == 4,
             "This code assumes that the maximum number of entries in the bounce buffer is 4. This code needs to be update if that changes");

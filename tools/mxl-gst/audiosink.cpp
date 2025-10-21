@@ -9,8 +9,10 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <ranges>
 #include <stdexcept>
 #include <string>
+#include <vector>
 #include <CLI/CLI.hpp>
 #include <glib-object.h>
 #include <gst/audio/audio.h>
@@ -64,15 +66,11 @@ struct GstreamerPipelineConfig
 GstCaps* gstCapsFromAudioConfig(GstreamerAudioPipelineConfig const& config)
 {
     auto* audioInfo = gst_audio_info_new();
+
     std::vector<GstAudioChannelPosition> chanPositions;
-    if (config.channelCount == 2)
+    for (size_t i = 0; i < config.channelCount; i++)
     {
-        MXL_INFO("Using stereo audio");
-        chanPositions = {GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT, GST_AUDIO_CHANNEL_POSITION_FRONT_RIGHT};
-    }
-    else
-    {
-        chanPositions = {GST_AUDIO_CHANNEL_POSITION_MONO};
+        chanPositions.emplace_back(static_cast<GstAudioChannelPosition>(i));
     }
 
     gst_audio_info_set_format(audioInfo, GST_AUDIO_FORMAT_F32LE, config.rate.numerator, config.channelCount, chanPositions.data());
@@ -211,8 +209,8 @@ public:
             auto const readSize1{payload.base.fragments[1].size};
             ::memcpy(currentWritePtr, readPtr1, readSize1);
         }
+
         gst_audio_buffer_unmap(&audioBuffer);
-        // GST_BUFFER_PTS(gstBuffer) = currentMxlTime;
         MXL_DEBUG("Pushing {} audio samples with PTS: {} ns", oneChannelBufferSize / 4, GST_BUFFER_PTS(gstBuffer));
 
         int ret;

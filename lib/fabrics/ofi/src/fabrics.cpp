@@ -490,7 +490,7 @@ mxlStatus mxlFabricsTargetTryNewSample(mxlFabricsTarget in_target, uint64_t* out
 }
 
 extern "C" MXL_EXPORT
-mxlStatus mxlFabricsTargetWaitForNewSamples(mxlFabricsTarget in_target, uint64_t* out_index, size_t* out_count, uint16_t in_timeoutMs)
+mxlStatus mxlFabricsTargetWaitForNewSamples(mxlFabricsTarget in_target, uint16_t* out_index, size_t* out_count, uint16_t in_timeoutMs)
 {
     if (in_target == nullptr || out_index == nullptr)
     {
@@ -1023,6 +1023,20 @@ mxlStatus mxlFabricsRecoverGrainIndex(mxlRational const* editRate, uint16_t in_i
 
     auto currentGrainIndex = mxlGetCurrentIndex(editRate);
     *out_index = (currentGrainIndex & 0xFFFF'FFFF'FFFF'0000) | (in_index & 0xFFFF);
+
+    return MXL_STATUS_OK;
+}
+
+extern "C" MXL_EXPORT
+mxlStatus mxlFabricsRecoverSampleIndex(mxlRational const* editRate, uint16_t in_index, uint64_t* out_index)
+{
+    if (out_index == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
+    auto currentGrainIndex = mxlGetCurrentIndex(editRate);
+    *out_index = (currentGrainIndex & 0xFFFF'FFFF'FFFF'8000) | (in_index & 0x7FFF);
 
     return MXL_STATUS_OK;
 }
