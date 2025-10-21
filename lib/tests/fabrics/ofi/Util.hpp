@@ -16,7 +16,8 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    using InnerRegionsGroups = std::vector<std::vector<std::vector<std::uint8_t>>>;
+    using InnerRegion = std::vector<std::uint8_t>;
+    using InnerRegions = std::vector<InnerRegion>;
 
     inline mxlTargetConfig getDefaultTargetConfig(mxlRegions regions)
     {
@@ -69,62 +70,58 @@ namespace mxl::lib::fabrics::ofi
         return domain;
     }
 
-    inline std::pair<RegionGroups, InnerRegionsGroups> getHostRegionGroups()
+    inline std::pair<MxlRegions, InnerRegions> getHostRegionGroups()
     {
-        auto innerRegions = InnerRegionsGroups{
-            {
-             std::vector<std::uint8_t>(256),
-             std::vector<std::uint8_t>(512),
-             },
-            {
-             std::vector<std::uint8_t>(1024),
-             std::vector<std::uint8_t>(2048),
-             },
+        auto innerRegions = std::vector<std::vector<std::uint8_t>>{
+            std::vector<std::uint8_t>(256),
+            std::vector<std::uint8_t>(512),
+            std::vector<std::uint8_t>(1024),
+            std::vector<std::uint8_t>(2048),
         };
-
-        auto& group0 = innerRegions[0];
-        auto& group1 = innerRegions[1];
 
         /// Warning: Do not modify the values below, you will break many tests
         // clang-format off
-        auto inputRegion0 = std::vector<mxlFabricsMemoryRegion>{
+        auto mxlRegions =  std::vector<mxlFabricsMemoryRegion>{
             mxlFabricsMemoryRegion{
-                .addr = reinterpret_cast<std::uintptr_t>(group0[0].data()),
-                .size = group0[0].size(),
+                .addr = reinterpret_cast<std::uintptr_t>(innerRegions[0].data()),
+                .size = innerRegions[0].size(),
                 .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
             },
             mxlFabricsMemoryRegion{
-                .addr = reinterpret_cast<std::uintptr_t>(group0[1].data()),
-                .size = group0[1].size(),
-                .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
-            }
-        };
-
-        auto inputRegion1 = std::vector<mxlFabricsMemoryRegion>{
-            mxlFabricsMemoryRegion{
-                .addr = reinterpret_cast<std::uintptr_t>(group1[0].data()),
-                .size = group1[0].size(),
+                .addr = reinterpret_cast<std::uintptr_t>(innerRegions[1].data()),
+                .size = innerRegions[1].size(),
                 .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
             },
             mxlFabricsMemoryRegion{
-                .addr = reinterpret_cast<std::uintptr_t>(group1[1].data()),
-                .size = group1[1].size(),
+                .addr = reinterpret_cast<std::uintptr_t>(innerRegions[2].data()),
+                .size = innerRegions[2].size(),
+                .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
+            },
+            mxlFabricsMemoryRegion{
+                .addr = reinterpret_cast<std::uintptr_t>(innerRegions[3].data()),
+                .size = innerRegions[3].size(),
                 .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
             }
         };
 
-        auto inputGroups = std::vector<mxlFabricsMemoryRegionGroup>{
-            mxlFabricsMemoryRegionGroup{
-                .regions = inputRegion0.data(),
-                .count = 2,
-            },
-            mxlFabricsMemoryRegionGroup{
-                .regions = inputRegion1.data(),
-                .count = 2,
-            },
-        };
         // clang-format on
 
-        return {regionGroupsfromGroups(inputGroups.data(), inputGroups.size()), innerRegions};
+        return {mxlRegionsFromUser(mxlRegions.data(), mxlRegions.size()), innerRegions};
     }
+
+    inline std::pair<mxlRegions, InnerRegions> getUserMxlRegions()
+    {
+        auto regions = InnerRegions{InnerRegion(256)};
+        auto memoryRegions = std::vector<mxlFabricsMemoryRegion>{
+            mxlFabricsMemoryRegion{.addr = reinterpret_cast<std::uintptr_t>(regions[0].data()),
+                                   .size = regions[0].size(),
+                                   .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0}},
+        };
+
+        mxlRegions outRegions;
+        mxlFabricsRegionsFromUserBuffers(memoryRegions.data(), memoryRegions.size(), &outRegions);
+
+        return {outRegions, regions};
+    }
+
 }

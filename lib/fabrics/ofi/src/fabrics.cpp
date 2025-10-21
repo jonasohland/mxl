@@ -9,12 +9,10 @@
 #include <cstring>
 #include <memory>
 #include <sstream>
-#include <rfl.hpp>
 #include <mxl-internal/FlowReader.hpp>
 #include <mxl-internal/Instance.hpp>
 #include <mxl-internal/Logging.hpp>
 #include <rdma/fabric.h>
-#include <rfl/json.hpp>
 #include <mxl/mxl.h>
 #include "internal/Exception.hpp"
 #include "internal/FabricsInstance.hpp"
@@ -42,7 +40,7 @@ mxlStatus mxlFabricsRegionsForFlowReader(mxlFlowReader in_reader, mxlRegions* ou
         auto reader = ::mxl::lib::to_FlowReader(in_reader);
 
         // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
-        auto regionPtr = std::make_unique<ofi::RegionGroups>(ofi::regionGroupsfromFlow(reader->getFlowData())).release();
+        auto regionPtr = std::make_unique<ofi::MxlRegions>(ofi::mxlRegionsFromFlow(reader->getFlowData())).release();
 
         *out_regions = regionPtr->toAPI();
 
@@ -84,7 +82,7 @@ mxlStatus mxlFabricsRegionsForFlowWriter(mxlFlowWriter in_writer, mxlRegions* ou
         auto reader = ::mxl::lib::to_FlowWriter(in_writer);
 
         // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
-        auto regionPtr = std::make_unique<ofi::RegionGroups>(ofi::regionGroupsfromFlow(reader->getFlowData())).release();
+        auto regionPtr = std::make_unique<ofi::MxlRegions>(ofi::mxlRegionsFromFlow(reader->getFlowData())).release();
 
         *out_regions = regionPtr->toAPI();
 
@@ -114,19 +112,19 @@ mxlStatus mxlFabricsRegionsForFlowWriter(mxlFlowWriter in_writer, mxlRegions* ou
 }
 
 extern "C" MXL_EXPORT
-mxlStatus mxlFabricsRegionsFromBufferGroups(mxlFabricsMemoryRegionGroup const* in_groups, size_t in_count, mxlRegions* out_regions)
+mxlStatus mxlFabricsRegionsFromUserBuffers(mxlFabricsMemoryRegion const* in_regions, size_t in_count, mxlRegions* out_regions)
 {
-    if (in_groups == nullptr || out_regions == nullptr)
+    if (in_regions == nullptr || out_regions == nullptr)
     {
         return MXL_ERR_INVALID_ARG;
     }
 
     try
     {
-        auto regions = ofi::regionGroupsfromGroups(in_groups, in_count);
+        auto regions = ofi::mxlRegionsFromUser(in_regions, in_count);
 
         // We are leaking the ownership, the user is responsible for calling mxlFabricsRegionsFree to free the memory.
-        auto regionPtr = std::make_unique<ofi::RegionGroups>(regions).release();
+        auto regionPtr = std::make_unique<ofi::MxlRegions>(regions).release();
 
         *out_regions = regionPtr->toAPI();
 
@@ -165,7 +163,7 @@ mxlStatus mxlFabricsRegionsFree(mxlRegions in_regions)
 
     try
     {
-        auto regions = ofi::RegionGroups::fromAPI(in_regions);
+        auto regions = ofi::MxlRegions::fromAPI(in_regions);
         delete regions;
 
         return MXL_STATUS_OK;
@@ -771,13 +769,7 @@ mxlStatus mxlFabricsTargetInfoFromString(char const* in_string, mxlTargetInfo* o
 
     try
     {
-        auto deserializedTargetInfo = rfl::json::read<ofi::TargetInfo>(in_string);
-        if (!deserializedTargetInfo)
-        {
-            throw ofi::Exception::invalidArgument("Failed to deserialize json: {}", deserializedTargetInfo.error().what());
-        }
-
-        auto targetInfo = std::make_unique<ofi::TargetInfo>(deserializedTargetInfo.value());
+        auto targetInfo = std::make_unique<ofi::TargetInfo>(ofi::TargetInfo::fromJSON(in_string));
         *out_targetInfo = targetInfo.release()->toAPI();
 
         return MXL_STATUS_OK;
@@ -811,8 +803,7 @@ mxlStatus mxlFabricsTargetInfoToString(mxlTargetInfo const in_targetInfo, char* 
     try
     {
         std::stringstream ss;
-        auto targetInfo = ofi::TargetInfo::fromAPI(in_targetInfo);
-        auto targetInfoString = rfl::json::write(targetInfo);
+        auto targetInfoString = ofi::TargetInfo::fromAPI(in_targetInfo)->toJSON();
 
         if (out_string == nullptr)
         {

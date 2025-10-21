@@ -10,7 +10,6 @@
 #include "Endpoint.hpp"
 #include "PassiveEndpoint.hpp"
 #include "QueueHelpers.hpp"
-#include "RegisteredRegion.hpp"
 #include "Target.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -51,7 +50,6 @@ namespace mxl::lib::fabrics::ofi
 
     private:
         std::shared_ptr<Domain> _domain;
-        std::vector<RegisteredRegionGroup> _regRegions;
 
         State _state;
     };

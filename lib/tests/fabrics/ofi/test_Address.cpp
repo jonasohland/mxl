@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <catch2/catch_test_macros.hpp>
-#include <rfl/json/read.hpp>
 #include "Address.hpp"
 
 using namespace mxl::lib::fabrics::ofi;
@@ -34,11 +33,4 @@ TEST_CASE("FabricAddress base64 decode", "[FabricAddress]")
     // Encode again and validate we get the same string
     std::string b64 = addr.toBase64();
     REQUIRE(b64 == "AQIDBAU=");
-}
-
-TEST_CASE("FabricAddressRfl conversion", "[FabricAddressRfl]")
-{
-    auto addr = rfl::json::read<FabricAddress>(R"({"addr":"AQIDBAU="})");
-
-    REQUIRE(addr.value().toBase64() == "AQIDBAU=");
 }

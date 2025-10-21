@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <map>
 #include <memory>
 #include <variant>
 #include <vector>
@@ -12,7 +13,6 @@
 #include "Endpoint.hpp"
 #include "Event.hpp"
 #include "Initiator.hpp"
-#include "RegisteredRegion.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -21,7 +21,7 @@ namespace mxl::lib::fabrics::ofi
     class RCInitiatorEndpoint
     {
     public:
-        RCInitiatorEndpoint(Endpoint, FabricAddress, std::vector<RemoteRegionGroup>);
+        RCInitiatorEndpoint(Endpoint, FabricAddress, std::vector<RemoteRegion>);
 
         /// Returns true if there is any pending events that the endpoint is waiting for, and for which
         /// the queues must be polled
@@ -52,7 +52,7 @@ namespace mxl::lib::fabrics::ofi
         void consume(Completion);
 
         /// Post a data transfer request to this endpoint.
-        void postTransfer(LocalRegionGroup const& localRegion, std::uint64_t index);
+        void postTransfer(LocalRegion const& localRegion, std::uint64_t index);
 
     private:
         /// The idle state. In this state the endpoint waits to be activated. This will happen immediately if the
@@ -99,9 +99,9 @@ namespace mxl::lib::fabrics::ofi
         Idle restart(Endpoint const&);
 
     private:
-        State _state;                            /// The internal state object
-        FabricAddress _addr;                     /// The remote fabric address to connect to.
-        std::vector<RemoteRegionGroup> _regions; /// Descriptions of the remote memory regions where we need to write our grains.
+        State _state;                       /// The internal state object
+        FabricAddress _addr;                /// The remote fabric address to connect to.
+        std::vector<RemoteRegion> _regions; /// Descriptions of the remote memory regions where we need to write our grains.
     };
 
     class RCInitiator : public Initiator
@@ -165,8 +165,7 @@ namespace mxl::lib::fabrics::ofi
         std::shared_ptr<CompletionQueue> _cq;
         std::shared_ptr<EventQueue> _eq;
 
-        std::vector<RegisteredRegionGroup> _registeredRegions;
-        std::vector<LocalRegionGroup> _localRegions;
+        std::vector<LocalRegion> _localRegions;
 
         // Default initialized
         std::map<Endpoint::Id, RCInitiatorEndpoint> _targets{};

@@ -9,7 +9,6 @@
 #include <uuid.h>
 #include <mxl-internal/Logging.hpp>
 #include <rdma/fabric.h>
-#include <rfl/json/write.hpp>
 #include "Domain.hpp"
 #include "Exception.hpp"
 #include "ImmData.hpp"
@@ -18,7 +17,7 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    RCInitiatorEndpoint::RCInitiatorEndpoint(Endpoint ep, FabricAddress remote, std::vector<RemoteRegionGroup> rr)
+    RCInitiatorEndpoint::RCInitiatorEndpoint(Endpoint ep, FabricAddress remote, std::vector<RemoteRegion> rr)
         : _state(Idle{.ep = std::move(ep), .idleSince = std::chrono::steady_clock::time_point{}})
         , _addr(std::move(remote))
         , _regions(std::move(rr))
@@ -193,7 +192,7 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& local, uint64_t index)
+    void RCInitiatorEndpoint::postTransfer(LocalRegion const& local, uint64_t index)
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
@@ -278,9 +277,12 @@ namespace mxl::lib::fabrics::ofi
 
         auto fabric = Fabric::open(info);
         auto domain = Domain::open(fabric);
-        if (config.regions != nullptr)
+
+        auto mxlRegions = MxlRegions::fromAPI(config.regions);
+
+        if (mxlRegions && !mxlRegions->regions().empty())
         {
-            domain->registerRegionGroups(*RegionGroups::fromAPI(config.regions), FI_WRITE);
+            domain->registerRegions(mxlRegions->regions(), FI_WRITE);
         }
 
         auto eq = EventQueue::open(fabric);
@@ -300,13 +302,13 @@ namespace mxl::lib::fabrics::ofi
         : _domain(std::move(domain))
         , _cq(std::move(cq))
         , _eq(std::move(eq))
-        , _localRegions(_domain->localRegionGroups())
+        , _localRegions(_domain->localRegions())
     {}
 
     void RCInitiator::addTarget(TargetInfo const& targetInfo)
     {
         _targets.emplace(targetInfo.id,
-            RCInitiatorEndpoint{Endpoint::create(_domain, targetInfo.id), targetInfo.fabricAddress, targetInfo.remoteRegionGroups});
+            RCInitiatorEndpoint{Endpoint::create(_domain, targetInfo.id), targetInfo.fabricAddress, targetInfo.remoteRegions});
     }
 
     void RCInitiator::removeTarget(TargetInfo const& targetInfo)

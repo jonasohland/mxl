@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "RemoteRegion.hpp"
+#include <algorithm>
 
 namespace mxl::lib::fabrics::ofi
 {

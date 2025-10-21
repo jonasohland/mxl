@@ -5,11 +5,10 @@
 #include <chrono>
 #include <cstdint>
 #include <cstring>
-#include <ratio>
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
-#include <mxl/fabrics.h>
 #include <rdma/fabric.h>
+#include <mxl/fabrics.h>
 #include "mxl/mxl.h"
 #ifdef MXL_FABRICS_OFI
 // clang-format off
@@ -315,20 +314,14 @@ TEST_CASE("Fabrics: RCInitiator transfer grain", "[fabrics][connected][transfer]
     auto targetRegion = std::vector<std::vector<std::vector<std::uint8_t>>>{
         {std::vector<std::uint8_t>(1e6)},
     };
-    auto targetGroup = std::vector<mxlFabricsMemoryRegion>{
+    auto targetRegions = std::vector<mxlFabricsMemoryRegion>{
         {
          .addr = reinterpret_cast<std::uintptr_t>(targetRegion[0][0].data()),
          .size = targetRegion[0][0].size(),
          .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
          }
     };
-    auto targetGroups = std::vector<mxlFabricsMemoryRegionGroup>{
-        {
-         .regions = targetGroup.data(),
-         .count = targetGroup.size(),
-         }
-    };
-    mxlFabricsRegionsFromBufferGroups(targetGroups.data(), 1, &mxlTargetRegions);
+    mxlFabricsRegionsFromUserBuffers(targetRegions.data(), 1, &mxlTargetRegions);
 
     // Setup target
     mxlFabricsTarget target;
@@ -347,20 +340,14 @@ TEST_CASE("Fabrics: RCInitiator transfer grain", "[fabrics][connected][transfer]
     auto initiatorRegion = std::vector<std::vector<std::vector<std::uint8_t>>>{
         {std::vector<std::uint8_t>(1e6)},
     };
-    auto initiatorGroup = std::vector<mxlFabricsMemoryRegion>{
+    auto initiatorRegions = std::vector<mxlFabricsMemoryRegion>{
         {
          .addr = reinterpret_cast<std::uintptr_t>(initiatorRegion[0][0].data()),
          .size = initiatorRegion[0][0].size(),
          .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
          }
     };
-    auto initiatorGroups = std::vector<mxlFabricsMemoryRegionGroup>{
-        {
-         .regions = initiatorGroup.data(),
-         .count = initiatorGroup.size(),
-         }
-    };
-    mxlFabricsRegionsFromBufferGroups(targetGroups.data(), 1, &mxlInitiatorRegions);
+    mxlFabricsRegionsFromUserBuffers(initiatorRegions.data(), 1, &mxlInitiatorRegions);
 
     // Setup intiator
     mxlFabricsInitiator initiator;
@@ -454,20 +441,14 @@ TEST_CASE("Fabrics: RCInitiator transfer grain", "[fabrics][connected][transfer]
     auto targetRegion = std::vector<std::vector<std::vector<std::uint8_t>>>{
         {std::vector<std::uint8_t>(1e6)},
     };
-    auto targetGroup = std::vector<mxlFabricsMemoryRegion>{
+    auto targetRegions = std::vector<mxlFabricsMemoryRegion>{
         {
          .addr = reinterpret_cast<std::uintptr_t>(targetRegion[0][0].data()),
          .size = targetRegion[0][0].size(),
          .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
          }
     };
-    auto targetGroups = std::vector<mxlFabricsMemoryRegionGroup>{
-        {
-         .regions = targetGroup.data(),
-         .count = targetGroup.size(),
-         }
-    };
-    mxlFabricsRegionsFromBufferGroups(targetGroups.data(), 1, &mxlTargetRegions);
+    mxlFabricsRegionsFromUserBuffers(targetRegions.data(), 1, &mxlTargetRegions);
 
     // Setup target
     mxlFabricsTarget target;
@@ -486,20 +467,14 @@ TEST_CASE("Fabrics: RCInitiator transfer grain", "[fabrics][connected][transfer]
     auto initiatorRegion = std::vector<std::vector<std::vector<std::uint8_t>>>{
         {std::vector<std::uint8_t>(1e6)},
     };
-    auto initiatorGroup = std::vector<mxlFabricsMemoryRegion>{
+    auto initiatorRegions = std::vector<mxlFabricsMemoryRegion>{
         {
          .addr = reinterpret_cast<std::uintptr_t>(initiatorRegion[0][0].data()),
          .size = initiatorRegion[0][0].size(),
          .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
          }
     };
-    auto initiatorGroups = std::vector<mxlFabricsMemoryRegionGroup>{
-        {
-         .regions = initiatorGroup.data(),
-         .count = initiatorGroup.size(),
-         }
-    };
-    mxlFabricsRegionsFromBufferGroups(targetGroups.data(), 1, &mxlInitiatorRegions);
+    mxlFabricsRegionsFromUserBuffers(initiatorRegions.data(), 1, &mxlInitiatorRegions);
 
     // Setup intiator
     mxlFabricsInitiator initiator;
@@ -593,20 +568,14 @@ TEST_CASE("Fabrics: RDMInitiator transfer grain", "[fabrics][ofi][connectionless
     auto targetRegion = std::vector<std::vector<std::vector<std::uint8_t>>>{
         {std::vector<std::uint8_t>(1e6)},
     };
-    auto targetGroup = std::vector<mxlFabricsMemoryRegion>{
+    auto targetRegions = std::vector<mxlFabricsMemoryRegion>{
         {
          .addr = reinterpret_cast<std::uintptr_t>(targetRegion[0][0].data()),
          .size = targetRegion[0][0].size(),
          .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
          }
     };
-    auto targetGroups = std::vector<mxlFabricsMemoryRegionGroup>{
-        {
-         .regions = targetGroup.data(),
-         .count = targetGroup.size(),
-         }
-    };
-    mxlFabricsRegionsFromBufferGroups(targetGroups.data(), 1, &mxlTargetRegions);
+    mxlFabricsRegionsFromUserBuffers(targetRegions.data(), 1, &mxlTargetRegions);
 
     // Setup target
     mxlFabricsTarget target;
@@ -625,20 +594,14 @@ TEST_CASE("Fabrics: RDMInitiator transfer grain", "[fabrics][ofi][connectionless
     auto initiatorRegion = std::vector<std::vector<std::vector<std::uint8_t>>>{
         {std::vector<std::uint8_t>(1e6)},
     };
-    auto initiatorGroup = std::vector<mxlFabricsMemoryRegion>{
+    auto initiatorRegions = std::vector<mxlFabricsMemoryRegion>{
         {
          .addr = reinterpret_cast<std::uintptr_t>(initiatorRegion[0][0].data()),
          .size = initiatorRegion[0][0].size(),
          .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
          }
     };
-    auto initiatorGroups = std::vector<mxlFabricsMemoryRegionGroup>{
-        {
-         .regions = initiatorGroup.data(),
-         .count = initiatorGroup.size(),
-         }
-    };
-    mxlFabricsRegionsFromBufferGroups(targetGroups.data(), 1, &mxlInitiatorRegions);
+    mxlFabricsRegionsFromUserBuffers(targetRegions.data(), 1, &mxlInitiatorRegions);
 
     // Setup intiator
     mxlFabricsInitiator initiator;
@@ -732,20 +695,14 @@ TEST_CASE("Fabrics: RDMInitiator transfer grain", "[fabrics][ofi][connectionless
     auto targetRegion = std::vector<std::vector<std::vector<std::uint8_t>>>{
         {std::vector<std::uint8_t>(1e6)},
     };
-    auto targetGroup = std::vector<mxlFabricsMemoryRegion>{
+    auto targetRegions = std::vector<mxlFabricsMemoryRegion>{
         {
          .addr = reinterpret_cast<std::uintptr_t>(targetRegion[0][0].data()),
          .size = targetRegion[0][0].size(),
          .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
          }
     };
-    auto targetGroups = std::vector<mxlFabricsMemoryRegionGroup>{
-        {
-         .regions = targetGroup.data(),
-         .count = targetGroup.size(),
-         }
-    };
-    mxlFabricsRegionsFromBufferGroups(targetGroups.data(), 1, &mxlTargetRegions);
+    mxlFabricsRegionsFromUserBuffers(targetRegions.data(), 1, &mxlTargetRegions);
 
     // Setup target
     mxlFabricsTarget target;
@@ -764,20 +721,14 @@ TEST_CASE("Fabrics: RDMInitiator transfer grain", "[fabrics][ofi][connectionless
     auto initiatorRegion = std::vector<std::vector<std::vector<std::uint8_t>>>{
         {std::vector<std::uint8_t>(1e6)},
     };
-    auto initiatorGroup = std::vector<mxlFabricsMemoryRegion>{
+    auto initiatorRegions = std::vector<mxlFabricsMemoryRegion>{
         {
          .addr = reinterpret_cast<std::uintptr_t>(initiatorRegion[0][0].data()),
          .size = initiatorRegion[0][0].size(),
          .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
          }
     };
-    auto initiatorGroups = std::vector<mxlFabricsMemoryRegionGroup>{
-        {
-         .regions = initiatorGroup.data(),
-         .count = initiatorGroup.size(),
-         }
-    };
-    mxlFabricsRegionsFromBufferGroups(targetGroups.data(), 1, &mxlInitiatorRegions);
+    mxlFabricsRegionsFromUserBuffers(targetRegions.data(), 1, &mxlInitiatorRegions);
 
     // Setup intiator
     mxlFabricsInitiator initiator;
