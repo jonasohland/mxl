@@ -9,10 +9,12 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <numbers>
 #include <ranges>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <glib.h>
 #include <CLI/CLI.hpp>
 #include <glib-object.h>
 #include <gst/audio/audio.h>
@@ -55,6 +57,7 @@ struct GstreamerAudioPipelineConfig
 {
     mxlRational rate;
     std::size_t channelCount;
+    std::vector<size_t> spkrEnabled;
 };
 
 struct GstreamerPipelineConfig
@@ -99,47 +102,62 @@ public:
 
         if (config.audio_config)
         {
-            _audioAppsrc = gst_element_factory_make("appsrc", "audio_source");
-            if (!_audioAppsrc)
+            std::string pipelineDesc = fmt::format(
+                "appsrc name=appsrc ! "
+                "audio/x-raw,format=F32LE,layout=non-interleaved,channels={},rate=48000 ! "
+                "audioconvert mix-matrix=\"< ",
+                config.audio_config->channelCount);
+
+            for (size_t spkrId = 0; spkrId < config.audio_config->spkrEnabled.size(); spkrId++)
             {
-                throw std::runtime_error("Gstreamer: 'appsrc' for audio could not be created.");
+                auto spkrEn = config.audio_config->spkrEnabled[spkrId];
+
+                pipelineDesc += "< ";
+                for (size_t chan = 0; chan < config.audio_config->channelCount; chan++)
+                {
+                    if (chan == spkrEn)
+                    {
+                        pipelineDesc += "(float)1";
+                    }
+                    else
+                    {
+                        pipelineDesc += "(float)0";
+                    }
+
+                    if (chan != config.audio_config->channelCount - 1)
+                    {
+                        pipelineDesc += ", ";
+                    }
+                }
+                pipelineDesc += " >";
+
+                if (spkrId != config.audio_config->spkrEnabled.size() - 1)
+                {
+                    pipelineDesc += ", ";
+                }
             }
-            gst_bin_add(GST_BIN(_pipeline), _audioAppsrc);
-            if (config.audio_config->rate.denominator != 1)
+            pipelineDesc += ">\" ! "
+                            "autoaudiosink";
+
+            MXL_INFO("pipeline description -> {}", pipelineDesc);
+
+            GError* error = nullptr;
+            _pipeline = gst_parse_launch(pipelineDesc.c_str(), &error);
+            if (!_pipeline || error)
             {
-                throw std::runtime_error("Audio rate denominator must be 1.");
+                MXL_ERROR("Failed to create pipeline: {}", error->message);
+                g_error_free(error);
+                throw std::runtime_error("Gstreamer: 'pipeline' could not be created.");
             }
+
+            _audioAppsrc = gst_bin_get_by_name(GST_BIN(_pipeline), "appsrc");
+            if (_audioAppsrc == nullptr)
+            {
+                throw std::runtime_error("Gstreamer: 'appsink' could not be found in the pipeline.");
+            }
+
             _audioCaps = gstCapsFromAudioConfig(*config.audio_config);
             g_object_set(G_OBJECT(_audioAppsrc), "caps", _audioCaps, "format", GST_FORMAT_TIME, nullptr);
-
-            _audioconvert = gst_element_factory_make("audioconvert", "audio_convert");
-            if (!_audioconvert)
-            {
-                throw std::runtime_error("Gstreamer: 'audioconvert' could not be created.");
-            }
-            gst_bin_add(GST_BIN(_pipeline), _audioconvert);
-
-            _audioqueue = gst_element_factory_make("queue", "audio_queue");
-            if (!_audioqueue)
-            {
-                throw std::runtime_error("Gstreamer: 'queue' for audio could not be created.");
-            }
-            gst_bin_add(GST_BIN(_pipeline), _audioqueue);
-
-            _autoaudiosink = gst_element_factory_make("autoaudiosink", "audio_sink");
-            if (!_autoaudiosink)
-            {
-                throw std::runtime_error("Gstreamer: 'autoaudiosink' could not be created.");
-            }
-            gst_bin_add(GST_BIN(_pipeline), _autoaudiosink);
-        }
-
-        if (config.audio_config)
-        {
-            if (gst_element_link_many(_audioAppsrc, _audioconvert, _audioqueue, _autoaudiosink, nullptr) != TRUE)
-            {
-                throw std::runtime_error("Gstreamer: Audio elements could not be linked.");
-            }
         }
 
         _audioConfig = config.audio_config;
@@ -249,7 +267,8 @@ std::string read_flow_descriptor(std::string const& domain, std::string const& f
     return std::string{(std::istreambuf_iterator<char>(descriptor_reader)), std::istreambuf_iterator<char>()};
 }
 
-GstreamerPipelineConfig prepare_gstreamer_config(std::string const& domain, std::optional<std::string> const& audioFlowID)
+GstreamerPipelineConfig prepare_gstreamer_config(std::string const& domain, std::optional<std::string> const& audioFlowID,
+    std::vector<size_t> const& listenChannels)
 {
     std::optional<GstreamerAudioPipelineConfig> audio_config;
     if (audioFlowID)
@@ -257,7 +276,10 @@ GstreamerPipelineConfig prepare_gstreamer_config(std::string const& domain, std:
         std::string audio_flow_descriptor{read_flow_descriptor(domain, *audioFlowID)};
         mxl::lib::FlowParser audio_descriptor_parser{audio_flow_descriptor};
         audio_config = GstreamerAudioPipelineConfig{
-            .rate = audio_descriptor_parser.getGrainRate(), .channelCount = audio_descriptor_parser.getChannelCount()};
+            .rate = audio_descriptor_parser.getGrainRate(),
+            .channelCount = audio_descriptor_parser.getChannelCount(),
+            .spkrEnabled = listenChannels,
+        };
     }
     else
     {
@@ -278,6 +300,10 @@ int real_main(int argc, char** argv, void*)
     auto audioFlowIDOpt = app.add_option("-a, --audio-flow-id", audioFlowID, "The audio flow ID");
     audioFlowIDOpt->required(false);
 
+    std::vector<std::size_t> listenChannels;
+    auto listenChanOpt = app.add_option("-l, --listen-channels", listenChannels, "Audio channels to listen");
+    listenChanOpt->default_val(std::vector<std::size_t>{0, 1});
+
     std::string domain;
     auto domainOpt = app.add_option("-d,--domain", domain, "The MXL domain directory");
     domainOpt->required(true);
@@ -289,7 +315,7 @@ int real_main(int argc, char** argv, void*)
 
     CLI11_PARSE(app, argc, argv);
 
-    GstreamerPipelineConfig gst_config{prepare_gstreamer_config(domain, audioFlowID)};
+    GstreamerPipelineConfig gst_config{prepare_gstreamer_config(domain, audioFlowID, listenChannels)};
     GstreamerPipeline gst_pipeline(gst_config);
     uint64_t headIndex;
 

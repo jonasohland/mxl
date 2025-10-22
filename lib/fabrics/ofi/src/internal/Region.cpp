@@ -44,7 +44,7 @@ namespace mxl::lib::fabrics::ofi
             _inner);
     }
 
-    ::fi_hmem_iface Region::Location::iface() const noexcept
+    ::fi_hmem_iface Region::Location::iface() const
     {
         return std::visit(
             overloaded{
@@ -58,12 +58,12 @@ namespace mxl::lib::fabrics::ofi
             _inner);
     }
 
-    bool Region::Location::isHost() const noexcept
+    bool Region::Location::isHost() const
     {
         return std::holds_alternative<Host>(_inner);
     }
 
-    Region::Location Region::Location::fromAPI(mxlFabricsMemoryRegionLocation loc) noexcept
+    Region::Location Region::Location::fromAPI(mxlFabricsMemoryRegionLocation loc)
     {
         switch (loc.type)
         {
@@ -77,10 +77,7 @@ namespace mxl::lib::fabrics::ofi
     {
         return std::visit(overloaded{[](std::monostate) -> std::string { throw Exception::invalidState("Region type is not set"); },
                               [](Location::Host const&) -> std::string { return "host"; },
-                              [&](Location::Cuda const&) -> std::string
-                              {
-                                  return fmt::format("cuda, id={}", id());
-                              }},
+                              [&](Location::Cuda const&) -> std::string { return fmt::format("cuda, id={}", id()); }},
             _inner);
     }
 

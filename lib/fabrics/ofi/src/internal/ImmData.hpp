@@ -26,7 +26,7 @@ namespace mxl::lib::fabrics::ofi
             {
                 std::uint16_t grainIndex;
                 std::uint16_t sliceIndex;
-            };
+            } _repr;
 
             uint32_t data;
         } _inner;
@@ -51,7 +51,7 @@ namespace mxl::lib::fabrics::ofi
                 std::uint32_t entryIndex : 2;  // enough for 4 out-standing entries
                 std::uint32_t headIndex  : 15; // Sample index associated with the transfer (enough for ~340ms @ 96KHz)
                 std::uint32_t count      : 15; // Enough for ~340ms @ 96KHz
-            };
+            } _repr;
 
             uint32_t data;
         } _inner;

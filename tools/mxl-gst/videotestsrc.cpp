@@ -290,78 +290,35 @@ public:
 
         gst_init(nullptr, nullptr);
 
-        _audiotestsrc = gst_element_factory_make("audiotestsrc", "audiotestsrc");
-        if (!_audiotestsrc)
+        std::string pipelineDesc;
+        for (size_t chan = 0; chan < config.channelCount; ++chan)
         {
-            throw std::runtime_error("Gstreamer: 'audiotestsrc' could not be created.");
+            auto freq = (chan + 1) * 100;
+            pipelineDesc += fmt::format("audiotestsrc freq={} ! audio/x-raw,channels=1 ! queue ! m.sink_{} ", freq, chan);
         }
+        pipelineDesc += fmt::format("interleave name=m ! \
+                     audioconvert ! \
+                     queue !\
+                     audio/x-raw,format=F32LE,rate=48000,channels={},layout=non-interleaved ! \
+                     queue ! \
+                     appsink name=appsink",
+            config.channelCount);
 
-        g_object_set(_audiotestsrc,
-            "is-live",
-            TRUE,
-            "wave",
-            config.wave,
-            "freq",
-            config.freq,
-            "samplesperbuffer",
-            config.samplesPerBatch,
-            "timestamp-offset",
-            config.offset,
-            nullptr);
+        MXL_INFO("pipeline description -> {}", pipelineDesc);
 
-        _audioconvert = gst_element_factory_make("audioconvert", "audioconvert");
-        if (!_audioconvert)
+        GError* error = nullptr;
+        _pipeline = gst_parse_launch(pipelineDesc.c_str(), &error);
+        if (!_pipeline || error)
         {
-            throw std::runtime_error("Gstreamer: 'audioconvert' could not be created.");
-        }
-
-        _appsink = gst_element_factory_make("appsink", "appsink");
-        if (!_appsink)
-        {
-            throw std::runtime_error("Gstreamer: 'appsink' could not be created.");
-        }
-
-        guint64 channelMask{gst_audio_channel_get_fallback_mask(config.channelCount)};
-        // Configure appsink
-        g_object_set(G_OBJECT(_appsink),
-            "caps",
-            gst_caps_new_simple("audio/x-raw",
-                "format",
-                G_TYPE_STRING,
-                "F32LE",
-                "rate",
-                G_TYPE_INT,
-                config.rate.numerator,
-                "channels",
-                G_TYPE_INT,
-                config.channelCount,
-                "layout",
-                G_TYPE_STRING,
-                "non-interleaved",
-                "channel-mask",
-                GST_TYPE_BITMASK,
-                channelMask,
-                nullptr),
-            "max-buffers",
-            16,
-            nullptr);
-
-        // Create the empty pipeline
-        _pipeline = gst_pipeline_new("sink-pipeline");
-        if (!_pipeline)
-        {
+            MXL_ERROR("Failed to create pipeline: {}", error->message);
+            g_error_free(error);
             throw std::runtime_error("Gstreamer: 'pipeline' could not be created.");
         }
 
-        // Build the pipeline
-        gst_bin_add_many(GST_BIN(_pipeline), _audiotestsrc, _audioconvert, _appsink, nullptr);
-        if (!_pipeline)
+        _appsink = gst_bin_get_by_name(GST_BIN(_pipeline), "appsink");
+        if (_appsink == nullptr)
         {
-            throw std::runtime_error("Gstreamer: could not add elements to the pipeline");
-        }
-        if (gst_element_link_many(_audiotestsrc, _audioconvert, _appsink, nullptr) != TRUE)
-        {
-            throw std::runtime_error("Gstreamer: elements could not be linked.");
+            throw std::runtime_error("Gstreamer: 'appsink' could not be found in the pipeline.");
         }
     }
 

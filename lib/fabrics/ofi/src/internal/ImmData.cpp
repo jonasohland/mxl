@@ -13,13 +13,13 @@ namespace mxl::lib::fabrics::ofi
 
     ImmDataGrain::ImmDataGrain(std::uint64_t grainIndex, std::uint16_t sliceIndex) noexcept
     {
-        _inner.grainIndex = grainIndex;
-        _inner.sliceIndex = sliceIndex;
+        _inner._repr.grainIndex = grainIndex;
+        _inner._repr.sliceIndex = sliceIndex;
     }
 
     std::pair<std::uint64_t, std::uint16_t> ImmDataGrain::unpack() const noexcept
     {
-        return {_inner.grainIndex, _inner.sliceIndex};
+        return {_inner._repr.grainIndex, _inner._repr.sliceIndex};
     }
 
     std::uint32_t ImmDataGrain::data() const noexcept
@@ -36,16 +36,16 @@ namespace mxl::lib::fabrics::ofi
     {
         static_assert(AudioBounceBuffer::NUMBER_OF_ENTRIES == 4,
             "This code assumes that the maximum number of entries in the bounce buffer is 4. This code needs to be update if that changes");
-        _inner.entryIndex = entryIndex;
-        _inner.headIndex = headIndex & 0x7FFF;
-        _inner.count = count & 0x7FFF;
+        _inner._repr.entryIndex = entryIndex;
+        _inner._repr.headIndex = headIndex & 0x7FFF;
+        _inner._repr.count = count & 0x7FFF;
     }
 
     std::tuple<std::size_t, std::uint16_t, std::size_t> ImmDataSample::unpack() const noexcept
     {
         static_assert(AudioBounceBuffer::NUMBER_OF_ENTRIES == 4,
             "This code assumes that the maximum number of entries in the bounce buffer is 4. This code needs to be update if that changes");
-        return {_inner.entryIndex, _inner.headIndex, _inner.count};
+        return {_inner._repr.entryIndex, _inner._repr.headIndex, _inner._repr.count};
     }
 
     std::uint32_t ImmDataSample::data() const noexcept

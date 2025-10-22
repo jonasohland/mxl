@@ -120,7 +120,7 @@ namespace mxl::lib
 
     // TODO: merge these two
     inline void getMultiBufferSlices(std::uint64_t index, std::size_t count, size_t channelBufferLength, std::size_t sampleWordSize,
-        std::size_t channelCount, std::uint8_t const* const baseBufferPtr, mxlWrappedMultiBufferSlice& slice) noexcept
+        std::size_t channelCount, std::uint8_t const* baseBufferPtr, mxlWrappedMultiBufferSlice& slice) noexcept
     {
         auto const startOffset = (index + channelBufferLength - count) % channelBufferLength;
         auto const endOffset = (index % channelBufferLength);
@@ -139,7 +139,7 @@ namespace mxl::lib
     }
 
     inline void getMultiBufferSlices(std::uint64_t index, std::size_t count, size_t channelBufferLength, std::size_t sampleWordSize,
-        std::size_t channelCount, std::uint8_t* const baseBufferPtr, mxlMutableWrappedMultiBufferSlice& slice) noexcept
+        std::size_t channelCount, std::uint8_t* baseBufferPtr, mxlMutableWrappedMultiBufferSlice& slice) noexcept
     {
         auto const startOffset = (index + channelBufferLength - count) % channelBufferLength;
         auto const endOffset = (index % channelBufferLength);
@@ -162,13 +162,13 @@ namespace mxl::lib
     inline void ContinuousFlowData::multiBufferSlices(std::uint64_t index, std::size_t count, mxlMutableWrappedMultiBufferSlice& slices) noexcept
     {
         getMultiBufferSlices(
-            index, count, channelBufferLength(), sampleWordSize(), channelCount(), static_cast<std::uint8_t* const>(channelData()), slices);
+            index, count, channelBufferLength(), sampleWordSize(), channelCount(), static_cast<std::uint8_t*>(channelData()), slices);
     }
 
     inline void ContinuousFlowData::multiBufferSlices(std::uint64_t index, std::size_t count, mxlWrappedMultiBufferSlice& slices) const noexcept
     {
         getMultiBufferSlices(
-            index, count, channelBufferLength(), sampleWordSize(), channelCount(), static_cast<std::uint8_t const* const>(channelData()), slices);
+            index, count, channelBufferLength(), sampleWordSize(), channelCount(), static_cast<std::uint8_t const*>(channelData()), slices);
     }
 
 }

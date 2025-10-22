@@ -28,7 +28,7 @@ namespace mxl::lib::fabrics::ofi
         public:
             static Location host() noexcept;
             static Location cuda(int deviceId) noexcept;
-            static Location fromAPI(mxlFabricsMemoryRegionLocation loc) noexcept;
+            static Location fromAPI(mxlFabricsMemoryRegionLocation loc);
 
             /// Return the device id. For host location 0 is returned.
             [[nodiscard]]
@@ -36,14 +36,14 @@ namespace mxl::lib::fabrics::ofi
 
             /// Convert the current location to libfabric "iface" representation
             [[nodiscard]]
-            ::fi_hmem_iface iface() const noexcept;
+            ::fi_hmem_iface iface() const;
 
             [[nodiscard]]
             std::string toString() const noexcept;
 
             /// Return true if the memory location is on host.
             [[nodiscard]]
-            bool isHost() const noexcept;
+            bool isHost() const;
 
         private:
             class Host
