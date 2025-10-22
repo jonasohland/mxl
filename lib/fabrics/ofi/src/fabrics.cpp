@@ -1028,7 +1028,7 @@ mxlStatus mxlFabricsRecoverGrainIndex(mxlRational const* editRate, uint16_t in_i
 }
 
 extern "C" MXL_EXPORT
-mxlStatus mxlFabricsRecoverSampleIndex(mxlRational const* editRate, uint16_t in_index, uint64_t* out_index)
+mxlStatus mxlFabricsRecoverSampleIndex(mxlRational const* editRate, size_t nbSamples, uint16_t in_index, uint64_t* out_index)
 {
     if (out_index == nullptr)
     {
@@ -1036,7 +1036,7 @@ mxlStatus mxlFabricsRecoverSampleIndex(mxlRational const* editRate, uint16_t in_
     }
 
     auto currentGrainIndex = mxlGetCurrentIndex(editRate);
-    *out_index = (currentGrainIndex & 0xFFFF'FFFF'FFFF'8000) | (in_index & 0x7FFF);
+    *out_index = (currentGrainIndex - (currentGrainIndex % nbSamples)) + in_index;
 
     return MXL_STATUS_OK;
 }

@@ -209,13 +209,15 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& localRegionGroup, std::uint64_t index, std::size_t count)
+    void RCInitiatorEndpoint::postTransfer(LocalRegionGroup const& localRegionGroup, std::uint64_t partialHeadIndex, std::size_t count)
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
-            auto const& remote = _regions[connected->entryIndex % _regions.size()];
-            connected->pending += connected->ep.write(localRegionGroup, remote, ImmDataSample{connected->entryIndex, index, count}.data());
-            connected->entryIndex = (connected->entryIndex + 1) % 4; // TODO: should be using the NUMBER_OF_ENTRIES from AudioBounceBuffer
+            auto const& remote = _regions[connected->entryIndex];
+
+            connected->pending += connected->ep.write(
+                localRegionGroup, remote, FI_ADDR_UNSPEC, ImmDataSample{connected->entryIndex, partialHeadIndex, count}.data());
+            connected->entryIndex = (connected->entryIndex + 1) % AudioBounceBuffer::NUMBER_OF_ENTRIES;
         }
     }
 
@@ -239,7 +241,6 @@ namespace mxl::lib::fabrics::ofi
                         MXL_WARN("Received a completion but no transfer was pending");
                         return connectedState;
                     }
-                    MXL_INFO("Received completion!");
 
                     --connectedState.pending;
 
@@ -381,7 +382,7 @@ namespace mxl::lib::fabrics::ofi
         // Do the post the transfer to each targets
         for (auto& [_, target] : _targets)
         {
-            target.postTransfer(sgList, headIndex, count);
+            target.postTransfer(sgList, headIndex % audioDataLayout.samplesPerChannel, count);
         }
     }
 

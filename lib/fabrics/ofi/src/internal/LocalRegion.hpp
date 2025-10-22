@@ -16,7 +16,7 @@ namespace mxl::lib::fabrics::ofi
     class LocalRegionGroup;
     class LocalRegionGroupSpan;
 
-    struct LocalRegion
+    struct LocalRegion // TODO: there should be a RegisteredLocalRegion which contains the desc and a LocalRegion which does not contain the desc
     {
     public:
         [[nodiscard]]

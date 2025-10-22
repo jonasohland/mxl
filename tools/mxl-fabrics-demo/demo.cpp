@@ -673,7 +673,8 @@ public:
                 return status;
             }
 
-            status = mxlFabricsRecoverSampleIndex(&_flowInfo.continuous.sampleRate, partialSampleIndex, &sampleIndex);
+            status = mxlFabricsRecoverSampleIndex(
+                &_flowInfo.continuous.sampleRate, _flowInfo.continuous.bufferLength, partialSampleIndex, &sampleIndex);
             if (status != MXL_STATUS_OK)
             {
                 MXL_ERROR("Failed to recover grain index with status '{}'", static_cast<int>(status));

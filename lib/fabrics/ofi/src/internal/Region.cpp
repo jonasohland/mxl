@@ -15,6 +15,7 @@
 #include "mxl/mxl.h"
 #include "DataLayout.hpp"
 #include "Exception.hpp"
+#include "LocalRegion.hpp"
 #include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -90,10 +91,22 @@ namespace mxl::lib::fabrics::ofi
         return _iovec;
     }
 
+    LocalRegion Region::toLocal(std::uintptr_t base, size_t size) const noexcept
+    {
+        return LocalRegion{.addr = base, .len = size, .desc = nullptr};
+    }
+
     // Region implementations
     ::iovec Region::iovecFromRegion(std::uintptr_t base, size_t size) noexcept
     {
         return ::iovec{.iov_base = reinterpret_cast<void*>(base), .iov_len = size};
+    }
+
+    std::vector<LocalRegion> toLocal(std::vector<Region> const& regions) noexcept
+    {
+        std::vector<LocalRegion> localRegions;
+        std::ranges::transform(regions, std::back_inserter(localRegions), [](Region const& reg) { return reg.toLocal(reg.base, reg.size); });
+        return localRegions;
     }
 
     ::iovec const* RegionGroup::asIovec() const noexcept

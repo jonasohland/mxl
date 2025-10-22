@@ -44,7 +44,8 @@ namespace mxl::lib::fabrics::ofi
         using State = std::variant<WaitForConnectionRequest, WaitForConnection, Connected>;
 
     private:
-        RCTarget(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer, PassiveEndpoint pep);
+        RCTarget(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer, std::vector<LocalRegion> flowLocalRegions,
+            PassiveEndpoint pep);
 
         template<QueueReadMode>
         Target::ReadResult makeProgress(std::chrono::steady_clock::duration timeout);
@@ -52,6 +53,7 @@ namespace mxl::lib::fabrics::ofi
     private:
         std::shared_ptr<Domain> _domain;
         std::optional<AudioBounceBuffer> _bounceBuffer;
+        std::vector<LocalRegion> _flowLocalRegions;
 
         State _state;
     };

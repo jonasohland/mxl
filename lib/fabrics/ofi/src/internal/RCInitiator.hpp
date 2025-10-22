@@ -55,7 +55,7 @@ namespace mxl::lib::fabrics::ofi
         void postTransfer(LocalRegion const& localRegion, std::uint64_t index);
 
         /// Post a sample data transfer request to this endpoint.
-        void postTransfer(LocalRegionGroup const& localRegionGroup, std::uint64_t index, std::size_t count);
+        void postTransfer(LocalRegionGroup const& localRegionGroup, std::uint64_t partialHeadIndex, std::size_t count);
 
     private:
         /// The idle state. In this state the endpoint waits to be activated. This will happen immediately if the

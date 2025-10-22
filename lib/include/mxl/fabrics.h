@@ -379,7 +379,7 @@ extern "C"
      * \param in_index Grain index 15LSB received
      * \param out_index The actual sample index.
      */
-    mxlStatus mxlFabricsRecoverSampleIndex(mxlRational const* editRate, uint16_t in_index, uint64_t* out_index);
+    mxlStatus mxlFabricsRecoverSampleIndex(mxlRational const* editRate, size_t nbSamples, uint16_t in_index, uint64_t* out_index);
 
 #ifdef __cplusplus
 }

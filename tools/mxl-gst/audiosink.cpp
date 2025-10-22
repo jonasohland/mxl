@@ -331,14 +331,13 @@ int real_main(int argc, char** argv, void*)
 
     gst_pipeline.start();
 
-    headIndex = mxlGetCurrentIndex(&audioFlowInfo.continuous.sampleRate); // 4ms delay
-
+    headIndex = mxlGetCurrentIndex(&audioFlowInfo.continuous.sampleRate);
     while (!g_exit_requested)
     {
         if (audioReader)
         {
             mxlWrappedMultiBufferSlice audioPayload;
-            auto ret = mxlFlowReaderGetSamples(audioReader, headIndex - samplesPerBatch, samplesPerBatch, &audioPayload);
+            auto ret = mxlFlowReaderGetSamples(audioReader, headIndex - (samplesPerBatch + 100), samplesPerBatch, &audioPayload);
             if (ret != MXL_STATUS_OK)
             {
                 mxlFlowReaderGetInfo(audioReader, &audioFlowInfo);

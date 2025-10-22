@@ -1,8 +1,8 @@
 #include "AudioBounceBuffer.hpp"
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 #include "internal/ContinuousFlowData.hpp"
-#include "internal/Logging.hpp"
 #include "DataLayout.hpp"
 #include "LocalRegion.hpp"
 
@@ -36,7 +36,7 @@ namespace mxl::lib::fabrics::ofi
             reinterpret_cast<std::uint8_t*>(region.addr),
             slices);
 
-        std::uintptr_t srcAddr = 0;
+        auto srcAddr = _buffer.data();
         for (auto& fragment : slices.base.fragments)
         {
             // check if the fragment present
@@ -45,7 +45,7 @@ namespace mxl::lib::fabrics::ofi
                 for (size_t chan = 0; chan < slices.count; chan++)
                 {
                     auto dstAddr = reinterpret_cast<std::uintptr_t>(fragment.pointer) + (slices.stride * chan);
-                    std::memcpy(reinterpret_cast<void*>(dstAddr), reinterpret_cast<void*>(srcAddr), fragment.size);
+                    std::memcpy(reinterpret_cast<void*>(dstAddr), srcAddr, fragment.size);
                     srcAddr += fragment.size;
                 }
             }
@@ -75,12 +75,12 @@ namespace mxl::lib::fabrics::ofi
         _entries.at(entryIndex).unpack(_layout, index, count, outRegion);
     }
 
-    std::vector<LocalRegion> AudioBounceBuffer::scatterGatherList(DataLayout::AudioDataLayout layout, std::uint64_t index, std::size_t count,
+    std::vector<LocalRegion> AudioBounceBuffer::scatterGatherList(DataLayout::AudioDataLayout layout, std::uint64_t headIndex, std::size_t nbSamples,
         LocalRegion const& localRegion) noexcept
     {
         mxlWrappedMultiBufferSlice slice = {};
-        getMultiBufferSlices(index,
-            count,
+        getMultiBufferSlices(headIndex,
+            nbSamples,
             layout.samplesPerChannel,
             layout.bytesPerSample,
             layout.channelCount,
@@ -97,8 +97,9 @@ namespace mxl::lib::fabrics::ofi
             {
                 for (size_t chan = 0; chan < slice.count; chan++)
                 {
-                    auto chanAddr = reinterpret_cast<std::uintptr_t>(fragment.pointer) + (slice.stride * chan);
-                    sgList.emplace_back(LocalRegion{.addr = chanAddr, .len = fragment.size, .desc = localRegion.desc});
+                    auto srcAddr = reinterpret_cast<std::uintptr_t>(fragment.pointer) + (slice.stride * chan);
+
+                    sgList.emplace_back(LocalRegion{.addr = srcAddr, .len = fragment.size, .desc = localRegion.desc});
                 }
             }
         }

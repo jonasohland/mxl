@@ -7,6 +7,7 @@
 #include <utility>
 #include <rdma/fabric.h>
 #include "internal/Logging.hpp"
+#include "mxl/fabrics.h"
 #include "mxl/mxl.h"
 #include "AudioBounceBuffer.hpp"
 #include "Exception.hpp"
@@ -58,22 +59,23 @@ namespace mxl::lib::fabrics::ofi
 
         auto const mxlRegions = MxlRegions::fromAPI(config.regions);
         std::optional<AudioBounceBuffer> bounceBuffer;
+        std::vector<LocalRegion> flowLocalRegions;
 
         // Check if we need to use a bounce buffer.
         if (auto dataLayout = mxlRegions->dataLayout(); dataLayout.isAudio()) // audio
         {
             MXL_INFO("Audio Data Layout. Creating a bounce buffer");
             auto audioLayout = dataLayout.asAudio();
-            // auto bouncingBufferEntrySize = audioLayout.channelCount * audioLayout.samplesPerChannel * audioLayout.bytesPerSample;
             // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
-            // //TODO: find a way to calculate the number of entries required
             bounceBuffer = AudioBounceBuffer{audioLayout};
             domain->registerRegions(bounceBuffer->getRegions(), FI_REMOTE_WRITE);
+            flowLocalRegions = toLocal(mxlRegions->regions());
         }
         else // video
         {
             // media buffers are directly used as reception buffer, so register them
             domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
+            flowLocalRegions = domain->localRegions();
         }
         /// TODO: this code is exactly the same for both RC and RDM target
 
@@ -91,8 +93,9 @@ namespace mxl::lib::fabrics::ofi
         // Helper struct to enable the std::make_unique function to access the private constructor of this class
         struct MakeUniqueEnabler : RCTarget
         {
-            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer, PassiveEndpoint pep)
-                : RCTarget(std::move(domain), std::move(bounceBuffer), std::move(pep))
+            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer,
+                std::vector<LocalRegion> flowLocalRegions, PassiveEndpoint pep)
+                : RCTarget(std::move(domain), std::move(bounceBuffer), std::move(flowLocalRegions), std::move(pep))
             {}
         };
 
@@ -100,13 +103,15 @@ namespace mxl::lib::fabrics::ofi
         auto remoteRegionGroups = domain->remoteRegions();
 
         // Return the constructed RCTarget and associated TargetInfo for remote peers to connect.
-        return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(bounceBuffer), std::move(pep)),
+        return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(bounceBuffer), std::move(flowLocalRegions), std::move(pep)),
             std::make_unique<TargetInfo>(std::move(localAddress), std::move(remoteRegionGroups))};
     }
 
-    RCTarget::RCTarget(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer, PassiveEndpoint ep)
+    RCTarget::RCTarget(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer, std::vector<LocalRegion> flowLocalRegions,
+        PassiveEndpoint ep)
         : _domain(std::move(domain))
         , _bounceBuffer(std::move(bounceBuffer))
+        , _flowLocalRegions(std::move(flowLocalRegions))
         , _state(WaitForConnectionRequest{std::move(ep)})
     {}
 
@@ -192,7 +197,6 @@ namespace mxl::lib::fabrics::ofi
                     {
                         if (auto dataEntry = completion.value().tryData(); dataEntry)
                         {
-                            MXL_INFO("received a completion!");
                             // The written grain index is sent as immediate data, and was returned
                             // from the completion queue.
                             result.immData = dataEntry->data();
@@ -207,8 +211,9 @@ namespace mxl::lib::fabrics::ofi
                             // TODO: this code should be in the "protocol" implementation
                             if (_bounceBuffer)
                             {
-                                auto [entryIndex, headIndex, count] = ImmDataSample{*result.immData}.unpack();
-                                _bounceBuffer->unpack(entryIndex, headIndex, count, _domain->localRegions().front());
+                                auto [entryIndex, ringBufferHeadIndex, count] = ImmDataSample{*result.immData}.unpack();
+
+                                _bounceBuffer->unpack(entryIndex, ringBufferHeadIndex, count, _flowLocalRegions.front());
                             }
                             // TODO: this code should be in the "protocol" implementation
                         }

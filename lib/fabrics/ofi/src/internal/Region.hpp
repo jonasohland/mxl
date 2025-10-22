@@ -18,6 +18,8 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+    struct LocalRegion;
+
     class Region
     {
     public:
@@ -82,6 +84,9 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         ::iovec toIovec() const noexcept;
 
+        [[nodiscard]]
+        LocalRegion toLocal(std::uintptr_t base, std::size_t size) const noexcept;
+
     public:
         std::uintptr_t base;
         std::size_t size;
@@ -93,6 +98,8 @@ namespace mxl::lib::fabrics::ofi
     private:
         ::iovec _iovec;
     };
+
+    std::vector<LocalRegion> toLocal(std::vector<Region> const& regions) noexcept;
 
     class RegionGroup
     {

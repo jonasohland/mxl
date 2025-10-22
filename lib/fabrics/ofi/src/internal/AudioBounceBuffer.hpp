@@ -33,7 +33,7 @@ namespace mxl::lib::fabrics::ofi
         std::vector<Region> getRegions() const noexcept;
 
         /// Copy the bouncing buffer entry to the LocalRegion following the internal data layout
-        void unpack(std::size_t entryIndex, std::uint64_t index, std::size_t count, LocalRegion& outRegion) const noexcept;
+        void unpack(std::size_t entryIndex, std::uint64_t headIndex, std::size_t nbSamples, LocalRegion& outRegion) const noexcept;
 
         /// Generate the scatter-gather list for a given head index, sample count and localRegion, using  the audio data layout
         static std::vector<LocalRegion> scatterGatherList(DataLayout::AudioDataLayout layout, std::uint64_t index, std::size_t count,
@@ -42,7 +42,7 @@ namespace mxl::lib::fabrics::ofi
     private:
         friend class ImmDataSample;
 
-    private:
+    public:
         constexpr static size_t NUMBER_OF_ENTRIES = 4;
 
     private:

@@ -333,7 +333,6 @@ namespace mxl::lib::fabrics::ofi
         // transfer is posted with immediate data to signal completion to the target. If multiple writes are posted, we also need to add and offset to
         // the remote region for each request otherwise we overwrite the indices.
         std::uint64_t data = immData.value_or(0);
-        std::uint64_t flags = FI_DELIVERY_COMPLETE;
 
         auto remoteRmaIov = remoteRegion.toRmaIov();
         auto remoteOffset = 0;
@@ -343,6 +342,7 @@ namespace mxl::lib::fabrics::ofi
 
         for (std::size_t i = 0; i < nbWrites; i++)
         {
+            std::uint64_t flags = FI_DELIVERY_COMPLETE;
             auto begin = i * iovLimit;
             auto end = begin + std::min(iovLimit, localRegionGroup.size() - begin);
 
@@ -358,24 +358,10 @@ namespace mxl::lib::fabrics::ofi
             remoteRmaIov.addr = remoteRegion.addr + remoteOffset;
             remoteRmaIov.len = localGroupSpan.byteSize();
 
-            // check if it is the last transfer, if it is, we post the request with immediate data
+            // // check if it is the last transfer, if it is, we post the request with immediate data
             if (i == nbWrites - 1)
             {
                 flags |= immData ? FI_REMOTE_CQ_DATA : 0;
-            }
-
-            MXL_INFO("local.size={} remote.addr={} remote.size={} remote.key={} flags={}",
-                localGroupSpan.size(),
-                remoteRmaIov.addr,
-                remoteRmaIov.len,
-                remoteRmaIov.key,
-                flags);
-            for (std::size_t i = 0; i < localGroupSpan.size(); i++)
-            {
-                MXL_INFO("local.addr={} local.len={} local.desc={:p}",
-                    localGroupSpan.asIovec()[i].iov_base,
-                    localGroupSpan.asIovec()[i].iov_len,
-                    localGroupSpan.desc()[i]);
             }
 
             ::fi_msg_rma msg = {
@@ -449,6 +435,7 @@ namespace mxl::lib::fabrics::ofi
 
     void Endpoint::recv(LocalRegion region)
     {
+        MXL_INFO("Posting recv buffer addr=0x{:x} len={}", region.addr, region.len);
         auto iovec = region.toIovec();
         fiCall(::fi_recv, "Failed to push recv to work queue", _raw, iovec.iov_base, iovec.iov_len, nullptr, FI_ADDR_UNSPEC, nullptr);
     }
