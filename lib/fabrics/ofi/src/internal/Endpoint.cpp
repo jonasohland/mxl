@@ -366,8 +366,7 @@ namespace mxl::lib::fabrics::ofi
 
             ::fi_msg_rma msg = {
                 .msg_iov = localGroupSpan.asIovec(),
-                // .desc = const_cast<void**>(localGroupSpan.desc()),
-                .desc = nullptr,
+                .desc = const_cast<void**>(localGroupSpan.desc()),
                 .iov_count = localGroupSpan.size(),
                 .addr = destAddr,
                 .rma_iov = &remoteRmaIov,
@@ -409,15 +408,6 @@ namespace mxl::lib::fabrics::ofi
                 flags |= immData ? FI_REMOTE_CQ_DATA : 0;
             }
 
-            MXL_INFO("local.size={} flags={}", localGroupSpan.size(), flags);
-            for (std::size_t i = 0; i < localGroupSpan.size(); i++)
-            {
-                MXL_INFO("local.addr={} local.len={} local.desc={:p}",
-                    localGroupSpan.asIovec()[i].iov_base,
-                    localGroupSpan.asIovec()[i].iov_len,
-                    localGroupSpan.desc()[i]);
-            }
-
             ::fi_msg msg = {
                 .msg_iov = localGroupSpan.asIovec(),
                 .desc = const_cast<void**>(localGroupSpan.desc()),
@@ -435,7 +425,6 @@ namespace mxl::lib::fabrics::ofi
 
     void Endpoint::recv(LocalRegion region)
     {
-        MXL_INFO("Posting recv buffer addr=0x{:x} len={}", region.addr, region.len);
         auto iovec = region.toIovec();
         fiCall(::fi_recv, "Failed to push recv to work queue", _raw, iovec.iov_base, iovec.iov_len, nullptr, FI_ADDR_UNSPEC, nullptr);
     }

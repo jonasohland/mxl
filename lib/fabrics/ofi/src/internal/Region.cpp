@@ -77,7 +77,10 @@ namespace mxl::lib::fabrics::ofi
     {
         return std::visit(overloaded{[](std::monostate) -> std::string { throw Exception::invalidState("Region type is not set"); },
                               [](Location::Host const&) -> std::string { return "host"; },
-                              [&](Location::Cuda const&) -> std::string { return fmt::format("cuda, id={}", id()); }},
+                              [&](Location::Cuda const&) -> std::string
+                              {
+                                  return fmt::format("cuda, id={}", id());
+                              }},
             _inner);
     }
 
@@ -178,7 +181,7 @@ namespace mxl::lib::fabrics::ofi
 
             // For the continuous flow, the data layout is a single contiguous buffer
             regions.emplace_back(
-                reinterpret_cast<std::uintptr_t>(continuousFlow.channelData()), continuousFlow.channelDataLength(), Region::Location::host());
+                reinterpret_cast<std::uintptr_t>(continuousFlow.channelData()), continuousFlow.channelDataSize(), Region::Location::host());
 
             return {std::move(regions),
                 DataLayout::fromAudio(continuousFlow.channelCount(), continuousFlow.channelBufferLength(), continuousFlow.sampleWordSize())};
