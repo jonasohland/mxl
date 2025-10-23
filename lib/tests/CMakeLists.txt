@@ -102,3 +102,7 @@ target_compile_options(mxl-all-headers PRIVATE
     -Wall -Wextra -Werror -pedantic
     -Wstrict-prototypes
 )
+
+if (MXL_ENABLE_FABRICS_OFI)
+    add_subdirectory(fabrics)
+endif ()

@@ -7,12 +7,12 @@ find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(libfabric REQUIRED IMPORTED_TARGET libfabric)
 
-add_library(mxl-fabrics SHARED)
-target_compile_features(mxl-fabrics
+add_library(mxl-fabrics-objects OBJECT)
+target_compile_features(mxl-fabrics-objects
         PRIVATE
             cxx_std_20
     )
-target_sources(mxl-fabrics
+target_sources(mxl-fabrics-objects
         PRIVATE
             src/fabrics.cpp
             src/internal/Exception.cpp
@@ -34,7 +34,7 @@ target_sources(mxl-fabrics
             src/internal/EventQueue.cpp
             src/internal/Endpoint.cpp
     )
-target_link_libraries(mxl-fabrics
+target_link_libraries(mxl-fabrics-objects
         PUBLIC
             mxl
             mxl-fabrics-headers
@@ -42,7 +42,19 @@ target_link_libraries(mxl-fabrics
         PRIVATE
             mxl-internal-headers
     )
-set_target_properties(mxl-fabrics
+set_target_properties(mxl-fabrics-objects
+        PROPERTIES
+            POSITION_INDEPENDENT_CODE ON
+            C_EXTENSIONS              OFF
+            CXX_EXTENSIONS            OFF
+    )
+
+add_library(mxl-fabrics SHARED)
+target_link_libraries(mxl-fabrics
+        PRIVATE
+            mxl-fabrics-objects
+    )
+set_target_properties(mxl-fabrics-objects
         PROPERTIES
             POSITION_INDEPENDENT_CODE ON
             VISIBILITY_INLINES_HIDDEN ON
@@ -53,9 +65,16 @@ set_target_properties(mxl-fabrics
             VERSION                   "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
             SOVERSION                 "${PROJECT_VERSION_MAJOR}"
     )
+
 target_link_options(mxl-fabrics
         PRIVATE
             "-Wl,--exclude-libs,ALL"
+    )
+target_link_libraries(mxl-fabrics
+        PUBLIC
+            mxl
+            mxl-fabrics-headers
+            PkgConfig::libfabric
     )
 
 add_library(${PROJECT_NAME}::mxl-fabrics ALIAS mxl-fabrics)
