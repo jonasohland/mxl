@@ -2701,10 +2701,12 @@ namespace base64
 
         switch (binarytextsize % 3)
         {
-            case 0: {
+            case 0:
+            {
                 break;
             }
-            case 1: {
+            case 1:
+            {
                 uint8_t const t1 = bytes[0];
                 *currEncoding++ = detail::encode_table_0[t1];
                 *currEncoding++ = detail::encode_table_1[(t1 & 0x03) << 4];
@@ -2712,7 +2714,8 @@ namespace base64
                 // *currEncoding++ = detail::padding_char;
                 break;
             }
-            case 2: {
+            case 2:
+            {
                 uint8_t const t1 = bytes[0];
                 uint8_t const t2 = bytes[1];
                 *currEncoding++ = detail::encode_table_0[t1];
@@ -2721,7 +2724,8 @@ namespace base64
                 // *currEncoding++ = detail::padding_char;
                 break;
             }
-            default: {
+            default:
+            {
                 throw std::runtime_error{"Invalid base64 encoded data"};
             }
         }
@@ -2799,10 +2803,12 @@ namespace base64
 
         switch (numPadding)
         {
-            case 0: {
+            case 0:
+            {
                 break;
             }
-            case 1: {
+            case 1:
+            {
                 uint8_t const t1 = *bytes++;
                 uint8_t const t2 = *bytes++;
                 uint8_t const t3 = *bytes++;
@@ -2826,7 +2832,8 @@ namespace base64
                 *currDecoding++ = tempBytes[detail::decidx1];
                 break;
             }
-            case 2: {
+            case 2:
+            {
                 uint8_t const t1 = *bytes++;
                 uint8_t const t2 = *bytes++;
 
@@ -2844,7 +2851,8 @@ namespace base64
                 *currDecoding++ = tempBytes[detail::decidx0];
                 break;
             }
-            default: {
+            default:
+            {
                 throw std::runtime_error{"Invalid base64 encoded data - Invalid padding number"};
             }
         }

@@ -74,7 +74,10 @@ namespace mxl::lib::fabrics::ofi
     {
         return std::visit(overloaded{[](std::monostate) -> std::string { throw Exception::invalidState("Region type is not set"); },
                               [](Location::Host const&) -> std::string { return "host"; },
-                              [&](Location::Cuda const&) -> std::string { return fmt::format("cuda, id={}", id()); }},
+                              [&](Location::Cuda const&) -> std::string
+                              {
+                                  return fmt::format("cuda, id={}", id());
+                              }},
             _inner);
     }
 
