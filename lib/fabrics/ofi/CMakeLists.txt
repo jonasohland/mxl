@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 Contributors to the Media eXchange Layer project.
+# SPDX-License-Identifier: Apache-2.0
+
 message ("-- Building fabrics library with libfabric/ofi")
 
 find_package(PkgConfig REQUIRED)
