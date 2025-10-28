@@ -51,14 +51,12 @@ namespace mxl::lib::fabrics::ofi
         // See fi_domain(3) and fi_fabric(3) for more complete information about these concepts.
         auto fabric = Fabric::open(*fabricInfoList.begin());
         auto domain = Domain::open(fabric);
-
         if (config.regions == nullptr)
         {
             throw Exception::invalidArgument("config.regions must not be null");
         }
 
         auto const mxlRegions = MxlRegions::fromAPI(config.regions);
-        std::vector<LocalRegion> flowLocalRegions;
 
         // Select the "protocol" when a data transfer completes
         auto proto = selectProtocol(domain, mxlRegions->dataLayout(), mxlRegions->regions());

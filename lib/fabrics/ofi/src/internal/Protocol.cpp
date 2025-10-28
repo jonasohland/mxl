@@ -1,6 +1,7 @@
 #include "Protocol.hpp"
 #include <cassert>
 #include <memory>
+#include "DataLayout.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
 #include "ProtocolEgress.hpp"
@@ -15,7 +16,7 @@ namespace mxl::lib::fabrics::ofi
             auto proto = std::make_unique<IngressProtocolWriter>();
             domain->registerRegions(dstRegions, FI_REMOTE_WRITE);
 
-            return std::move(proto);
+            return proto;
         }
         else if (layout.isAudio()) // audio
         {
@@ -26,15 +27,15 @@ namespace mxl::lib::fabrics::ofi
         throw Exception::invalidArgument("Unsupported data layout for ingress protocol selection.");
     }
 
-    std::unique_ptr<EgressProtocol> selectProtocol(DataLayout const& layout)
+    std::unique_ptr<EgressProtocol> selectProtocol(Endpoint& ep, DataLayout const& layout, TargetInfo const& info)
     {
         if (layout.isVideo())
         {
-            return std::make_unique<EgressProtocolWriter>(layout.asVideo());
+            return std::make_unique<EgressProtocolWriterDiscrete>(ep, info.remoteRegions, layout.asVideo());
         }
         else if (layout.isAudio()) // audio
         {
-            return std::make_unique<EgressProtocolWriterWithBounceBuffer>(layout.asAudio());
+            return std::make_unique<EgressProtocolWriterContinuous>(ep, info.remoteRegions, layout.asAudio());
         }
         throw Exception::invalidArgument("Unsupported data layout for egress protocol selection.");
     }

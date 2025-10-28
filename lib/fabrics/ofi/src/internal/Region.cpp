@@ -151,6 +151,7 @@ namespace mxl::lib::fabrics::ofi
         {
             auto& discreteFlow = static_cast<DiscreteFlowData const&>(flow);
             std::vector<Region> regions;
+            std::uintptr_t grainPayloadSize = 0;
 
             for (std::size_t i = 0; i < discreteFlow.grainCount(); ++i)
             {
@@ -158,18 +159,18 @@ namespace mxl::lib::fabrics::ofi
 
                 auto grainInfoBaseAddr = reinterpret_cast<std::uintptr_t>(discreteFlow.grainAt(i));
                 auto grainInfoSize = sizeof(GrainHeader);
-                auto grainPayloadSize = grain->header.info.grainSize;
+                grainPayloadSize = grain->header.info.grainSize;
 
                 if (grain->header.info.payloadLocation != MXL_PAYLOAD_LOCATION_HOST_MEMORY)
                 {
                     throw Exception::make(MXL_ERR_UNKNOWN,
                         "GPU memory is not currently supported in the Flow API of MXL. Edit the code below when it is supported");
                 }
-
                 regions.emplace_back(grainInfoBaseAddr, grainInfoSize + grainPayloadSize, Region::Location::host());
             }
 
-            return {std::move(regions), DataLayout::fromVideo(false)};
+            // TODO: review these after the merge with main
+            return {std::move(regions), DataLayout::fromVideo(0, grainPayloadSize, 0, false)};
         }
         else if (mxlIsContinuousDataFormat(flow.flowInfo()->common.format))
         {
@@ -193,11 +194,13 @@ namespace mxl::lib::fabrics::ofi
     MxlRegions mxlRegionsFromUser(mxlFabricsMemoryRegion const* regions, size_t count)
     {
         std::vector<Region> outRegions;
+        std::uint64_t grainPayloadSize = 0;
         for (size_t i = 0; i < count; i++)
         {
+            grainPayloadSize = std::max(grainPayloadSize, regions[i].size);
             outRegions.emplace_back(regions[i].addr, regions[i].size, Region::Location::fromAPI(regions[i].loc));
         }
 
-        return {std::move(outRegions), DataLayout::fromVideo(false)}; // TODO: datalayout struct definition at API level
+        return {std::move(outRegions), DataLayout::fromVideo(0, grainPayloadSize, 0, false)}; // TODO: datalayout struct definition at API level
     }
 }

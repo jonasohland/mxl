@@ -8,7 +8,7 @@
 
 namespace mxl::lib::fabrics::ofi
 {
-    class IngressProtocolWriter : public IngressProtocol
+    class IngressProtocolWriter final : public IngressProtocol
     {
     public:
         IngressProtocolWriter() = default;
@@ -16,7 +16,7 @@ namespace mxl::lib::fabrics::ofi
         void processCompletion(std::uint32_t immData) final;
     };
 
-    class IngressProtocolWriterWithBounceBuffer : public IngressProtocol
+    class IngressProtocolWriterWithBounceBuffer final : public IngressProtocol
     {
     public:
         IngressProtocolWriterWithBounceBuffer(std::shared_ptr<Domain> domain, DataLayout::AudioDataLayout layout, Region dstRegion);
@@ -29,7 +29,7 @@ namespace mxl::lib::fabrics::ofi
         LocalRegion _dstRegion;
     };
 
-    class IngressProtocolReceiverDiscrete : public IngressProtocol
+    class IngressProtocolReceiverDiscrete final : public IngressProtocol
 
     {
         IngressProtocolReceiverDiscrete(DataLayout::VideoDataLayout layout, std::shared_ptr<std::vector<LocalRegion>> localRegions);
@@ -41,7 +41,7 @@ namespace mxl::lib::fabrics::ofi
         std::shared_ptr<std::vector<LocalRegion>> _localRegions;
     };
 
-    class IngressProtocolReceiverContinuous : public IngressProtocol
+    class IngressProtocolReceiverContinuous final : public IngressProtocol
     {
     public:
         IngressProtocolReceiverContinuous(DataLayout::AudioDataLayout layout, std::shared_ptr<LocalRegion> localRegion);

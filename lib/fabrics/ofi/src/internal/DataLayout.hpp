@@ -26,7 +26,7 @@ namespace mxl::lib::fabrics::ofi
         };
 
     public:
-        static DataLayout fromVideo(bool alphaPresent) noexcept;
+        static DataLayout fromVideo(std::size_t totalSlices, std::size_t colorPlaneSize, std::size_t alphaPlaneSize, bool alphaPresent) noexcept;
         static DataLayout fromAudio(std::uint32_t channelCount, std::uint32_t samplesPerChannel, std::size_t bytesPerSample) noexcept;
 
         [[nodiscard]]

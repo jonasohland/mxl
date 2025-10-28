@@ -1,11 +1,15 @@
 #include "DataLayout.hpp"
+#include <cstddef>
 #include <variant>
 
 namespace mxl::lib::fabrics::ofi
 {
-    DataLayout DataLayout::fromVideo(bool alphaPresent) noexcept
+    DataLayout DataLayout::fromVideo(std::size_t totalSlices, std::size_t colorPlaneSize, std::size_t alphaPlaneSize, bool alphaPresent) noexcept
     {
-        return DataLayout{VideoDataLayout{.alphaPresent = alphaPresent}};
+        return DataLayout{
+            VideoDataLayout{
+                            .alphaPresent = alphaPresent, .colorPlaneSize = colorPlaneSize, .alphaPlaneSize = alphaPlaneSize, .totalSlices = totalSlices}
+        };
     }
 
     DataLayout DataLayout::fromAudio(std::uint32_t channelCount, std::uint32_t samplesPerChannel, std::size_t bytesPerSample) noexcept

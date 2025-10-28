@@ -319,7 +319,7 @@ public:
         mxlWrappedMultiBufferSlice slice;
 
         std::uint64_t headIndex = flow_info.continuous.headIndex;
-        std::size_t batchSize = 1024; // TODO: use flow_info.continuous.syncBatchSize instead.
+        std::size_t batchSize = 48; // TODO: use flow_info.continuous.syncBatchSize instead.
 
         while (!g_exit_requested)
         {

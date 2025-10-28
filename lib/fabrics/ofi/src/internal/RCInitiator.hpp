@@ -14,6 +14,7 @@
 #include "Event.hpp"
 #include "Initiator.hpp"
 #include "Protocol.hpp"
+#include "TargetInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -22,7 +23,7 @@ namespace mxl::lib::fabrics::ofi
     class RCInitiatorEndpoint
     {
     public:
-        RCInitiatorEndpoint(Endpoint, FabricAddress, std::unique_ptr<EgressProtocol>);
+        RCInitiatorEndpoint(Endpoint, DataLayout const&, TargetInfo info);
 
         /// Returns true if there is any pending events that the endpoint is waiting for, and for which
         /// the queues must be polled
@@ -77,8 +78,9 @@ namespace mxl::lib::fabrics::ofi
         /// The connected state. The endpoint is connected to a target and can receive write requests.
         struct Connected
         {
-            Endpoint ep;
-            std::size_t pending; /// The number of currently pending write requests.
+            std::shared_ptr<Endpoint> ep;
+            std::unique_ptr<EgressProtocol> proto; /// The protocol used to transfer data to the target.
+            std::size_t pending;                   /// The number of currently pending write requests.
         };
 
         /// The shutdown state. The endpoint is shutting down and is waiting for a Event::Shutdown event.
@@ -103,9 +105,10 @@ namespace mxl::lib::fabrics::ofi
         Idle restart(Endpoint const&);
 
     private:
-        State _state;                           /// The internal state object
-        FabricAddress _addr;                    /// The remote fabric address to connect to.
-        std::unique_ptr<EgressProtocol> _proto; /// The protocol used to transfer data to the target.
+        State _state;              /// The internal state object
+        DataLayout const& _layout; // Layout inherited by the parent RCInitiator
+
+        TargetInfo _info;          /// The target info of the remote endpoint
     };
 
     class RCInitiator : public Initiator

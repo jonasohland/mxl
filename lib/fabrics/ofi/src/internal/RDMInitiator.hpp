@@ -10,10 +10,10 @@
 #include <memory>
 #include <rdma/fabric.h>
 #include "mxl/fabrics.h"
-#include "Address.hpp"
 #include "DataLayout.hpp"
 #include "Endpoint.hpp"
 #include "Initiator.hpp"
+#include "Protocol.hpp"
 #include "TargetInfo.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -22,7 +22,7 @@ namespace mxl::lib::fabrics::ofi
     class RDMInitiatorEndpoint
     {
     public:
-        RDMInitiatorEndpoint(std::shared_ptr<Endpoint> ep, FabricAddress, std::vector<RemoteRegion>);
+        RDMInitiatorEndpoint(std::shared_ptr<Endpoint> ep, DataLayout const&, TargetInfo info);
 
         /// Returns true if the endpoint is idle and could be actived.
         [[nodiscard]]
@@ -53,8 +53,8 @@ namespace mxl::lib::fabrics::ofi
         /// Remote endpoint was added to the address vector, in this state we can write to the remote endpoint.
         struct Added
         {
-            ::fi_addr_t fiAddr;       // Address index in address vector
-            std::uint64_t entryIndex; /// When a bounce buffer is used, this corresponds to the bounce buffer entry
+            ::fi_addr_t fiAddr; // Address index in address vector
+            std::unique_ptr<EgressProtocol> proto;
         };
 
         /// The endpoint is done and can be evicted from the initiator.
@@ -65,10 +65,11 @@ namespace mxl::lib::fabrics::ofi
 
     private:
         State _state;
+
         std::shared_ptr<Endpoint> _ep; // The endpoint used to post transfer with. There is only one endpoint shared for all targets in constrast to
-                                       // the RCInitiator where each target will have their own endppint.
-        FabricAddress _addr;           // The remote fabric address to transfer payloads to
-        std::vector<RemoteRegion> _regions; /// Descriptions of the remote memory regions where we need to write our grains.
+                                       // the RCInitiator where each target will have their own endpoint.
+        DataLayout const& _dataLayout;
+        TargetInfo _info;
     };
 
     class RDMInitiator : public Initiator

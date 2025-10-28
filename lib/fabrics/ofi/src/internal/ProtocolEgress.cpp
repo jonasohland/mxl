@@ -1,18 +1,20 @@
 #include "ProtocolEgress.hpp"
 #include <cstddef>
+#include "BounceBuffer.hpp"
 #include "Exception.hpp"
 #include "ImmData.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    EgressProtocolWriter::EgressProtocolWriter(Endpoint ep, std::vector<RemoteRegion> remoteRegions, DataLayout::VideoDataLayout layout)
+    EgressProtocolWriterDiscrete::EgressProtocolWriterDiscrete(Endpoint& ep, std::vector<RemoteRegion> const& remoteRegions,
+        DataLayout::VideoDataLayout const& layout)
 
-        : _ep(std::move(ep))
-        , _remoteRegions(std::move(remoteRegions))
-        , _layout(std::move(layout))
+        : _ep(ep)
+        , _remoteRegions(remoteRegions)
+        , _layout(layout)
     {}
 
-    std::size_t EgressProtocolWriter::transferGrain(LocalRegion const& localRegion, std::uint64_t grainIndex, std::uint16_t sliceIndex)
+    std::size_t EgressProtocolWriterDiscrete::transferGrain(LocalRegion const& localRegion, std::uint64_t grainIndex, std::uint16_t sliceIndex)
     {
         // Find the remote region to which this grain should be written.
         auto const& remoteRegion = _remoteRegions[grainIndex % _remoteRegions.size()];
@@ -44,31 +46,26 @@ namespace mxl::lib::fabrics::ofi
         return _ep.write(localRegion.asGroup(), remoteRegion, FI_ADDR_UNSPEC, ImmDataGrain{grainIndex, sliceIndex}.data());
     }
 
-    std::size_t EgressProtocolWriter::transferSamples(LocalRegionGroup const&, std::uint64_t, std::size_t)
+    std::size_t EgressProtocolWriterDiscrete::transferSamples(LocalRegionGroup const&, std::uint64_t, std::size_t)
     {
         // A user probably tried to call transferSamples with an endpoint that was configured for transferring grains.
         throw Exception::internal("transferSamples for \"Writer\" protocol is not supported.");
     }
 
-    EgressProtocolWriterWithBounceBuffer::EgressProtocolWriterWithBounceBuffer(Endpoint ep, std::vector<RemoteRegion> remoteRegions,
-        DataLayout::AudioDataLayout layout)
-        : _ep(std::move(ep))
-        , _remoteRegions(std::move(remoteRegions))
-        , _layout(std::move(layout))
-        ,
+    EgressProtocolWriterContinuous::EgressProtocolWriterContinuous(Endpoint& ep, std::vector<RemoteRegion> const& remoteRegions,
+        DataLayout::AudioDataLayout const& layout)
+        : _ep(ep)
+        , _remoteRegions(remoteRegions)
+        , _layout(layout)
+        , _bounceBufferSize(BounceBuffer::NUMBER_OF_ENTRIES)
     {}
 
-    std::size_t EgressProtocolWriterWithBounceBuffer::transferGrain(LocalRegion const& localRegion, std::uint64_t grainIndex,
-        std::uint16_t sliceIndex)
+    std::size_t EgressProtocolWriterContinuous::transferGrain(LocalRegion const&, std::uint64_t, std::uint16_t)
     {
-        // Exactly the same as without a bounce buffer, we can recover the bounce buffer entry by using the grain index
-        // TODO: shared code with EgressProtocolWriter
-        auto const& remote = _remoteRegions[grainIndex % _remoteRegions.size()];
-
-        return _ep.write(localRegion.asGroup(), remote, FI_ADDR_UNSPEC, ImmDataGrain{grainIndex, sliceIndex}.data());
+        throw Exception::internal("transferGrain for \"EgressProtocolWriterContinuous\" protocol is not supported.");
     }
 
-    std::size_t EgressProtocolWriterWithBounceBuffer::transferSamples(LocalRegionGroup const& localRegionGroup, std::uint64_t partialHeadIndex,
+    std::size_t EgressProtocolWriterContinuous::transferSamples(LocalRegionGroup const& localRegionGroup, std::uint64_t partialHeadIndex,
         std::size_t sampleCount)
     {
         auto const& remote = _remoteRegions[_bounceBufferEntryIndex];

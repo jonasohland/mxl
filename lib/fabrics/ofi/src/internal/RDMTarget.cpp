@@ -10,10 +10,10 @@
 #include <rdma/fabric.h>
 #include "internal/Logging.hpp"
 #include "AddressVector.hpp"
-#include "AudioBounceBuffer.hpp"
 #include "Exception.hpp"
 #include "FIInfo.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
+#include "Protocol.hpp"
 #include "Region.hpp"
 
 namespace mxl::lib::fabrics::ofi
@@ -49,24 +49,8 @@ namespace mxl::lib::fabrics::ofi
         }
 
         auto const mxlRegions = MxlRegions::fromAPI(config.regions);
-        std::optional<AudioBounceBuffer> bouncingBuffer;
 
-        if (auto dataLayout = mxlRegions->dataLayout(); dataLayout.isAudio())
-        {
-            auto audioLayout = dataLayout.asAudio();
-            // auto bouncingBufferEntrySize = audioLayout.channelCount * audioLayout.samplesPerChannel * audioLayout.bytesPerSample;
-            // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
-            // //TODO: find a way to calculate the number of entries required
-            bouncingBuffer = AudioBounceBuffer{audioLayout};
-            domain->registerRegions(bouncingBuffer->getRegions(), FI_REMOTE_WRITE);
-        }
-        else
-        {
-            // media buffers are directly used as reception buffer, so register them
-            domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
-        }
-
-        /// TODO: this code is exactly the same for both RC and RDM target
+        auto proto = selectProtocol(domain, mxlRegions->dataLayout(), mxlRegions->regions());
 
         auto endpoint = Endpoint::create(domain);
 
@@ -94,19 +78,19 @@ namespace mxl::lib::fabrics::ofi
 
         struct MakeUniqueEnabler : RDMTarget
         {
-            MakeUniqueEnabler(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData, std::optional<AudioBounceBuffer> bouncingBuffer)
-                : RDMTarget(std::move(endpoint), std::move(immData), std::move(bouncingBuffer))
+            MakeUniqueEnabler(Endpoint endpoint, std::unique_ptr<IngressProtocol> proto, std::unique_ptr<ImmediateDataLocation> immData)
+                : RDMTarget(std::move(endpoint), std::move(proto), std::move(immData))
             {}
         };
 
-        return {std::make_unique<MakeUniqueEnabler>(std::move(endpoint), std::move(dataRegion), std::move(bouncingBuffer)),
+        return {std::make_unique<MakeUniqueEnabler>(std::move(endpoint), std::move(proto), std::move(dataRegion)),
             std::make_unique<TargetInfo>(std::move(localAddress), domain->remoteRegions())};
     }
 
-    RDMTarget::RDMTarget(Endpoint endpoint, std::unique_ptr<ImmediateDataLocation> immData, std::optional<AudioBounceBuffer> bouncingBuffer)
+    RDMTarget::RDMTarget(Endpoint endpoint, std::unique_ptr<IngressProtocol> proto, std::unique_ptr<ImmediateDataLocation> immData)
         : _endpoint(std::move(endpoint))
+        , _proto(std::move(proto))
         , _immData(std::move(immData))
-        , _bouncingBuffer(std::move(bouncingBuffer))
     {}
 
     Target::ReadResult RDMTarget::read()
@@ -140,6 +124,12 @@ namespace mxl::lib::fabrics::ofi
                     // the immmediate data (in our case the grain index), will be returned in the registered region.
                     _endpoint.recv(_immData->toLocalRegion());
                 }
+
+                _proto->processCompletion(*result.immData);
+            }
+            else
+            {
+                MXL_ERROR("CQ Error={}", completion->err().toString());
             }
         }
         return result;

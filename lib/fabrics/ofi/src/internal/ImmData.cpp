@@ -1,7 +1,7 @@
 #include "ImmData.hpp"
 #include <cstddef>
 #include <cstdint>
-#include "AudioBounceBuffer.hpp"
+#include "BounceBuffer.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -44,7 +44,7 @@ namespace mxl::lib::fabrics::ofi
 
     ImmDataSample::ImmDataSample(std::uint64_t entryIndex, std::uint64_t headIndex, std::size_t count) noexcept
     {
-        static_assert(AudioBounceBuffer::NUMBER_OF_ENTRIES == 4,
+        static_assert(BounceBuffer::NUMBER_OF_ENTRIES == 4,
             "This code assumes that the maximum number of entries in the bounce buffer is 4. This code needs to be update if that changes");
         _inner._repr.entryIndex = entryIndex;
         _inner._repr.headIndex = headIndex & 0x7FFF;
@@ -53,7 +53,7 @@ namespace mxl::lib::fabrics::ofi
 
     std::tuple<std::size_t, std::uint16_t, std::size_t> ImmDataSample::unpack() const noexcept
     {
-        static_assert(AudioBounceBuffer::NUMBER_OF_ENTRIES == 4,
+        static_assert(BounceBuffer::NUMBER_OF_ENTRIES == 4,
             "This code assumes that the maximum number of entries in the bounce buffer is 4. This code needs to be update if that changes");
         return {_inner._repr.entryIndex, _inner._repr.headIndex, _inner._repr.count};
     }

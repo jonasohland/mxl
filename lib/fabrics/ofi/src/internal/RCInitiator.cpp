@@ -16,14 +16,16 @@
 #include "Exception.hpp"
 #include "Protocol.hpp"
 #include "Region.hpp"
+#include "RemoteRegion.hpp"
+#include "TargetInfo.hpp"
 #include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    RCInitiatorEndpoint::RCInitiatorEndpoint(Endpoint ep, FabricAddress remote, std::unique_ptr<EgressProtocol> proto)
+    RCInitiatorEndpoint::RCInitiatorEndpoint(Endpoint ep, DataLayout const& layout, TargetInfo info)
         : _state(Idle{.ep = std::move(ep), .idleSince = std::chrono::steady_clock::time_point{}})
-        , _addr(std::move(remote))
-        , _proto(std::move(proto))
+        , _layout(std::move(layout))
+        , _info(std::move(info))
     {}
 
     bool RCInitiatorEndpoint::isIdle() const noexcept
@@ -68,8 +70,9 @@ namespace mxl::lib::fabrics::ofi
                 [](Connected state) -> State
                 {
                     MXL_INFO("Shutting down");
-                    state.ep.shutdown();
-                    return Shutdown{.ep = std::move(state.ep)};
+                    state.ep->shutdown();
+
+                    return Shutdown{.ep = std::move(*state.ep)};
                 },
                 [](Shutdown) -> State
                 {
@@ -102,7 +105,7 @@ namespace mxl::lib::fabrics::ofi
                     state.ep.bind(cq, FI_TRANSMIT);
 
                     // Transition into the connecting state
-                    state.ep.connect(_addr);
+                    state.ep.connect(_info.fabricAddress);
                     return Connecting{.ep = std::move(state.ep)};
                 },
                 [](Connecting state) -> State { return state; },
@@ -131,7 +134,9 @@ namespace mxl::lib::fabrics::ofi
                     {
                         MXL_INFO("Endpoint is now connected");
 
-                        return Connected{.ep = std::move(state.ep), .pending = 0};
+                        auto sharedEp = std::make_shared<Endpoint>(std::move(state.ep));
+
+                        return Connected{.ep = sharedEp, .proto = selectProtocol(*sharedEp, _layout, _info), .pending = 0};
                     }
                     else if (ev.isShutdown())
                     {
@@ -149,13 +154,14 @@ namespace mxl::lib::fabrics::ofi
                     if (ev.isError())
                     {
                         MXL_WARN("Received an error event in connected state, going idle. Error: {}", ev.errorString());
-                        return restart(state.ep);
+
+                        return restart(*state.ep);
                     }
                     else if (ev.isShutdown())
                     {
                         MXL_INFO("Remote endpoint has closed the connection");
 
-                        return restart(state.ep);
+                        return restart(*state.ep);
                     }
 
                     return state;
@@ -201,7 +207,7 @@ namespace mxl::lib::fabrics::ofi
         {
             // Post a write work item to the endpoint and increment the pending counter. When the write is complete, a completion will be posted to
             // the completion queue, after which the counter will be decremented again if the target is still in the connected state.
-            connected->pending += _proto->transferGrain(local, index, 0); // TODO: sliceIndex
+            connected->pending += connected->proto->transferGrain(local, index, 0); // TODO: sliceIndex
         }
     }
 
@@ -209,7 +215,7 @@ namespace mxl::lib::fabrics::ofi
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
-            connected->pending += _proto->transferSamples(localRegionGroup, partialHeadIndex, count);
+            connected->pending += connected->proto->transferSamples(localRegionGroup, partialHeadIndex, count);
         }
     }
 
@@ -316,10 +322,7 @@ namespace mxl::lib::fabrics::ofi
 
     void RCInitiator::addTarget(TargetInfo const& targetInfo)
     {
-        auto proto = selectProtocol(_dataLayout);
-
-        _targets.emplace(targetInfo.id,
-            RCInitiatorEndpoint{Endpoint::create(_domain, targetInfo.id), targetInfo.fabricAddress, targetInfo.remoteRegions, std::move(proto)});
+        _targets.emplace(targetInfo.id, RCInitiatorEndpoint{Endpoint::create(_domain, targetInfo.id), _dataLayout, targetInfo});
     }
 
     void RCInitiator::removeTarget(TargetInfo const& targetInfo)

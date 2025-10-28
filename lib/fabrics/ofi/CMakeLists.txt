@@ -68,7 +68,9 @@ target_sources(mxl-fabrics-objects
         PRIVATE
             src/internal/Address.cpp
             src/internal/AddressVector.cpp
-            src/internal/AudioBounceBuffer.cpp
+            src/internal/BounceBuffer.cpp
+            src/internal/BounceBufferContinuous.cpp
+            src/internal/BounceBufferDiscrete.cpp
             src/internal/CompletionQueue.cpp
             src/internal/Completion.cpp
             src/internal/DataLayout.cpp
@@ -87,6 +89,9 @@ target_sources(mxl-fabrics-objects
             src/internal/LocalRegion.cpp
             src/internal/MemoryRegion.cpp
             src/internal/PassiveEndpoint.cpp
+            src/internal/Protocol.cpp
+            src/internal/ProtocolEgress.cpp
+            src/internal/ProtocolIngress.cpp
             src/internal/Provider.cpp
             src/internal/Region.cpp
             src/internal/RegisteredRegion.cpp
