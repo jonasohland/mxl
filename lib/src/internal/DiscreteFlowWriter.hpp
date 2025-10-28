@@ -16,8 +16,6 @@ namespace mxl::lib
 
         virtual mxlStatus cancel() = 0;
 
-        virtual FlowData& getFlowData() = 0;
-
     protected:
         using FlowWriter::FlowWriter;
     };

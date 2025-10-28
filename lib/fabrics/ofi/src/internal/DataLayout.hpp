@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <variant>
 
@@ -12,6 +13,9 @@ namespace mxl::lib::fabrics::ofi
         struct VideoDataLayout
         {
             bool alphaPresent;
+            std::size_t colorPlaneSize;
+            std::size_t alphaPlaneSize;
+            std::size_t totalSlices;
         };
 
         struct AudioDataLayout

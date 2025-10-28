@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include <filesystem>
 #include <uuid.h>
 #include <mxl/flow.h>
@@ -38,7 +37,8 @@ namespace mxl::lib
         /// Accessor for the underlying flow data.
         /// The reader must be properly attached to the flow before invoking this method.
         ///
-        virtual FlowData& getFlowData() = 0;
+        [[nodiscard]]
+        virtual FlowData const& getFlowData() const = 0;
 
         ///
         /// Dtor.

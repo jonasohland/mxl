@@ -51,7 +51,8 @@ namespace mxl::lib
         ///
         /// \see FlowWriter::getFlowData()
         ///
-        virtual FlowData& getFlowData() override;
+        [[nodiscard]]
+        FlowData const& getFlowData() const final;
 
         ///
         /// \see FlowWriter

@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <optional>
 #include <thread>
 #include <uuid.h>
 #include <CLI/CLI.hpp>
@@ -38,6 +37,7 @@ struct VideoPipelineConfig
     uint64_t pattern{0};
     std::string textoverlay{"EBU DMF MXL"};
 
+    [[nodiscard]]
     std::string display() const noexcept
     {
         return fmt::format("frame_width={} frame_height={} frame_rate={}/{} pattern={} textoverlay={}",
@@ -59,6 +59,7 @@ struct AudioPipelineConfig
     uint64_t wave{0};
     uint64_t offset{0};
 
+    [[nodiscard]]
     std::string display() const noexcept
     {
         return fmt::format("rate={} channelCount={} freq={} samplesPerBatch={} wave={}", rate.numerator, channelCount, freq, samplesPerBatch, wave);
@@ -294,7 +295,7 @@ public:
         for (size_t chan = 0; chan < config.channelCount; ++chan)
         {
             auto freq = (chan + 1) * 100;
-            pipelineDesc += fmt::format("audiotestsrc freq={} ! audio/x-raw,channels=1 ! queue ! m.sink_{} ", freq, chan);
+            pipelineDesc += fmt::format("audiotestsrc is-live freq={} ! audio/x-raw,channels=1 ! queue ! m.sink_{} ", freq, chan);
         }
         pipelineDesc += fmt::format("interleave name=m ! \
                      audioconvert ! \
@@ -304,7 +305,7 @@ public:
                      appsink name=appsink",
             config.channelCount);
 
-        MXL_INFO("pipeline description -> {}", pipelineDesc);
+        MXL_INFO("Generating the following gstreamer pipeline -> {}", pipelineDesc);
 
         GError* error = nullptr;
         _pipeline = gst_parse_launch(pipelineDesc.c_str(), &error);
@@ -329,21 +330,6 @@ public:
             gst_element_set_state(_pipeline, GST_STATE_NULL);
             gst_object_unref(_pipeline);
         }
-        if (_audiotestsrc)
-        {
-            if (GST_OBJECT_REFCOUNT_VALUE(_audiotestsrc) > 0)
-            {
-                gst_object_unref(_audiotestsrc);
-            }
-        }
-
-        if (_audioconvert)
-        {
-            if (GST_OBJECT_REFCOUNT_VALUE(_audioconvert) > 0)
-            {
-                gst_object_unref(_audioconvert);
-            }
-        }
 
         if (_appsink)
         {
@@ -365,8 +351,6 @@ public:
     }
 
 private:
-    GstElement* _audiotestsrc{nullptr};
-    GstElement* _audioconvert{nullptr};
     GstElement* _appsink{nullptr};
     GstElement* _pipeline{nullptr};
 };
@@ -517,7 +501,7 @@ private:
                         {
                             headIndex = mxlGetCurrentIndex(&rate);
                             first = false;
-                            MXL_INFO("Starting at index {} rate={}/{}", headIndex, rate.numerator, rate.denominator);
+                            MXL_INFO("Continuous flow starting at sample \"{}\" with rate {}/{}", headIndex, rate.numerator, rate.denominator);
                         }
 
                         auto nbSamplesPerChan = map_info.size / (4 * _flowInfo.continuous.channelCount);

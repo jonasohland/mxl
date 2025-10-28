@@ -10,20 +10,20 @@
 #include <rdma/fabric.h>
 #include <rfl/json/write.hpp>
 #include "internal/Logging.hpp"
-#include "AudioBounceBuffer.hpp"
+#include "BounceBufferContinuous.hpp"
 #include "DataLayout.hpp"
 #include "Domain.hpp"
 #include "Exception.hpp"
-#include "ImmData.hpp"
+#include "Protocol.hpp"
 #include "Region.hpp"
 #include "VariantUtils.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    RCInitiatorEndpoint::RCInitiatorEndpoint(Endpoint ep, FabricAddress remote, std::vector<RemoteRegion> rr)
+    RCInitiatorEndpoint::RCInitiatorEndpoint(Endpoint ep, FabricAddress remote, std::unique_ptr<EgressProtocol> proto)
         : _state(Idle{.ep = std::move(ep), .idleSince = std::chrono::steady_clock::time_point{}})
         , _addr(std::move(remote))
-        , _regions(std::move(rr))
+        , _proto(std::move(proto))
     {}
 
     bool RCInitiatorEndpoint::isIdle() const noexcept
@@ -131,7 +131,7 @@ namespace mxl::lib::fabrics::ofi
                     {
                         MXL_INFO("Endpoint is now connected");
 
-                        return Connected{.ep = std::move(state.ep), .entryIndex = 0, .pending = 0};
+                        return Connected{.ep = std::move(state.ep), .pending = 0};
                     }
                     else if (ev.isShutdown())
                     {
@@ -195,17 +195,13 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    void RCInitiatorEndpoint::postTransfer(LocalRegion const& local, uint64_t index)
+    void RCInitiatorEndpoint::postTransfer(LocalRegion const& local, std::uint64_t index)
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
-            // Find the remote region to which this grain should be written.
-            auto const& remote = _regions[index % _regions.size()];
-
             // Post a write work item to the endpoint and increment the pending counter. When the write is complete, a completion will be posted to
             // the completion queue, after which the counter will be decremented again if the target is still in the connected state.
-            connected->pending += connected->ep.write(
-                local.asGroup(), remote, FI_ADDR_UNSPEC, ImmDataGrain{index, 0}.data()); // TODO: handle sliceIndex
+            connected->pending += _proto->transferGrain(local, index, 0); // TODO: sliceIndex
         }
     }
 
@@ -213,11 +209,7 @@ namespace mxl::lib::fabrics::ofi
     {
         if (auto connected = std::get_if<Connected>(&_state); connected != nullptr)
         {
-            auto const& remote = _regions[connected->entryIndex];
-
-            connected->pending += connected->ep.write(
-                localRegionGroup, remote, FI_ADDR_UNSPEC, ImmDataSample{connected->entryIndex, partialHeadIndex, count}.data());
-            connected->entryIndex = (connected->entryIndex + 1) % AudioBounceBuffer::NUMBER_OF_ENTRIES;
+            connected->pending += _proto->transferSamples(localRegionGroup, partialHeadIndex, count);
         }
     }
 
@@ -324,8 +316,10 @@ namespace mxl::lib::fabrics::ofi
 
     void RCInitiator::addTarget(TargetInfo const& targetInfo)
     {
+        auto proto = selectProtocol(_dataLayout);
+
         _targets.emplace(targetInfo.id,
-            RCInitiatorEndpoint{Endpoint::create(_domain, targetInfo.id), targetInfo.fabricAddress, targetInfo.remoteRegions});
+            RCInitiatorEndpoint{Endpoint::create(_domain, targetInfo.id), targetInfo.fabricAddress, targetInfo.remoteRegions, std::move(proto)});
     }
 
     void RCInitiator::removeTarget(TargetInfo const& targetInfo)
@@ -372,17 +366,16 @@ namespace mxl::lib::fabrics::ofi
         {
             throw Exception::internal("transferSamples called, but the data layout for that endpoint is not audio.");
         }
-
-        auto& localRegion = _localRegions.front();
-
         auto audioDataLayout = _dataLayout.asAudio();
 
-        auto sgList = AudioBounceBuffer::scatterGatherList(audioDataLayout, headIndex, count, localRegion);
+        auto sgList = scatterGatherList(audioDataLayout, headIndex, count, _localRegions.front());
 
         // Do the post the transfer to each targets
         for (auto& [_, target] : _targets)
         {
-            target.postTransfer(sgList, headIndex % audioDataLayout.samplesPerChannel, count);
+            target.postTransfer(sgList,
+                headIndex % audioDataLayout.samplesPerChannel,
+                count); // TODO: pass the actual headIndex and count and add them to scatter-gather list
         }
     }
 

@@ -5,6 +5,16 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+    LocalRegion ImmediateDataLocation::toLocalRegion() noexcept
+    {
+        auto addr = &data;
+
+        return LocalRegion{
+            .addr = reinterpret_cast<uint64_t>(reinterpret_cast<std::uintptr_t>(addr)),
+            .len = sizeof(uint64_t),
+            .desc = nullptr,
+        };
+    }
 
     ImmDataGrain::ImmDataGrain(std::uint32_t data) noexcept
     {

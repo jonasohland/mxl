@@ -243,9 +243,6 @@ public:
 
 private:
     GstElement* _audioAppsrc{nullptr};
-    GstElement* _audioconvert{nullptr};
-    GstElement* _audioqueue{nullptr};
-    GstElement* _autoaudiosink{nullptr};
     GstElement* _pipeline{nullptr};
 
     /// The following information is needed when passing audio samples in non-interleaved formate.

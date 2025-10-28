@@ -34,7 +34,8 @@ namespace mxl::lib
         virtual mxlFlowInfo getFlowInfo() override;
 
         /** \see FlowWriter::getFlowData() */
-        virtual FlowData& getFlowData() override;
+        [[nodiscard]]
+        FlowData const& getFlowData() const final;
 
         /** \see ContinuousFlowWriter::openSamples */
         virtual mxlStatus openSamples(std::uint64_t index, std::size_t count, mxlMutableWrappedMultiBufferSlice& payloadBufferSlices) override;

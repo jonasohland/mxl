@@ -38,7 +38,8 @@ namespace mxl::lib
         /// Accessor for the underlying flow data.
         /// The reader must be properly attached to the flow before invoking this method.
         ///
-        virtual FlowData& getFlowData() override;
+        [[nodiscard]]
+        FlowData const& getFlowData() const final;
 
         ///
         /// Accessor for a specific grain at a specific index.

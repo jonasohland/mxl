@@ -91,7 +91,7 @@ namespace mxl::lib::fabrics::ofi
         return _iovec;
     }
 
-    LocalRegion Region::toLocal(std::uintptr_t base, size_t size) const noexcept
+    LocalRegion Region::toLocal() const noexcept
     {
         return LocalRegion{.addr = base, .len = size, .desc = nullptr};
     }
@@ -105,7 +105,7 @@ namespace mxl::lib::fabrics::ofi
     std::vector<LocalRegion> toLocal(std::vector<Region> const& regions) noexcept
     {
         std::vector<LocalRegion> localRegions;
-        std::ranges::transform(regions, std::back_inserter(localRegions), [](Region const& reg) { return reg.toLocal(reg.base, reg.size); });
+        std::ranges::transform(regions, std::back_inserter(localRegions), [](Region const& reg) { return reg.toLocal(); });
         return localRegions;
     }
 
@@ -141,7 +141,7 @@ namespace mxl::lib::fabrics::ofi
         return _layout;
     }
 
-    MxlRegions mxlRegionsFromFlow(FlowData& flow)
+    MxlRegions mxlRegionsFromFlow(FlowData const& flow)
     {
         static_assert(sizeof(GrainHeader) == 8192,
             "GrainHeader type size changed! The Fabrics API makes assumptions on the memory layout of a flow, please review the code below if the "
@@ -149,7 +149,7 @@ namespace mxl::lib::fabrics::ofi
 
         if (mxlIsDiscreteDataFormat(flow.flowInfo()->common.format))
         {
-            auto& discreteFlow = static_cast<DiscreteFlowData&>(flow);
+            auto& discreteFlow = static_cast<DiscreteFlowData const&>(flow);
             std::vector<Region> regions;
 
             for (std::size_t i = 0; i < discreteFlow.grainCount(); ++i)
@@ -173,7 +173,7 @@ namespace mxl::lib::fabrics::ofi
         }
         else if (mxlIsContinuousDataFormat(flow.flowInfo()->common.format))
         {
-            auto& continuousFlow = static_cast<ContinuousFlowData&>(flow);
+            auto& continuousFlow = static_cast<ContinuousFlowData const&>(flow);
             std::vector<Region> regions;
 
             // For the continuous flow, the data layout is a single contiguous buffer

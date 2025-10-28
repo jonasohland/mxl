@@ -9,10 +9,10 @@
 #include "internal/Logging.hpp"
 #include "mxl/fabrics.h"
 #include "mxl/mxl.h"
-#include "AudioBounceBuffer.hpp"
 #include "Exception.hpp"
 #include "Format.hpp" // IWYU pragma: keep; Includes template specializations of fmt::formatter for our types
 #include "ImmData.hpp"
+#include "Protocol.hpp"
 #include "Region.hpp"
 #include "VariantUtils.hpp"
 
@@ -58,26 +58,10 @@ namespace mxl::lib::fabrics::ofi
         }
 
         auto const mxlRegions = MxlRegions::fromAPI(config.regions);
-        std::optional<AudioBounceBuffer> bounceBuffer;
         std::vector<LocalRegion> flowLocalRegions;
 
-        // Check if we need to use a bounce buffer.
-        if (auto dataLayout = mxlRegions->dataLayout(); dataLayout.isAudio()) // audio
-        {
-            MXL_INFO("Audio Data Layout. Creating a bounce buffer");
-            auto audioLayout = dataLayout.asAudio();
-            // create a bouncing buffer and register the bouncing buffer, because it will be used as the reception buffer
-            bounceBuffer = AudioBounceBuffer{audioLayout};
-            domain->registerRegions(bounceBuffer->getRegions(), FI_REMOTE_WRITE);
-            flowLocalRegions = toLocal(mxlRegions->regions());
-        }
-        else // video
-        {
-            // media buffers are directly used as reception buffer, so register them
-            domain->registerRegions(mxlRegions->regions(), FI_REMOTE_WRITE);
-            flowLocalRegions = domain->localRegions();
-        }
-        /// TODO: this code is exactly the same for both RC and RDM target
+        // Select the "protocol" when a data transfer completes
+        auto proto = selectProtocol(domain, mxlRegions->dataLayout(), mxlRegions->regions());
 
         // Create a passive endpoint. A passive endpoint can be viewed like a bound TCP socket listening for
         // incoming connections
@@ -93,9 +77,8 @@ namespace mxl::lib::fabrics::ofi
         // Helper struct to enable the std::make_unique function to access the private constructor of this class
         struct MakeUniqueEnabler : RCTarget
         {
-            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer,
-                std::vector<LocalRegion> flowLocalRegions, PassiveEndpoint pep)
-                : RCTarget(std::move(domain), std::move(bounceBuffer), std::move(flowLocalRegions), std::move(pep))
+            MakeUniqueEnabler(std::shared_ptr<Domain> domain, std::unique_ptr<IngressProtocol> proto, PassiveEndpoint pep)
+                : RCTarget(std::move(domain), std::move(proto), std::move(pep))
             {}
         };
 
@@ -103,15 +86,13 @@ namespace mxl::lib::fabrics::ofi
         auto remoteRegionGroups = domain->remoteRegions();
 
         // Return the constructed RCTarget and associated TargetInfo for remote peers to connect.
-        return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(bounceBuffer), std::move(flowLocalRegions), std::move(pep)),
+        return {std::make_unique<MakeUniqueEnabler>(std::move(domain), std::move(proto), std::move(pep)),
             std::make_unique<TargetInfo>(std::move(localAddress), std::move(remoteRegionGroups))};
     }
 
-    RCTarget::RCTarget(std::shared_ptr<Domain> domain, std::optional<AudioBounceBuffer> bounceBuffer, std::vector<LocalRegion> flowLocalRegions,
-        PassiveEndpoint ep)
+    RCTarget::RCTarget(std::shared_ptr<Domain> domain, std::unique_ptr<IngressProtocol> proto, PassiveEndpoint ep)
         : _domain(std::move(domain))
-        , _bounceBuffer(std::move(bounceBuffer))
-        , _flowLocalRegions(std::move(flowLocalRegions))
+        , _proto(std::move(proto))
         , _state(WaitForConnectionRequest{std::move(ep)})
     {}
 
@@ -164,13 +145,13 @@ namespace mxl::lib::fabrics::ofi
 
                     if (event && event->isConnected())
                     {
-                        std::unique_ptr<RCTarget::ImmediateDataLocation> dataRegion;
+                        std::unique_ptr<ImmediateDataLocation> dataRegion;
 
                         // Need to post a receive buffer to get immediate data.
                         if (_domain->usingRecvBufForCqData())
                         {
                             // Create a local memory region. The grain indices will be written here when a transfer arrives.
-                            dataRegion = std::make_unique<RCTarget::ImmediateDataLocation>();
+                            dataRegion = std::make_unique<ImmediateDataLocation>();
 
                             // Post a receive for the first incoming grain. Pass a region to receive the grain index.
                             state.ep.recv(dataRegion->toLocalRegion());
@@ -208,14 +189,8 @@ namespace mxl::lib::fabrics::ofi
                                 // the immmediate data (in our case the grain index), will be returned in the registered region.
                                 state.ep.recv(state.immData->toLocalRegion());
                             }
-                            // TODO: this code should be in the "protocol" implementation
-                            if (_bounceBuffer)
-                            {
-                                auto [entryIndex, ringBufferHeadIndex, count] = ImmDataSample{*result.immData}.unpack();
 
-                                _bounceBuffer->unpack(entryIndex, ringBufferHeadIndex, count, _flowLocalRegions.front());
-                            }
-                            // TODO: this code should be in the "protocol" implementation
+                            _proto->processCompletion(result.immData.value());
                         }
                         else
                         {

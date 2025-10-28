@@ -1,42 +1,33 @@
-#include "AudioBounceBuffer.hpp"
+#include "BounceBufferContinuous.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 #include "internal/ContinuousFlowData.hpp"
 #include "DataLayout.hpp"
+#include "Exception.hpp"
 #include "LocalRegion.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
-    AudioBounceBufferEntry::AudioBounceBufferEntry(std::size_t size)
+
+    void BounceBufferContinuousUnpacker::unpack(BounceBufferEntry const&, LocalRegion&) const
     {
-        _buffer = std::vector<std::uint8_t>(size);
+        throw Exception::internal("Attempted to unpack discrete data layout using a continous data layout Unpacker.");
     }
 
-    std::uint8_t const* AudioBounceBufferEntry::data() const noexcept
-    {
-        return _buffer.data();
-    }
-
-    std::size_t AudioBounceBufferEntry::size() const noexcept
-    {
-        return _buffer.size();
-    }
-
-    void AudioBounceBufferEntry::unpack(DataLayout::AudioDataLayout const& layout, std::uint64_t index, std::size_t sampleCount,
-        LocalRegion& region) const noexcept
+    void BounceBufferContinuousUnpacker::unpack(BounceBufferEntry const& entry, std::uint64_t index, std::size_t count, LocalRegion& outRegion) const
     {
         /// Using the given audio data layout, head index and number of samples recover the slices
         mxlMutableWrappedMultiBufferSlice slices;
         getMultiBufferSlices(index,
-            sampleCount,
-            layout.samplesPerChannel,
-            layout.bytesPerSample,
-            layout.channelCount,
-            reinterpret_cast<std::uint8_t*>(region.addr),
+            count,
+            _layout.samplesPerChannel,
+            _layout.bytesPerSample,
+            _layout.channelCount,
+            reinterpret_cast<std::uint8_t*>(outRegion.addr),
             slices);
 
-        auto srcAddr = _buffer.data();
+        auto srcAddr = entry.data();
         for (auto& fragment : slices.base.fragments)
         {
             // check if the fragment present
@@ -52,30 +43,13 @@ namespace mxl::lib::fabrics::ofi
         }
     }
 
-    AudioBounceBuffer::AudioBounceBuffer(DataLayout::AudioDataLayout const& layout)
-
+    std::size_t BounceBufferContinuousUnpacker::entrySize() const noexcept
     {
-        _entries = std::vector<AudioBounceBufferEntry>(NUMBER_OF_ENTRIES,
-            AudioBounceBufferEntry{layout.channelCount * layout.samplesPerChannel * layout.bytesPerSample});
-        _layout = layout;
+        // Calculate the size of a bounce buffer entry needed to hold the given number of samples for all channels
+        return _layout.channelCount * _layout.samplesPerChannel * _layout.bytesPerSample;
     }
 
-    std::vector<Region> AudioBounceBuffer::getRegions() const noexcept
-    {
-        std::vector<Region> out;
-        for (auto const& entry : _entries)
-        {
-            out.emplace_back(reinterpret_cast<std::uintptr_t>(entry.data()), entry.size(), Region::Location::host());
-        }
-        return out;
-    }
-
-    void AudioBounceBuffer::unpack(std::size_t entryIndex, std::uint64_t index, std::size_t count, LocalRegion& outRegion) const noexcept
-    {
-        _entries.at(entryIndex).unpack(_layout, index, count, outRegion);
-    }
-
-    std::vector<LocalRegion> AudioBounceBuffer::scatterGatherList(DataLayout::AudioDataLayout layout, std::uint64_t headIndex, std::size_t nbSamples,
+    std::vector<LocalRegion> scatterGatherList(DataLayout::AudioDataLayout layout, std::uint64_t headIndex, std::size_t nbSamples,
         LocalRegion const& localRegion) noexcept
     {
         mxlWrappedMultiBufferSlice slice = {};

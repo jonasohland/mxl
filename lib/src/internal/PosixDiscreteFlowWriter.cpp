@@ -87,7 +87,7 @@ namespace mxl::lib
         return MXL_ERR_UNKNOWN;
     }
 
-    FlowData& PosixDiscreteFlowWriter::getFlowData()
+    FlowData const& PosixDiscreteFlowWriter::getFlowData() const
     {
         if (_flowData)
         {

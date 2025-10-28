@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include <uuid.h>
 #include <mxl/flow.h>
 #include <mxl/mxl.h>
@@ -31,7 +30,8 @@ namespace mxl::lib
         /// Accessor for the underlying flow data.
         /// The flow writer must first open the flow before invoking this method.
         ///
-        virtual FlowData& getFlowData() = 0;
+        [[nodiscard]]
+        virtual FlowData const& getFlowData() const = 0;
 
         /// Invoked when a flow is read. The writer will
         /// update the 'lastReadTime' field

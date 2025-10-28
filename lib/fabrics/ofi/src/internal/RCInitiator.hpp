@@ -13,6 +13,7 @@
 #include "Endpoint.hpp"
 #include "Event.hpp"
 #include "Initiator.hpp"
+#include "Protocol.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
@@ -21,7 +22,7 @@ namespace mxl::lib::fabrics::ofi
     class RCInitiatorEndpoint
     {
     public:
-        RCInitiatorEndpoint(Endpoint, FabricAddress, std::vector<RemoteRegion>);
+        RCInitiatorEndpoint(Endpoint, FabricAddress, std::unique_ptr<EgressProtocol>);
 
         /// Returns true if there is any pending events that the endpoint is waiting for, and for which
         /// the queues must be polled
@@ -77,8 +78,7 @@ namespace mxl::lib::fabrics::ofi
         struct Connected
         {
             Endpoint ep;
-            std::uint64_t entryIndex; /// When a bounce buffer is used, this corresponds to the bounce buffer entry
-            std::size_t pending;      /// The number of currently pending write requests.
+            std::size_t pending; /// The number of currently pending write requests.
         };
 
         /// The shutdown state. The endpoint is shutting down and is waiting for a Event::Shutdown event.
@@ -103,9 +103,9 @@ namespace mxl::lib::fabrics::ofi
         Idle restart(Endpoint const&);
 
     private:
-        State _state;                       /// The internal state object
-        FabricAddress _addr;                /// The remote fabric address to connect to.
-        std::vector<RemoteRegion> _regions; /// Descriptions of the remote memory regions where we need to write our grains.
+        State _state;                           /// The internal state object
+        FabricAddress _addr;                    /// The remote fabric address to connect to.
+        std::unique_ptr<EgressProtocol> _proto; /// The protocol used to transfer data to the target.
     };
 
     class RCInitiator : public Initiator

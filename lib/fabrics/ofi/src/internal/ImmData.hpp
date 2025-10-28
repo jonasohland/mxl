@@ -4,9 +4,18 @@
 #include <cstdint>
 #include <tuple>
 #include <utility>
+#include "LocalRegion.hpp"
 
 namespace mxl::lib::fabrics::ofi
 {
+    struct ImmediateDataLocation
+    {
+    public:
+        LocalRegion toLocalRegion() noexcept;
+
+    public:
+        std::uint64_t data;
+    };
 
     class ImmDataGrain
     {

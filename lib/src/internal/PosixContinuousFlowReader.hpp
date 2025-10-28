@@ -40,7 +40,8 @@ namespace mxl::lib
          * The reader must be properly attached to the flow before invoking this method.
          * \return A copy of the FlowInfo
          */
-        virtual FlowData& getFlowData() override;
+        [[nodiscard]]
+        FlowData const& getFlowData() const final;
 
         /**
          * Accessor for a specific set of samples across all channels

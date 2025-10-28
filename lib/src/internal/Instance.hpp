@@ -49,8 +49,6 @@ namespace mxl::lib
         ///
         std::unique_ptr<FlowData> createFlow(std::string const& flowDef);
 
-        std::unique_ptr<FlowData> openFlow(uuids::uuid const& flowId, AccessMode mode);
-
         /// Delete a flow by id
         ///
         /// \param[in] flowId The flow id

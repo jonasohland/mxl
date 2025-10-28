@@ -59,7 +59,7 @@ namespace mxl::lib
         throw std::runtime_error("No open flow.");
     }
 
-    FlowData& PosixDiscreteFlowReader::getFlowData()
+    FlowData const& PosixDiscreteFlowReader::getFlowData() const
     {
         if (_flowData)
         {

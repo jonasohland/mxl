@@ -27,16 +27,6 @@ namespace mxl::lib::fabrics::ofi
 
         virtual ReadResult read() = 0;
         virtual ReadResult readBlocking(std::chrono::steady_clock::duration timeout) = 0;
-
-    protected:
-        struct ImmediateDataLocation
-        {
-        public:
-            LocalRegion toLocalRegion() noexcept;
-
-        public:
-            std::uint64_t data;
-        };
     };
 
     class TargetWrapper

@@ -85,7 +85,7 @@ namespace mxl::lib::fabrics::ofi
         ::iovec toIovec() const noexcept;
 
         [[nodiscard]]
-        LocalRegion toLocal(std::uintptr_t base, std::size_t size) const noexcept;
+        LocalRegion toLocal() const noexcept;
 
     public:
         std::uintptr_t base;
@@ -178,7 +178,7 @@ namespace mxl::lib::fabrics::ofi
         DataLayout const& dataLayout() const noexcept;
 
     private:
-        friend MxlRegions mxlRegionsFromFlow(FlowData& flow);
+        friend MxlRegions mxlRegionsFromFlow(FlowData const& flow);
         friend MxlRegions mxlRegionsFromUser(mxlFabricsMemoryRegion const* regions, size_t count);
 
     private:
@@ -192,7 +192,7 @@ namespace mxl::lib::fabrics::ofi
         DataLayout _layout;
     };
 
-    MxlRegions mxlRegionsFromFlow(FlowData& flow);
+    MxlRegions mxlRegionsFromFlow(FlowData const& flow);
     MxlRegions mxlRegionsFromUser(mxlFabricsMemoryRegion const* regions, size_t count);
 
 }
