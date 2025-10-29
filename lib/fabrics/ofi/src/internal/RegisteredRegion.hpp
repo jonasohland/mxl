@@ -14,6 +14,8 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+    /** \brief Represent a registered memory region.
+     */
     class RegisteredRegion
     {
     public:
@@ -22,9 +24,18 @@ namespace mxl::lib::fabrics::ofi
             , _region(std::move(reg))
         {}
 
+        /** \brief Generate a RemoteRegion from this RegisteredRegion.
+         *
+         * \param useVirtualAddress If true, the RemoteRegion will use the virtual address.
+         *                          If false, the RemoteRegion will use a zero-based address.
+         *
+         * \return The generated RemoteRegion.
+         */
         [[nodiscard]]
         RemoteRegion toRemote(bool useVirtualAddress) const noexcept;
 
+        /** \brief Generate a LocalRegion from this RegisteredRegion.
+         */
         [[nodiscard]]
         LocalRegion toLocal() const noexcept;
 
@@ -33,6 +44,14 @@ namespace mxl::lib::fabrics::ofi
         Region _region;
     };
 
+    /** Generate a list of RemoteRegions from a list of RegisteredRegions.
+     *
+     *  \param useVirtualAddress If true, the RemoteRegions will use the virtual addresses.
+     *                           If false, the RemoteRegions will use zero-based addresses.
+     */
     std::vector<RemoteRegion> toRemote(std::vector<RegisteredRegion> const& regions, bool useVirtualAddress) noexcept;
+
+    /** Generate a list of LocalRegions from a list of RegisteredRegions.
+     */
     std::vector<LocalRegion> toLocal(std::vector<RegisteredRegion> const& regions) noexcept;
 }

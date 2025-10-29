@@ -11,9 +11,16 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+
+    /** \brief Represent a remote memory region used for data transfer.
+     *
+     * This can be constructed from a `RegisteredRegion`.
+     */
     struct RemoteRegion
     {
     public:
+        /** \brief Convert this RemoteRegion to a struct fi_rma_iov used by libfabric RMA transfer functions.
+         */
         [[nodiscard]]
         ::fi_rma_iov toRmaIov() const noexcept;
 

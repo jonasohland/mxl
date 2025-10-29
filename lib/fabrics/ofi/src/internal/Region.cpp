@@ -64,20 +64,20 @@ namespace mxl::lib::fabrics::ofi
     {
         switch (loc.type)
         {
-            case MXL_MEMORY_REGION_TYPE_HOST: return Location::host();
-            case MXL_MEMORY_REGION_TYPE_CUDA: return Location::cuda(static_cast<int>(loc.deviceId));
-            default:                          throw Exception::invalidArgument("Invalid memory region type");
+            case MXL_PAYLOAD_LOCATION_HOST_MEMORY:   return Location::host();
+            case MXL_PAYLOAD_LOCATION_DEVICE_MEMORY: return Location::cuda(static_cast<int>(loc.deviceId));
+            default:                                 throw Exception::invalidArgument("Invalid memory region type");
         }
     }
 
     std::string Region::Location::toString() const noexcept
     {
-        return std::visit(overloaded{[](std::monostate) -> std::string { throw Exception::invalidState("Region type is not set"); },
-                              [](Location::Host const&) -> std::string { return "host"; },
-                              [&](Location::Cuda const&) -> std::string
-                              {
-                                  return fmt::format("cuda, id={}", id());
-                              }},
+        return std::visit(
+            overloaded{
+                [](std::monostate) -> std::string { throw Exception::invalidState("Region type is not set"); },
+                [](Location::Host const&) -> std::string { return "host"; },
+                [&](Location::Cuda const&) -> std::string { return fmt::format("cuda, id={}", id()); },
+            },
             _inner);
     }
 

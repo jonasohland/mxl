@@ -42,6 +42,11 @@ namespace mxl::lib::fabrics::ofi
         return _inner.size();
     }
 
+    bool FabricAddress::operator==(FabricAddress const& other) const noexcept
+    {
+        return _inner == other._inner;
+    }
+
     FabricAddress FabricAddress::fromBase64(std::string_view data)
     {
         return FabricAddress{base64::decode_into<std::vector<std::uint8_t>>(data)};

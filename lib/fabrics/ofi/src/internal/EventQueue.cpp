@@ -17,14 +17,14 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    EventQueueAttr EventQueueAttr::defaults()
+    EventQueue::Attributes EventQueue::Attributes::defaults()
     {
-        EventQueueAttr attr{};
+        EventQueue::Attributes attr{};
         attr.size = 8; // default size, this should be parameterized
         return attr;
     }
 
-    ::fi_eq_attr EventQueueAttr::raw() const noexcept
+    ::fi_eq_attr EventQueue::Attributes::raw() const noexcept
     {
         ::fi_eq_attr raw{};
         raw.size = size;
@@ -35,7 +35,7 @@ namespace mxl::lib::fabrics::ofi
         return raw;
     }
 
-    std::shared_ptr<EventQueue> EventQueue::open(std::shared_ptr<Fabric> fabric, EventQueueAttr const& attr)
+    std::shared_ptr<EventQueue> EventQueue::open(std::shared_ptr<Fabric> fabric, EventQueue::Attributes const& attr)
     {
         ::fid_eq* eq;
         auto eq_attr = attr.raw();

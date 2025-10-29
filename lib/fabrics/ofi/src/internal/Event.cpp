@@ -129,26 +129,6 @@ namespace mxl::lib::fabrics::ofi
         return std::holds_alternative<Error>(_event);
     }
 
-    FabricInfoView Event::info() const
-    {
-        if (auto connReq = std::get_if<ConnectionRequested>(&_event); connReq != nullptr)
-        {
-            return connReq->info();
-        }
-
-        throw Exception::invalidState("Tried to access fi_info from an event that is not a connection request");
-    }
-
-    std::string Event::errorString() const
-    {
-        if (auto err = std::get_if<Error>(&_event); err != nullptr)
-        {
-            return err->toString();
-        }
-
-        throw Exception::invalidState("Tried to access error string from an event that is not an error");
-    }
-
     ::fid_t Event::fid() noexcept
     {
         return std::visit(

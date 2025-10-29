@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include "mxl/fabrics.h"
+#include "mxl/flow.h"
 #include "Region.hpp"
 
 using namespace mxl::lib::fabrics::ofi;
@@ -45,7 +46,7 @@ TEST_CASE("ofi: RegionGroups fromGroups and view", "[ofi][RegionGroups]")
                 mxlFabricsMemoryRegion{
                     .addr = 0x3000,
                     .size = 256,
-                    .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
+                    .loc = {.type = MXL_PAYLOAD_LOCATION_HOST_MEMORY, .deviceId = 0},
                 }};
 
     // clang-format on

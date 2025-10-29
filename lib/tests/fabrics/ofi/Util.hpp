@@ -11,6 +11,7 @@
 #include <fmt/format.h>
 #include <rdma/fabric.h>
 #include "mxl/fabrics.h"
+#include "mxl/flow.h"
 #include "Domain.hpp"
 #include "Region.hpp"
 
@@ -85,22 +86,22 @@ namespace mxl::lib::fabrics::ofi
             mxlFabricsMemoryRegion{
                 .addr = reinterpret_cast<std::uintptr_t>(innerRegions[0].data()),
                 .size = innerRegions[0].size(),
-                .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
+                .loc = {.type = MXL_PAYLOAD_LOCATION_HOST_MEMORY, .deviceId = 0},
             },
             mxlFabricsMemoryRegion{
                 .addr = reinterpret_cast<std::uintptr_t>(innerRegions[1].data()),
                 .size = innerRegions[1].size(),
-                .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
+                .loc = {.type = MXL_PAYLOAD_LOCATION_HOST_MEMORY, .deviceId = 0},
             },
             mxlFabricsMemoryRegion{
                 .addr = reinterpret_cast<std::uintptr_t>(innerRegions[2].data()),
                 .size = innerRegions[2].size(),
-                .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
+                .loc = {.type = MXL_PAYLOAD_LOCATION_HOST_MEMORY, .deviceId = 0},
             },
             mxlFabricsMemoryRegion{
                 .addr = reinterpret_cast<std::uintptr_t>(innerRegions[3].data()),
                 .size = innerRegions[3].size(),
-                .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0},
+                .loc = {.type = MXL_PAYLOAD_LOCATION_HOST_MEMORY, .deviceId = 0},
             }
         };
 
@@ -115,7 +116,7 @@ namespace mxl::lib::fabrics::ofi
         auto memoryRegions = std::vector<mxlFabricsMemoryRegion>{
             mxlFabricsMemoryRegion{.addr = reinterpret_cast<std::uintptr_t>(regions[0].data()),
                                    .size = regions[0].size(),
-                                   .loc = {.type = MXL_MEMORY_REGION_TYPE_HOST, .deviceId = 0}},
+                                   .loc = {.type = MXL_PAYLOAD_LOCATION_HOST_MEMORY, .deviceId = 0}},
         };
 
         mxlRegions outRegions;

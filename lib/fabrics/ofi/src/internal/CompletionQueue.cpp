@@ -17,15 +17,15 @@
 namespace mxl::lib::fabrics::ofi
 {
 
-    CompletionQueueAttr CompletionQueueAttr::defaults()
+    CompletionQueue::Attributes CompletionQueue::Attributes::defaults()
     {
-        CompletionQueueAttr attr{};
+        CompletionQueue::Attributes attr{};
         attr.size = 8;                    // default size, this should be parameterized
         attr.waitObject = FI_WAIT_UNSPEC; // TODO: EFA will require no wait object
         return attr;
     }
 
-    ::fi_cq_attr CompletionQueueAttr::raw() const noexcept
+    ::fi_cq_attr CompletionQueue::Attributes::raw() const noexcept
     {
         ::fi_cq_attr raw{};
         raw.size = size;
@@ -38,7 +38,7 @@ namespace mxl::lib::fabrics::ofi
         return raw;
     }
 
-    std::shared_ptr<CompletionQueue> CompletionQueue::open(std::shared_ptr<Domain> domain, CompletionQueueAttr const& attr)
+    std::shared_ptr<CompletionQueue> CompletionQueue::open(std::shared_ptr<Domain> domain, CompletionQueue::Attributes const& attr)
     {
         ::fid_cq* cq;
         auto cq_attr = attr.raw();

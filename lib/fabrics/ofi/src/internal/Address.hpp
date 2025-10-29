@@ -12,58 +12,61 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+    /**
+     * \brief Wrapper around a libfabric endpoint address.
+     */
     class FabricAddress final
     {
     public:
         /**
-         * Default is an empty fabric address
+         * \brief Default is an empty fabric address
          */
         FabricAddress() = default;
 
         /**
-         * Retreive the fabric address of an endpoint by passing its fid.
+         * \brief Retrieve the fabric address of an endpoint by passing its fid.
          */
         static FabricAddress fromFid(::fid_t fid);
 
         /**
-         * Convert the raw fabric address into a base64 encoded string.
+         * \brief Convert the raw fabric address into a base64 encoded string.
          */
         [[nodiscard]]
         std::string toBase64() const;
 
         /**
-         * Parse a fabric address from a base64 encoded string
+         * \brief Parse a fabric address from a base64 encoded string
          */
         static FabricAddress fromBase64(std::string_view data);
 
         /**
-         * Pointer to the raw address data.
+         * \brief Pointer to the raw address data.
          */
         void* raw() noexcept;
 
         /**
-         * Pointer to the raw address data.
+         * \brief Pointer to the raw address data.
          */
         [[nodiscard]]
         void const* raw() const noexcept;
 
         /**
-         * Byte-length of the raw address data.
+         * \brief Byte-length of the raw address data.
          */
         [[nodiscard]]
         std::size_t size() const noexcept;
 
-        bool operator==(FabricAddress const& other) const noexcept
-        {
-            return _inner == other._inner;
-        }
+        bool operator==(FabricAddress const& other) const noexcept;
 
     private:
         explicit FabricAddress(std::vector<std::uint8_t> addr);
+
+        /** \brief Retrieve the fabric address of an endpoint by using its fid.
+         */
         static FabricAddress retrieveFabricAddress(::fid_t);
 
     private:
-        std::vector<std::uint8_t> _inner;
+        std::vector<std::uint8_t> _inner; /**< libfabric address represented as a buffer of bytes */
     };
 
 }

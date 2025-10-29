@@ -16,35 +16,57 @@
 
 namespace mxl::lib::fabrics::ofi
 {
+
+    /** \brief Represent a memory region (unregistered).
+     */
     class Region
     {
     public:
+        /** \brief Represent the location of a memory region.
+         */
         class Location
         {
         public:
+            /** \brief specify a host memory location.
+             */
             static Location host() noexcept;
+            /** \brief specify a CUDA device memory location.
+             *
+             * \param deviceId The CUDA device id.
+             */
             static Location cuda(int deviceId) noexcept;
+            /** \brief Convert between external and internal versions of this type
+             */
             static Location fromAPI(mxlFabricsMemoryRegionLocation loc);
 
-            /// Return the device id. For host location 0 is returned.
+            /** \brief Return the device id. For host location 0 is returned.
+             */
             [[nodiscard]]
             std::uint64_t id() const noexcept;
 
-            /// Convert the current location to libfabric "iface" representation
+            /** \brief Convert the current location to libfabric "iface" representation
+             */
             [[nodiscard]]
             ::fi_hmem_iface iface() const noexcept;
 
+            /** \brief Generate a string representation of the memory location.
+             */
             [[nodiscard]]
             std::string toString() const noexcept;
 
-            /// Return true if the memory location is on host.
+            /** \brief Return true if the memory location is on host.
+             */
             [[nodiscard]]
             bool isHost() const noexcept;
 
         private:
+            /** \brief Represent a host memory location variant.
+             */
             class Host
             {};
 
+            /** \brief Represent a CUDA device memory location variant.
+             */
             class Cuda
             {
                 Cuda(int deviceId)
@@ -66,6 +88,12 @@ namespace mxl::lib::fabrics::ofi
             Inner _inner;
         };
 
+        /** \brief Construct a Region object.
+         *
+         * \param base The base address of the memory region.
+         * \param size The size of the memory region in bytes.
+         * \param loc The location of the memory region \see Location.
+         */
         explicit Region(std::uintptr_t base, std::size_t size, Location loc = Location::host()) noexcept
             : base(base)
             , size(size)
@@ -74,9 +102,13 @@ namespace mxl::lib::fabrics::ofi
         {}
 
     public:
+        /** \brief Return the underlying iovec structure representing the memory region.
+         */
         [[nodiscard]]
         ::iovec const* asIovec() const noexcept;
 
+        /** \brief Convert the Region to an iovec structure.
+         */
         [[nodiscard]]
         ::iovec toIovec() const noexcept;
 
@@ -92,6 +124,8 @@ namespace mxl::lib::fabrics::ofi
         ::iovec _iovec;
     };
 
+    /** \brief Represent a group of memory regions.
+     */
     class RegionGroup
     {
     public:
@@ -155,13 +189,22 @@ namespace mxl::lib::fabrics::ofi
         std::vector<::iovec> _iovecs;
     };
 
+    /** \brief Represent a collection of memory regions.
+     *
+     * This is the internal strucure representing mxlRegions API type.
+     */
     class MxlRegions
     {
     public:
+        /** \brief Convert between external and internal versions of this type
+         */
         static MxlRegions* fromAPI(mxlRegions) noexcept;
+        /** \copydoc fromAPI() */
         [[nodiscard]]
         mxlRegions toAPI() noexcept;
 
+        /** \brief View accessor for the underlying regions.
+         */
         [[nodiscard]]
         std::vector<Region> const& regions() const noexcept;
 
@@ -183,7 +226,15 @@ namespace mxl::lib::fabrics::ofi
         // DataLayout _layout;
     };
 
+    /** \brief Convert a FlowData's memory regions to MxlRegions.
+     *
+     * FlowData are obtained from an MXL FlowWriter or FlowReader.
+     */
     MxlRegions mxlRegionsFromFlow(FlowData& flow);
-    MxlRegions mxlRegionsFromUser(mxlFabricsMemoryRegion const* groups, size_t count);
 
+    /** \brief Convert user-provided memory regions to MxlRegions.
+     *
+     * Used to convert mxlFabricsMemoryRegion arrays provided by the user.
+     */
+    MxlRegions mxlRegionsFromUser(mxlFabricsMemoryRegion const* regions, size_t count);
 }

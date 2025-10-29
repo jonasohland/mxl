@@ -68,6 +68,11 @@ namespace mxl::lib::fabrics::ofi
         return (_fabric->info().raw()->rx_attr->mode & FI_RX_CQ_DATA) != 0;
     }
 
+    std::shared_ptr<Fabric> Domain::fabric() const noexcept
+    {
+        return _fabric;
+    }
+
     RegisteredRegion Domain::registerRegion(Region const& region, std::uint64_t access)
     {
         return RegisteredRegion{MemoryRegion::reg(*this, region, access), region};
