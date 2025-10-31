@@ -81,7 +81,7 @@ namespace mxl::lib::fabrics::ofi
             return *error;
         }
 
-        throw Exception::invalidState("Failed to unwrap completion queue entry as error");
+        throw Exception::invalidState("Failed to unwrap completion queue entry as error.");
     }
 
     std::optional<Completion::Data> Completion::tryData() const noexcept
