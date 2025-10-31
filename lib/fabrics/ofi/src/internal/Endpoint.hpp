@@ -27,7 +27,7 @@ namespace mxl::lib::fabrics::ofi
     class Endpoint
     {
     public:
-        /** \brief The miniumum interval at which the event queue will be polled when
+        /** \brief The minimum interval at which the event queue will be polled when
          * doing a blocking read of both (event and completion) queues.
          */
         constexpr static auto const EQReadInterval = std::chrono::milliseconds(100);
