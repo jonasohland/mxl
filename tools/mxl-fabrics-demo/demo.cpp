@@ -469,7 +469,7 @@ public:
             if (status == MXL_ERR_TIMEOUT)
             {
                 // No completion before a timeout was triggered, most likely a problem upstream.
-                // MXL_WARN("wait for new grain timeout, most likely there is a problem upstream.");
+                MXL_WARN("wait for new grain timeout, most likely there is a problem upstream.");
                 continue;
             }
 
