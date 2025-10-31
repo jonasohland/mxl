@@ -144,7 +144,7 @@ namespace mxl::lib::fabrics::ofi
          * details describing the reason for the failed attempt. An Event::Connected event will also be generated on the passive side for the
          * accepting endpoint once the connection has been properly established. The fid of the FI_CONNECTED event will be that of the endpoint
          * passed to fi_accept as opposed to the listening passive endpoint. Outbound data transfers cannot be initiated on a connection-oriented
-         * endpoint until an FI_CONNECTED event has been generated. However, receive buffers may be associated with an endpoint anytime
+         * endpoint until an FI_CONNECTED event has been generated. However, receive buffers may be associated with an endpoint anytime.
          */
         void accept();
 
