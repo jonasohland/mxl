@@ -58,7 +58,7 @@ namespace mxl::lib::fabrics::ofi
             return *data;
         }
 
-        throw Exception::invalidState("Failed to unwrap completion queue entry as data entry");
+        throw Exception::invalidState("Failed to unwrap completion queue entry as data entry.");
     }
 
     ::fid_ep* Completion::Data::fid() const noexcept
