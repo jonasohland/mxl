@@ -186,7 +186,7 @@ namespace mxl::lib::fabrics::ofi
         /** \brief Get the associated addres vector.
          *
          * If an address vector is associated with this endpoint. Get the AV. Throws an exception if no address vector is
-         * associated with this endpoint
+         * associated with this endpoint.
          */
         [[nodiscard]]
         std::shared_ptr<AddressVector> addressVector() const;
