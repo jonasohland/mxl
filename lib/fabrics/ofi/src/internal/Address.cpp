@@ -54,7 +54,7 @@ namespace mxl::lib::fabrics::ofi
         auto decoded = base64::decode_into<std::vector<std::uint8_t>>(data);
         if (decoded.empty())
         {
-            throw std::runtime_error("Failed to decode base64 data into FabricAddress");
+            throw std::runtime_error("Failed to decode base64 data into FabricAddress.");
         }
         return FabricAddress{std::move(decoded)};
     }
