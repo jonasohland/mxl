@@ -67,7 +67,7 @@ extern "C"
         mxlEndpointAddress endpointAddress; /**< Bind address for the local endpoint. */
         mxlFabricsProvider provider;        /**< The provider that should be used */
         mxlRegions regions;                 /**< Local memory regions of the flow that grains should be written to. */
-        bool deviceSupport;                 /**< Th Require support of transfers involving device memory. */
+        bool deviceSupport;                 /**< Require support of transfers involving device memory. */
     } mxlTargetConfig;
 
     /** Configuration object required to set up an initiator.
