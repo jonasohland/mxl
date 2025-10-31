@@ -66,7 +66,7 @@ extern "C"
     {
         mxlEndpointAddress endpointAddress; /**< Bind address for the local endpoint. */
         mxlFabricsProvider provider;        /**< The provider that should be used */
-        mxlRegions regions;                 /**< Th Local memory regions of the flow that grains should be written to. */
+        mxlRegions regions;                 /**< Local memory regions of the flow that grains should be written to. */
         bool deviceSupport;                 /**< Th Require support of transfers involving device memory. */
     } mxlTargetConfig;
 
