@@ -12,7 +12,7 @@
 
 namespace mxl::lib
 {
-    class FlowReader
+    class MXL_EXPORT FlowReader
     {
     public:
         ///

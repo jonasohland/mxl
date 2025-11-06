@@ -73,6 +73,7 @@ namespace mxl::lib
 
     }
 
+    MXL_EXPORT
     Instance::Instance(std::filesystem::path const& mxlDomain, std::string const& options, std::unique_ptr<FlowIoFactory>&& flowIoFactory)
         : _flowManager{mxlDomain}
         , _flowIoFactory{std::move(flowIoFactory)}
@@ -90,6 +91,7 @@ namespace mxl::lib
         MXL_DEBUG("Instance created. MXL Domain: {}", mxlDomain.string());
     }
 
+    MXL_EXPORT
     Instance::~Instance()
     {
         _stopping = true;
@@ -117,6 +119,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     FlowReader* Instance::getFlowReader(std::string const& flowId)
     {
         auto const id = uuids::uuid::from_string(flowId);
@@ -148,6 +151,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     void Instance::releaseReader(FlowReader* reader)
     {
         if (reader)
@@ -169,6 +173,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     FlowWriter* Instance::getFlowWriter(std::string const& flowId)
     {
         auto const id = uuids::uuid::from_string(flowId);
@@ -200,6 +205,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     void Instance::releaseWriter(FlowWriter* writer)
     {
         if (writer)
@@ -224,6 +230,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     std::unique_ptr<FlowData> Instance::createFlow(std::string const& flowDef)
     {
         // Parse the json flow resource
@@ -265,16 +272,19 @@ namespace mxl::lib
         throw std::runtime_error("Unsupported flow format.");
     }
 
+    MXL_EXPORT
     bool Instance::deleteFlow(uuids::uuid const& flowId)
     {
         return _flowManager.deleteFlow(flowId);
     }
 
+    MXL_EXPORT
     std::string Instance::getDomain() const
     {
         return _flowManager.getDomain();
     }
 
+    MXL_EXPORT
     std::string Instance::getFlowDef(uuids::uuid const& flowId) const
     {
         return _flowManager.getFlowDef(flowId);
@@ -283,6 +293,7 @@ namespace mxl::lib
     // This function is performed in a 'collaborative best effort' way.
     // Exceptions thrown should not be propagated to the caller and cause disruptions to the application.
     // On error the function will return 0 and log the error
+    MXL_EXPORT
     std::size_t Instance::garbageCollect() const
     {
         std::size_t count = 0;
@@ -411,6 +422,7 @@ namespace mxl::lib
         MXL_DEBUG("History duration set to {} ns", historyDuration);
     }
 
+    MXL_EXPORT
     std::uint64_t Instance::getHistoryDurationNs() const
     {
         return _historyDuration;

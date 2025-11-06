@@ -16,6 +16,7 @@
 #include <uuid.h>
 #include "mxl-internal/Logging.hpp"
 #include "mxl-internal/PathUtils.hpp"
+#include "mxl/platform.h"
 
 #ifdef __APPLE__
 #   include <sys/event.h>
@@ -26,7 +27,7 @@
 
 namespace mxl::lib
 {
-
+    MXL_EXPORT
     DomainWatcher::DomainWatcher(std::filesystem::path const& in_domain, Callback in_callback)
         : _domain{in_domain}
         , _callback{std::move(in_callback)}
@@ -108,6 +109,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     DomainWatcher::~DomainWatcher()
     {
         _running = false;
@@ -141,6 +143,7 @@ namespace mxl::lib
 #endif
     }
 
+    MXL_EXPORT
     int16_t DomainWatcher::addFlow(uuids::uuid const& in_flowId, WatcherType in_type)
     {
         auto id = uuids::to_string(in_flowId);
@@ -198,6 +201,7 @@ namespace mxl::lib
         return useCount;
     }
 
+    MXL_EXPORT
     int16_t DomainWatcher::removeFlow(uuids::uuid const& in_flowId, WatcherType in_type)
     {
         auto id = uuids::to_string(in_flowId);

@@ -7,6 +7,6 @@ Name: libmxl
 Version: @PROJECT_VERSION@
 Description: Media eXchange Layer SDK
 Libs: -L${libdir} -lmxl
-Libs.private: -pthread 
+Libs.private: -pthread -lmxl-common
 Cflags: -I${includedir}
 

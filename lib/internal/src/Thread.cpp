@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <sched.h>
 #include "mxl-internal/detail/ClockHelpers.hpp"
+#include "mxl/platform.h"
 
 namespace mxl::lib
 {
@@ -28,6 +29,7 @@ namespace mxl::lib
 #endif
         }
 
+        MXL_EXPORT
         Duration sleep(Duration duration, [[maybe_unused]] Clock clock) noexcept
         {
             auto const sleepTime = asTimeSpec(duration);

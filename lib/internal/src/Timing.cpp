@@ -3,9 +3,11 @@
 
 #include "mxl-internal/Timing.hpp"
 #include "mxl-internal/detail/ClockHelpers.hpp"
+#include "mxl/platform.h"
 
 namespace mxl::lib
 {
+    MXL_EXPORT
     Timepoint currentTime(Clock clock) noexcept
     {
         auto result = Timepoint{};

@@ -7,7 +7,7 @@
 
 namespace mxl::lib
 {
-    struct PosixFlowIoFactory : FlowIoFactory
+    struct MXL_EXPORT PosixFlowIoFactory : FlowIoFactory
     {
         /** \see FlowReaderFactory::createDiscreteFlowReader() */
         virtual std::unique_ptr<DiscreteFlowReader> createDiscreteFlowReader(FlowManager const& manager, uuids::uuid const& flowId,

@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include "mxl/platform.h"
 #include "Flow.hpp"
 #include "SharedMemory.hpp"
 
@@ -13,7 +14,7 @@ namespace mxl::lib
     /// Simple structure holding the shared memory resources common to all types
     /// of flows.
     ///
-    class FlowData
+    class MXL_EXPORT FlowData
     {
     public:
         constexpr bool isValid() const noexcept;

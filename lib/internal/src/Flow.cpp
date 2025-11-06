@@ -37,6 +37,7 @@ namespace mxl::lib
 
     }
 
+    MXL_EXPORT
     std::ostream& operator<<(std::ostream& os, Flow const& flow)
     {
         auto const span = uuids::span<std::uint8_t, sizeof flow.info.common.id>{

@@ -115,6 +115,7 @@ namespace mxl::lib
 
     }
 
+    MXL_EXPORT
     FlowManager::FlowManager(std::filesystem::path const& in_mxlDomain)
         : _mxlDomain{std::filesystem::canonical(in_mxlDomain)}
     {
@@ -125,6 +126,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     std::unique_ptr<DiscreteFlowData> FlowManager::createDiscreteFlow(uuids::uuid const& flowId, std::string const& flowDef, mxlDataFormat flowFormat,
         std::size_t grainCount, mxlRational const& grainRate, std::size_t grainPayloadSize, std::size_t grainNumOfSlices,
         std::array<uint32_t, MXL_MAX_PLANES_PER_GRAIN> grainSliceLengths)
@@ -198,6 +200,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     std::unique_ptr<ContinuousFlowData> FlowManager::createContinuousFlow(uuids::uuid const& flowId, std::string const& flowDef,
         mxlDataFormat flowFormat, mxlRational const& sampleRate, std::size_t channelCount, std::size_t sampleWordSize, std::size_t bufferLength)
     {
@@ -247,6 +250,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     std::unique_ptr<FlowData> FlowManager::openFlow(uuids::uuid const& in_flowId, AccessMode in_mode)
     {
         if (in_mode == AccessMode::CREATE_READ_WRITE)
@@ -287,6 +291,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     std::unique_ptr<DiscreteFlowData> FlowManager::openDiscreteFlow(std::filesystem::path const& flowDir,
         SharedMemoryInstance<Flow>&& sharedFlowInstance)
     {
@@ -317,6 +322,7 @@ namespace mxl::lib
         return flowData;
     }
 
+    MXL_EXPORT
     std::unique_ptr<ContinuousFlowData> FlowManager::openContinuousFlow(std::filesystem::path const& flowDir,
         SharedMemoryInstance<Flow>&& sharedFlowInstance)
     {
@@ -327,6 +333,7 @@ namespace mxl::lib
         return flowData;
     }
 
+    MXL_EXPORT
     bool FlowManager::deleteFlow(std::unique_ptr<FlowData>&& flowData)
     {
         if (flowData)
@@ -345,6 +352,7 @@ namespace mxl::lib
         return false;
     }
 
+    MXL_EXPORT
     bool FlowManager::deleteFlow(uuids::uuid const& flowId)
     {
         auto uuid = uuids::to_string(flowId);
@@ -370,6 +378,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     std::vector<uuids::uuid> FlowManager::listFlows() const
     {
         auto base = std::filesystem::path{_mxlDomain};
@@ -398,6 +407,7 @@ namespace mxl::lib
         return flowIds;
     }
 
+    MXL_EXPORT
     std::string FlowManager::getFlowDef(uuids::uuid const& flowId) const
     {
         auto const uuid = uuids::to_string(flowId);

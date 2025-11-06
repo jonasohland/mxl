@@ -8,7 +8,7 @@
 
 namespace mxl::lib
 {
-    class FlowIoFactory
+    class MXL_EXPORT FlowIoFactory
         : public FlowReaderFactory
         , public FlowWriterFactory
     {

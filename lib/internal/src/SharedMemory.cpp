@@ -15,9 +15,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "mxl-internal/Logging.hpp"
+#include "mxl/platform.h"
 
 namespace mxl::lib
 {
+    MXL_EXPORT
     SharedMemoryBase::SharedMemoryBase(char const* path, AccessMode mode, std::size_t payloadSize)
         : SharedMemoryBase{}
     {
@@ -85,6 +87,7 @@ namespace mxl::lib
         }
     }
 
+    MXL_EXPORT
     SharedMemoryBase::~SharedMemoryBase()
     {
         if (_data != nullptr)

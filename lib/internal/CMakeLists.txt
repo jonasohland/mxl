@@ -32,8 +32,9 @@ target_compile_features(mxl-common
     )
 set_target_properties(mxl-common
         PROPERTIES 
-            POSITION_INDEPENDENT_CODE ON
             VISIBILITY_INLINES_HIDDEN ON
+            C_VISIBILITY_PRESET       hidden
+            CXX_VISIBILITY_PRESET     hidden
             C_EXTENSIONS              OFF
             CXX_EXTENSIONS            OFF
             VERSION                   "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"

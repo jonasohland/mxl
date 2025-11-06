@@ -10,6 +10,7 @@
 #include <picojson/picojson.h>
 #include <mxl/dataformat.h>
 #include <mxl/flowinfo.h>
+#include <mxl/platform.h>
 #include <mxl/rational.h>
 
 namespace mxl::lib

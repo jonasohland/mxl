@@ -11,7 +11,7 @@
 
 namespace mxl::lib
 {
-    class FlowWriter
+    class MXL_EXPORT FlowWriter
     {
     public:
         ///
