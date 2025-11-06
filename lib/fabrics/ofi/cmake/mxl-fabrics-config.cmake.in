@@ -1,0 +1,42 @@
+@PACKAGE_INIT@
+
+# Include PkgConfig as a dependency, because we need it to check for
+# transitive dependencies
+include(CMakeFindDependencyMacro)
+find_dependency(PkgConfig)
+
+# An adaption of CMakeFindDependencyMacro that applies the same logic
+# to pkg_check_modules.
+#
+# This has to be a macro because the call to return is used to end the
+# script execution entirely.
+macro(find_pkg_config_dependencies prefix)
+    set(cmake_fpcd_required_arg)
+    if(${CMAKE_FIND_PACKAGE_NAME}_FIND_REQUIRED)
+        set(cmake_fpcd_required_arg REQUIRED)
+    endif()
+
+    set(cmake_fpcd_quiet_arg)
+    if(${CMAKE_FIND_PACKAGE_NAME}_FIND_QUIETLY)
+        set(cmake_fpcd_quiet_arg QUIET)
+    endif()
+
+    pkg_check_modules(${prefix}
+            ${cmake_fpcd_required_arg} ${cmake_fpcd_quiet_arg} IMPORTED_TARGET
+            ${ARGN}
+        )
+
+    set(cmake_fpcd_required_arg)
+    set(cmake_fpcd_quiet_arg)
+
+    if (NOT ${prefix}_FOUND)
+        set(${CMAKE_FIND_PACKAGE_NAME}_NOT_FOUND_MESSAGE "${CMAKE_FIND_PACKAGE_NAME} could not be found because at least of the following pkg-config dependencies could not be found: ${ARGN}")
+        set(${CMAKE_FIND_PACKAGE_NAME}_FOUND False)
+        return()
+    endif()
+endmacro()
+
+find_pkg_config_dependencies(libfabric libfabric)
+
+include("${CMAKE_CURRENT_LIST_DIR}/libmxl-fabrics-targets.cmake")
+

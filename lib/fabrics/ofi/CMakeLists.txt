@@ -79,20 +79,56 @@ target_link_libraries(mxl-fabrics
 
 add_library(${PROJECT_NAME}::mxl-fabrics ALIAS mxl-fabrics)
 
-install(TARGETS mxl-fabrics EXPORT ${PROJECT_NAME}-targets
+
+include(CMakePackageConfigHelpers)
+
+set(MXL_FABRICS_CMAKE_CONFIG_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
+
+install(TARGETS mxl-fabrics EXPORT mxl-fabrics-targets
         COMPONENT ${PROJECT_NAME}-lib
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
 
-include(CMakePackageConfigHelpers)
+# This makes the project importable from the install directory
+install(EXPORT mxl-fabrics-targets
+        NAMESPACE ${PROJECT_NAME}::
+        DESTINATION ${MXL_FABRICS_CMAKE_CONFIG_DESTINATION}
+        COMPONENT ${PROJECT_NAME}-dev
+    )
+
+
+# Generate the config file and put it into the build directory.
+configure_package_config_file(
+        ${CMAKE_CURRENT_LIST_DIR}/cmake/mxl-fabrics-config.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/mxl-fabrics-config.cmake
+        INSTALL_DESTINATION ${MXL_FABRICS_CMAKE_CONFIG_DESTINATION}
+        NO_SET_AND_CHECK_MACRO
+        NO_CHECK_REQUIRED_COMPONENTS_MACRO
+    )
+
+# Generate the version file and put it into the build directory.
+write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/mxl-fabrics-config-version.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+    )
 
 # Generate a pkg-config file
 configure_file(
         ${CMAKE_CURRENT_LIST_DIR}/cmake/libmxl-fabrics.pc.in
         ${CMAKE_CURRENT_BINARY_DIR}/libmxl-fabrics.pc
         @ONLY
+    )
+
+
+# Install the generated config and version files.
+install(FILES
+            ${CMAKE_CURRENT_BINARY_DIR}/mxl-fabrics-config.cmake
+            ${CMAKE_CURRENT_BINARY_DIR}/mxl-fabrics-config-version.cmake
+            DESTINATION ${MXL_FABRICS_CMAKE_CONFIG_DESTINATION}
+        COMPONENT ${PROJECT_NAME}-dev
     )
 
 # Install the generated pkg-config file
