@@ -2,8 +2,7 @@
 
 # SPDX-FileCopyrightText: 2025 Contributors to the Media eXchange Layer project.
 # SPDX-License-Identifier: Apache-2.0
-#
-#     --slave /usr/bin/$1 $1 /usr/bin/$1-\${version} \\
+
 
 function register_clang_version {
     local version=$1
