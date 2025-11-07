@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <unistd.h>
 #include <uuid.h>
+#include <mxl/platform.h>
 
 namespace mxl::lib
 {
@@ -57,7 +58,7 @@ namespace mxl::lib
     /// by readers when they read a grain, which will trigger a 'FlowInfo.lastRead` update (performed by the FlowWriter
     /// since the writer is the only one mapping the flow in write-mode).
     ///
-    class DomainWatcher
+    class MXL_EXPORT DomainWatcher
     {
     public:
         using Callback = std::function<void(uuids::uuid const&, WatcherType in_type)>;

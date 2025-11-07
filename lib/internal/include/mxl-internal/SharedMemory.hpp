@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <utility>
+#include <mxl/platform.h>
 
 namespace mxl::lib
 {
@@ -15,7 +16,7 @@ namespace mxl::lib
         CREATE_READ_WRITE
     };
 
-    class SharedMemoryBase
+    class MXL_EXPORT SharedMemoryBase
     {
     public:
         /**

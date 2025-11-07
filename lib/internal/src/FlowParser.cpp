@@ -201,7 +201,6 @@ namespace mxl::lib
 
     } // namespace
 
-    MXL_EXPORT
     FlowParser::FlowParser(std::string const& in_flowDef)
         : _id{}
         , _format{MXL_DATA_FORMAT_UNSPECIFIED}
@@ -313,25 +312,21 @@ namespace mxl::lib
         }
     }
 
-    MXL_EXPORT
     uuids::uuid const& FlowParser::getId() const
     {
         return _id;
     }
 
-    MXL_EXPORT
     mxlRational FlowParser::getGrainRate() const
     {
         return _grainRate;
     }
 
-    MXL_EXPORT
     mxlDataFormat FlowParser::getFormat() const
     {
         return _format;
     }
 
-    MXL_EXPORT
     std::size_t FlowParser::getPayloadSize() const
     {
         auto payloadSize = std::size_t{0};
@@ -422,7 +417,6 @@ namespace mxl::lib
         return payloadSize;
     }
 
-    MXL_EXPORT
     std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN> FlowParser::getPayloadSliceLengths() const
     {
         auto sliceLengths = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{0, 0, 0, 0};
@@ -469,7 +463,6 @@ namespace mxl::lib
         }
     }
 
-    MXL_EXPORT
     std::size_t FlowParser::getTotalPayloadSlices() const
     {
         switch (_format)
@@ -505,7 +498,6 @@ namespace mxl::lib
         }
     }
 
-    MXL_EXPORT
     std::size_t FlowParser::getChannelCount() const
     {
         if (auto const it = _root.find("channel_count"); it != _root.end())

@@ -74,9 +74,9 @@ target_sources(mxl
 target_link_libraries(mxl
         PUBLIC
             mxl-headers # C Headers in <mxl/*.h>
-            mxl-common  # Common objects for libmxl and libmxl-fabrics
         PRIVATE
             mxl-internal-headers # Internal C++ headers in <mxl-internal/*.hpp>
+            mxl-common  # Common objects for libmxl and libmxl-fabrics
     )
 
 # Alias mxl to mxl::mxl so that this library can be used

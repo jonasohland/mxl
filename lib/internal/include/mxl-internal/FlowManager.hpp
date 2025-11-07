@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <uuid.h>
+#include <mxl/platform.h>
 #include "ContinuousFlowData.hpp"
 #include "DiscreteFlowData.hpp"
 
@@ -37,7 +38,7 @@ namespace mxl::lib
     /// LIST
     /// List all the flows found in the domain.
     ///
-    class FlowManager
+    class MXL_EXPORT FlowManager
     {
     public:
         ///

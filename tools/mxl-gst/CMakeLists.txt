@@ -46,6 +46,7 @@ if (gstreamer_FOUND)
             PRIVATE
                 mxl
                 mxl-internal-headers
+                mxl-common
                 CLI11::CLI11
                 PkgConfig::gstreamer
                 PkgConfig::gstreamer-app
@@ -76,6 +77,7 @@ if (gstreamer_FOUND)
             PRIVATE
                 mxl
                 mxl-internal-headers
+                mxl-common
                 CLI11::CLI11
                 spdlog::spdlog
                 PkgConfig::gstreamer
@@ -107,6 +109,7 @@ if (gstreamer_FOUND)
             PRIVATE
                 mxl
                 mxl-internal-headers
+                mxl-common
                 CLI11::CLI11
                 PkgConfig::gstreamer
                 PkgConfig::gstreamer-app

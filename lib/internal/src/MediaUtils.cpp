@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "mxl-internal/MediaUtils.hpp"
-#include "mxl/platform.h"
+#include <mxl/platform.h>
 
 MXL_EXPORT
 std::uint32_t mxl::lib::getV210LineLength(std::size_t width)

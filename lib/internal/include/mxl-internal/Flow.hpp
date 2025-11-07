@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iostream>
 #include <mxl/flow.h>
+#include <mxl/platform.h>
 
 namespace mxl::lib
 {

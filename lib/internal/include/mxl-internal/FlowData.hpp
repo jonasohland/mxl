@@ -4,7 +4,7 @@
 #pragma once
 
 #include <cstddef>
-#include "mxl/platform.h"
+#include <mxl/platform.h>
 #include "Flow.hpp"
 #include "SharedMemory.hpp"
 

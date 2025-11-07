@@ -4,8 +4,8 @@
 #include "mxl-internal/Thread.hpp"
 #include <cerrno>
 #include <sched.h>
+#include <mxl/platform.h>
 #include "mxl-internal/detail/ClockHelpers.hpp"
-#include "mxl/platform.h"
 
 namespace mxl::lib
 {

@@ -14,8 +14,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <mxl/platform.h>
 #include "mxl-internal/Logging.hpp"
-#include "mxl/platform.h"
 
 namespace mxl::lib
 {

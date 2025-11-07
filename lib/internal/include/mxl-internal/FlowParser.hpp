@@ -18,7 +18,7 @@ namespace mxl::lib
     /**
      * Parses a NMOS Flow resource and extracts / computes key elements based on the flow attributes.
      */
-    class FlowParser
+    class MXL_EXPORT FlowParser
     {
     public:
         /**

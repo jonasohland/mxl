@@ -13,6 +13,7 @@
 #include <string>
 #include <uuid.h>
 #include <mxl/mxl.h>
+#include <mxl/platform.h>
 #include "DomainWatcher.hpp"
 #include "FlowIoFactory.hpp"
 #include "FlowManager.hpp"
@@ -22,7 +23,7 @@ namespace mxl::lib
     ///
     /// Manages mxl resources allocated by the SDK user.  Represents a single mxfInstance.
     ///
-    class Instance
+    class MXL_EXPORT Instance
     {
     public:
         ///

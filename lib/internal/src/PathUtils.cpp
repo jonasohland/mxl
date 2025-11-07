@@ -3,7 +3,7 @@
 
 #include "mxl-internal/PathUtils.hpp"
 #include <fmt/format.h>
-#include "mxl/platform.h"
+#include <mxl/platform.h>
 
 namespace mxl::lib
 {

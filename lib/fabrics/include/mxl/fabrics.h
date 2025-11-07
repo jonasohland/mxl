@@ -5,9 +5,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <mxl/flow.h>
 #include <mxl/mxl.h>
-#include "mxl/flow.h"
-#include "mxl/platform.h"
+#include <mxl/platform.h>
 
 #ifdef __cplusplus
 extern "C"
