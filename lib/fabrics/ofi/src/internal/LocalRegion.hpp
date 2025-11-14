@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -19,6 +20,10 @@ namespace mxl::lib::fabrics::ofi
     struct LocalRegion
     {
     public:
+        // \brief Create a sub-region of this LocalRegion.
+        [[nodiscard]]
+        LocalRegion sub(std::uint64_t offset, std::size_t length) const noexcept;
+
         // \brief Convert this LocalRegion to a struct iovec used by libfabric transfer functions.
         [[nodiscard]]
         ::iovec toIovec() const noexcept;

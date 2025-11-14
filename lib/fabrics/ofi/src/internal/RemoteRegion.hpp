@@ -19,6 +19,9 @@ namespace mxl::lib::fabrics::ofi
     struct RemoteRegion
     {
     public:
+        [[nodiscard]]
+        RemoteRegion sub(std::uint64_t offset, std::size_t length) const noexcept;
+
         /** \brief Convert this RemoteRegion to a struct fi_rma_iov used by libfabric RMA transfer functions.
          */
         [[nodiscard]]
