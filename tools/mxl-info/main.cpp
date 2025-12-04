@@ -19,6 +19,7 @@
 #include <mxl/flow.h>
 #include <mxl/mxl.h>
 #include <mxl/time.h>
+#include "mxl-internal/FlowInfo.hpp"
 #include "mxl-internal/PathUtils.hpp"
 
 namespace
@@ -76,8 +77,6 @@ namespace
 
         std::ostream& operator<<(std::ostream& os, LatencyPrinter const& lp)
         {
-            os << *lp.flowInfo;
-
             if (mxlIsDiscreteDataFormat(lp.flowInfo->config.common.format))
             {
                 outputLatency(os, lp.flowInfo->runtime.headIndex, lp.flowInfo->config.common.grainRate, lp.flowInfo->config.discrete.grainCount);
@@ -219,6 +218,7 @@ namespace
         }
         else
         {
+            std::cout << info;
             std::cout << formatWithLatency(info);
 
             auto active = false;
