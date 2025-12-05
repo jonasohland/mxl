@@ -546,7 +546,7 @@ public:
                 return status;
             }
 
-            MXL_DEBUG("Comitted grain with index={} current index={} validSlices={} flags={}",
+            MXL_INFO("Comitted grain with index={} current index={} validSlices={} flags={}",
                 grainIndex,
                 mxlGetCurrentIndex(&_configInfo.common.grainRate),
                 validSlices,

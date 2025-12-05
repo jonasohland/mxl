@@ -117,7 +117,7 @@ namespace mxl::lib::fabrics::ofi
             throw Exception::make(MXL_ERR_NO_FABRIC, "No provider available.");
         }
 
-        auto caps = FI_WRITE;
+        auto caps = FI_RMA | FI_WRITE;
         caps |= config.deviceSupport ? FI_HMEM : 0;
 
         auto fabricInfoList = FabricInfoList::get(config.endpointAddress.node, config.endpointAddress.service, provider.value(), caps, FI_EP_RDM);
