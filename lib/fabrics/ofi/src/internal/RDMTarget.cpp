@@ -43,7 +43,12 @@ namespace mxl::lib::fabrics::ofi
 
         auto endpoint = Endpoint::create(domain);
 
-        auto cq = CompletionQueue::open(domain, CompletionQueue::Attributes::defaults());
+        auto cq_attr = CompletionQueue::Attributes::defaults();
+        if (provider == Provider::EFA)
+        {
+            cq_attr.waitObject = FI_WAIT_NONE;
+        }
+        auto cq = CompletionQueue::open(domain, cq_attr);
         endpoint.bind(cq, FI_RECV | FI_TRANSMIT);
 
         // Connectionless endpoints must be bound to an address vector. Even if it is not using the address vector.

@@ -134,7 +134,12 @@ namespace mxl::lib::fabrics::ofi
 
         auto endpoint = Endpoint::create(domain);
 
-        auto cq = CompletionQueue::open(endpoint.domain());
+        auto cq_attr = CompletionQueue::Attributes::defaults();
+        if (provider == Provider::EFA)
+        {
+            cq_attr.waitObject = FI_WAIT_NONE;
+        }
+        auto cq = CompletionQueue::open(endpoint.domain(), cq_attr);
         endpoint.bind(cq, FI_TRANSMIT | FI_RECV);
 
         auto av = AddressVector::open(endpoint.domain());
