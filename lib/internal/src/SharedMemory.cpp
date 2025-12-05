@@ -40,11 +40,11 @@ namespace mxl::lib
         }
         else
         {
-            if ((_fd = ::open(path, (mode == AccessMode::READ_ONLY) ? OMODE_RO : OMODE_RW)) == -1)
+            if ((_fd = ::open(path, (mode == AccessMode::READ_ONLY) ? OMODE_RW : OMODE_RW)) == -1)
             {
                 throw std::system_error(errno, std::generic_category(), "Could not open shared memory segment.");
             }
-            _mode = (mode == AccessMode::READ_ONLY) ? AccessMode::READ_ONLY : AccessMode::READ_WRITE;
+            _mode = (mode == AccessMode::READ_ONLY) ? AccessMode::READ_WRITE : AccessMode::READ_WRITE;
         }
 
         if (mode != AccessMode::READ_ONLY)

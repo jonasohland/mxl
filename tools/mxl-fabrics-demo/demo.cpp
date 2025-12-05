@@ -269,7 +269,7 @@ public:
             }
             while (status == MXL_ERR_NOT_READY);
 
-            MXL_DEBUG("Transferred grain index={} slices {}-{}", grainIndex, startSlice, grainInfo.validSlices);
+            MXL_INFO("Transferred grain index={} slices {}-{}", grainIndex, startSlice, grainInfo.validSlices);
 
             if (grainInfo.validSlices != grainInfo.totalSlices)
             {
