@@ -64,6 +64,10 @@ set_target_properties(mxl-fabrics-objects
             C_EXTENSIONS              OFF
             CXX_EXTENSIONS            OFF
     )
+target_include_directories(mxl-fabrics-objects
+        PUBLIC
+            "${CMAKE_CURRENT_LIST_DIR}/src/internal"
+    )
 
 add_library(mxl-fabrics SHARED)
 target_link_libraries(mxl-fabrics
