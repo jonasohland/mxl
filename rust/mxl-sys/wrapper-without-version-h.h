@@ -8,3 +8,8 @@
 #include "mxl/platform.h"
 #include "mxl/rational.h"
 #include "mxl/time.h"
+
+// #ifdef MXL_ENABLE_FABRICS_OFI
+#include "mxl/fabrics.h"
+#include "mxl/fabrics_ext.h"
+// #endif

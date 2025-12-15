@@ -30,6 +30,12 @@ fn get_bindgen_specs() -> BindgenSpecs {
             .join("include")
             .to_string_lossy()
             .to_string(),
+        repo_root
+            .join("lib")
+            .join("fabrics")
+            .join("include")
+            .to_string_lossy()
+            .to_string(),
     ];
     if cfg!(not(feature = "mxl-not-built")) {
         let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
@@ -41,7 +47,8 @@ fn get_bindgen_specs() -> BindgenSpecs {
         let lib_root = repo_root.join("lib");
         println!("cargo:rerun-if-changed={}", lib_root.display());
 
-        let dst = cmake::Config::new(repo_root)
+        let mut config = cmake::Config::new(repo_root);
+        config
             .generator("Ninja")
             .configure_arg("--preset")
             .configure_arg(BUILD_VARIANT)
@@ -49,8 +56,13 @@ fn get_bindgen_specs() -> BindgenSpecs {
             .configure_arg(out_dir.join("build"))
             .define("BUILD_DOCS", "OFF")
             .define("BUILD_TESTS", "OFF")
-            .define("BUILD_TOOLS", "OFF")
-            .build();
+            .define("BUILD_TOOLS", "OFF");
+
+        if cfg!(feature = "mxl-fabrics") {
+            config.define("MXL_ENABLE_FABRICS_OFI", "ON");
+        }
+
+        let dst = config.build();
 
         println!("cargo:rustc-link-search={}", dst.join("lib").display());
         println!("cargo:rustc-link-lib=mxl");

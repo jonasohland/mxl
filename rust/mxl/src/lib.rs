@@ -10,6 +10,9 @@ mod samples;
 
 pub mod config;
 
+#[cfg(feature = "mxl-fabrics")]
+mod fabrics;
+
 pub use api::{MxlApi, load_api};
 pub use error::{Error, Result};
 pub use flow::{reader::FlowReader, writer::FlowWriter, *};

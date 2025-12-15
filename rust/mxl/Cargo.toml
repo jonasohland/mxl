@@ -22,3 +22,4 @@ tracing-subscriber.workspace = true
 
 [features]
 mxl-not-built = ["mxl-sys/mxl-not-built"]
+mxl-fabrics = ["mxl-sys/mxl-fabrics"]
