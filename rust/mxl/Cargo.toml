@@ -19,7 +19,8 @@ uuid.workspace = true
 [dev-dependencies]
 clap.workspace = true
 tracing-subscriber.workspace = true
+ctrlc.workspace = true
 
 [features]
 mxl-not-built = ["mxl-sys/mxl-not-built"]
-mxl-fabrics = ["mxl-sys/mxl-fabrics"]
+mxl-fabrics-ofi = ["mxl-sys/mxl-fabrics-ofi"]

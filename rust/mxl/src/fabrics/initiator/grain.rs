@@ -15,7 +15,7 @@ impl Initiator for GrainInitiator {
         &self.inner.ctx
     }
 
-    fn inner(&self) -> mxl_sys::FabricsInitiator {
+    fn inner(&self) -> mxl_sys::fabrics::FabricsInitiator {
         self.inner.inner
     }
 }

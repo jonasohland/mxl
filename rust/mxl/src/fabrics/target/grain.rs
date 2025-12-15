@@ -19,7 +19,7 @@ impl Target for GrainTarget {
         &self.inner.ctx
     }
 
-    fn inner(&self) -> mxl_sys::FabricsTarget {
+    fn inner(&self) -> mxl_sys::fabrics::FabricsTarget {
         self.inner.inner
     }
 }

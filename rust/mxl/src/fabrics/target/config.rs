@@ -26,7 +26,7 @@ impl Config {
     }
 }
 
-impl TryFrom<&Config> for mxl_sys::FabricsTargetConfig {
+impl TryFrom<&Config> for mxl_sys::fabrics::FabricsTargetConfig {
     type Error = Error;
 
     fn try_from(value: &Config) -> Result<Self, Self::Error> {

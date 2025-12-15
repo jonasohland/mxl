@@ -56,6 +56,16 @@ impl GrainWriter {
         ))
     }
 
+    pub fn grain_info(&self, entry_index: u64) -> Result<mxl_sys::GrainInfo> {
+        let mut grain_info = mxl_sys::GrainInfo::default();
+        Error::from_status(unsafe {
+            self.context
+                .api
+                .flow_writer_get_grain_info(self.writer, entry_index, &mut grain_info)
+        })?;
+        Ok(grain_info)
+    }
+
     fn destroy_inner(&mut self) -> Result<()> {
         if self.writer.is_null() {
             return Err(Error::InvalidArg);

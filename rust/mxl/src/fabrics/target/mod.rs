@@ -7,10 +7,11 @@ use crate::error::{Error, Result};
 use crate::fabrics::{instance::FabricsInstanceContext, target_info::TargetInfo};
 
 pub use config::Config;
+pub use grain::GrainTarget;
 
 trait Target {
     fn ctx(&self) -> &Rc<FabricsInstanceContext>;
-    fn inner(&self) -> mxl_sys::FabricsTarget;
+    fn inner(&self) -> mxl_sys::fabrics::FabricsTarget;
 }
 
 pub trait TargetShared {
@@ -19,7 +20,7 @@ pub trait TargetShared {
 
 impl<T: Target> TargetShared for T {
     fn setup(&self, config: &Config) -> Result<TargetInfo> {
-        let mut info = mxl_sys::FabricsTargetInfo::default();
+        let mut info = mxl_sys::fabrics::FabricsTargetInfo::default();
         Error::from_status(unsafe {
             self.ctx()
                 .api()
@@ -33,11 +34,14 @@ impl<T: Target> TargetShared for T {
 /// type.
 pub struct UnspecTarget {
     ctx: Rc<FabricsInstanceContext>,
-    inner: mxl_sys::FabricsTarget,
+    inner: mxl_sys::fabrics::FabricsTarget,
 }
 
 impl UnspecTarget {
-    pub(crate) fn new(ctx: Rc<FabricsInstanceContext>, target: mxl_sys::FabricsTarget) -> Self {
+    pub(crate) fn new(
+        ctx: Rc<FabricsInstanceContext>,
+        target: mxl_sys::fabrics::FabricsTarget,
+    ) -> Self {
         Self { ctx, inner: target }
     }
 
@@ -67,7 +71,7 @@ impl Drop for UnspecTarget {
 
 /// Create a new unspecified target.
 pub(crate) fn create_target(ctx: &Rc<FabricsInstanceContext>) -> Result<UnspecTarget> {
-    let mut target = mxl_sys::FabricsTarget::default();
+    let mut target = mxl_sys::fabrics::FabricsTarget::default();
     unsafe {
         Error::from_status(ctx.api().fabrics_create_target(ctx.inner, &mut target))?;
     }

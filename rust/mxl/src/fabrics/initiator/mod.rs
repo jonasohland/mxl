@@ -7,20 +7,21 @@ use crate::{
 };
 
 pub use config::Config;
+pub use grain::GrainInitiator;
 
 use std::{rc::Rc, time::Duration};
 
 /// Defines the basic requirements for behaving as an Initiator.
 trait Initiator {
     fn ctx(&self) -> &Rc<FabricsInstanceContext>;
-    fn inner(&self) -> mxl_sys::FabricsInitiator;
+    fn inner(&self) -> mxl_sys::fabrics::FabricsInitiator;
 }
 
 /// These methods are generic over all initiator specializations.
 pub trait InitiatorShared {
     fn setup(&self, config: &Config) -> Result<()>;
-    fn add_target(&self, target: TargetInfo) -> Result<()>;
-    fn remove_target(&self, target: TargetInfo) -> Result<()>;
+    fn add_target(&self, target: &TargetInfo) -> Result<()>;
+    fn remove_target(&self, target: &TargetInfo) -> Result<()>;
     fn make_progress_non_blocking(&self) -> Result<()>;
     fn make_progress(&self, timeout: Duration) -> Result<()>;
 }
@@ -34,14 +35,14 @@ impl<I: Initiator> InitiatorShared for I {
                 .fabrics_initiator_setup(self.inner(), &config.try_into()?)
         })
     }
-    fn add_target(&self, target: TargetInfo) -> Result<()> {
+    fn add_target(&self, target: &TargetInfo) -> Result<()> {
         Error::from_status(unsafe {
             self.ctx()
                 .api()
                 .fabrics_initiator_add_target(self.inner(), target.inner)
         })
     }
-    fn remove_target(&self, target: TargetInfo) -> Result<()> {
+    fn remove_target(&self, target: &TargetInfo) -> Result<()> {
         Error::from_status(unsafe {
             self.ctx()
                 .api()
@@ -67,13 +68,13 @@ impl<I: Initiator> InitiatorShared for I {
 /// This is an unspecified initiator. See `into_*_initiator` methods to convert to a specific type.
 pub struct UnspecInitiator {
     pub(crate) ctx: Rc<FabricsInstanceContext>,
-    inner: mxl_sys::FabricsInitiator,
+    inner: mxl_sys::fabrics::FabricsInitiator,
 }
 
 impl UnspecInitiator {
     pub(crate) fn new(
         ctx: Rc<FabricsInstanceContext>,
-        initiator: mxl_sys::FabricsInitiator,
+        initiator: mxl_sys::fabrics::FabricsInitiator,
     ) -> Self {
         Self {
             ctx,
@@ -111,7 +112,7 @@ impl Drop for UnspecInitiator {
 
 // Create a new unspecified initiator.
 pub(crate) fn create_initiator(ctx: &Rc<FabricsInstanceContext>) -> Result<UnspecInitiator> {
-    let mut initiator = mxl_sys::FabricsInitiator::default();
+    let mut initiator = mxl_sys::fabrics::FabricsInitiator::default();
     unsafe {
         Error::from_status(
             ctx.api()

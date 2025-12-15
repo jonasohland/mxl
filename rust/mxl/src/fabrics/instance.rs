@@ -1,7 +1,7 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::api::MxlApiHandle;
+use crate::api::MxlFabricsAPiHandle;
 use crate::error::{Error, Result};
 use crate::fabrics::initiator::{UnspecInitiator, create_initiator};
 use crate::fabrics::provider::Provider;
@@ -11,10 +11,15 @@ use crate::fabrics::target_info::TargetInfo;
 use crate::instance::InstanceContext;
 use crate::{FlowReader, FlowWriter};
 
-pub(crate) fn create_instance(ctx: &Arc<InstanceContext>) -> Result<FabricsInstance> {
+pub(crate) fn create_instance(
+    ctx: &Arc<InstanceContext>,
+    fabrics_api: &MxlFabricsAPiHandle,
+) -> Result<FabricsInstance> {
     let mut inst = std::ptr::null_mut();
     unsafe {
-        Error::from_status(ctx.api.fabrics_create_instance(ctx.instance, &mut inst))?;
+        Error::from_status(
+            fabrics_api.fabrics_create_instance(std::mem::transmute(ctx.instance), &mut inst),
+        )?;
     }
     if inst.is_null() {
         return Err(Error::Other(
@@ -23,7 +28,8 @@ pub(crate) fn create_instance(ctx: &Arc<InstanceContext>) -> Result<FabricsInsta
     }
 
     let ctx = Rc::new(FabricsInstanceContext {
-        instance_ctx: ctx.clone(),
+        parent_ctx: ctx.clone(),
+        api: fabrics_api.clone(),
         inner: inst,
     });
 
@@ -31,13 +37,14 @@ pub(crate) fn create_instance(ctx: &Arc<InstanceContext>) -> Result<FabricsInsta
 }
 
 pub(crate) struct FabricsInstanceContext {
-    instance_ctx: Arc<InstanceContext>,
-    pub(crate) inner: mxl_sys::FabricsInstance,
+    parent_ctx: Arc<InstanceContext>,
+    api: MxlFabricsAPiHandle,
+    pub(crate) inner: mxl_sys::fabrics::FabricsInstance,
 }
 
 impl FabricsInstanceContext {
-    pub(crate) fn api(&self) -> &MxlApiHandle {
-        &self.instance_ctx.api
+    pub(crate) fn api(&self) -> &MxlFabricsAPiHandle {
+        &self.api
     }
 }
 
@@ -45,7 +52,7 @@ impl Drop for FabricsInstanceContext {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             unsafe {
-                let _ = self.instance_ctx.api.fabrics_destroy_instance(self.inner);
+                let _ = self.api.fabrics_destroy_instance(self.inner);
             }
         }
     }
