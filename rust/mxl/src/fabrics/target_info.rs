@@ -1,7 +1,7 @@
 use std::{ffi::CString, rc::Rc};
 
 use crate::error::{Error, Result};
-use mxl_sys::FabricsTargetInfo;
+use mxl_sys::fabrics::FabricsTargetInfo;
 
 use crate::fabrics::instance::FabricsInstanceContext;
 pub struct TargetInfo {
