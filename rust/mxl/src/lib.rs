@@ -10,9 +10,6 @@ mod samples;
 
 pub mod config;
 
-#[cfg(feature = "mxl-fabrics")]
-mod fabrics;
-
 pub use api::{MxlApi, load_api};
 pub use error::{Error, Result};
 pub use flow::{reader::FlowReader, writer::FlowWriter, *};
@@ -23,3 +20,8 @@ pub use instance::MxlInstance;
 pub use samples::{
     data::*, reader::SamplesReader, write_access::SamplesWriteAccess, writer::SamplesWriter,
 };
+
+#[cfg(feature = "mxl-fabrics")]
+mod fabrics;
+#[cfg(feature = "mxl-fabrics")]
+pub use fabrics::*;

@@ -6,14 +6,14 @@ use std::rc::Rc;
 use crate::error::{Error, Result};
 use crate::fabrics::{instance::FabricsInstanceContext, target_info::TargetInfo};
 
-use config::Config;
+pub use config::Config;
 
 trait Target {
     fn ctx(&self) -> &Rc<FabricsInstanceContext>;
     fn inner(&self) -> mxl_sys::FabricsTarget;
 }
 
-trait TargetShared {
+pub trait TargetShared {
     fn setup(&self, config: &Config) -> Result<TargetInfo>;
 }
 

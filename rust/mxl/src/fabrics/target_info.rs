@@ -20,7 +20,7 @@ impl TargetInfo {
         Error::from_status(unsafe { self.ctx.api().fabrics_free_target_info(inner) })
     }
 
-    pub fn from_str(ctx: Rc<FabricsInstanceContext>, s: &str) -> Result<Self> {
+    pub(crate) fn from_str(ctx: Rc<FabricsInstanceContext>, s: &str) -> Result<Self> {
         let mut inner = FabricsTargetInfo::default();
 
         Error::from_status(unsafe {

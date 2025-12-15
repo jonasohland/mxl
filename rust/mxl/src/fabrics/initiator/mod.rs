@@ -6,7 +6,7 @@ use crate::{
     fabrics::{instance::FabricsInstanceContext, target_info::TargetInfo},
 };
 
-use config::Config;
+pub use config::Config;
 
 use std::{rc::Rc, time::Duration};
 
@@ -17,7 +17,7 @@ trait Initiator {
 }
 
 /// These methods are generic over all initiator specializations.
-trait InitiatorShared {
+pub trait InitiatorShared {
     fn setup(&self, config: &Config) -> Result<()>;
     fn add_target(&self, target: TargetInfo) -> Result<()>;
     fn remove_target(&self, target: TargetInfo) -> Result<()>;
