@@ -5,7 +5,11 @@ use std::{ffi::CString, rc::Rc};
 
 use crate::fabrics::instance::FabricsInstanceContext;
 
-pub enum Provider {
+pub struct Provider {
+    inner: ProviderType,
+    ctx: Rc<FabricsInstanceContext>,
+}
+enum ProviderType {
     Auto,
     Tcp,
     Verbs,
@@ -13,37 +17,46 @@ pub enum Provider {
     Shm,
 }
 
-impl From<mxl_sys::FabricsProvider> for Provider {
+impl From<mxl_sys::FabricsProvider> for ProviderType {
     fn from(value: mxl_sys::FabricsProvider) -> Self {
         match value {
-            mxl_sys::MXL_FABRICS_PROVIDER_AUTO => Provider::Auto,
-            mxl_sys::MXL_FABRICS_PROVIDER_TCP => Provider::Tcp,
-            mxl_sys::MXL_FABRICS_PROVIDER_VERBS => Provider::Verbs,
-            mxl_sys::MXL_FABRICS_PROVIDER_EFA => Provider::Efa,
-            mxl_sys::MXL_FABRICS_PROVIDER_SHM => Provider::Shm,
+            mxl_sys::MXL_FABRICS_PROVIDER_AUTO => ProviderType::Auto,
+            mxl_sys::MXL_FABRICS_PROVIDER_TCP => ProviderType::Tcp,
+            mxl_sys::MXL_FABRICS_PROVIDER_VERBS => ProviderType::Verbs,
+            mxl_sys::MXL_FABRICS_PROVIDER_EFA => ProviderType::Efa,
+            mxl_sys::MXL_FABRICS_PROVIDER_SHM => ProviderType::Shm,
             _ => panic!("Unknown FabricsProvider value"),
+        }
+    }
+}
+
+impl From<&ProviderType> for mxl_sys::FabricsProvider {
+    fn from(value: &ProviderType) -> Self {
+        match value {
+            ProviderType::Auto => mxl_sys::MXL_FABRICS_PROVIDER_AUTO,
+            ProviderType::Tcp => mxl_sys::MXL_FABRICS_PROVIDER_TCP,
+            ProviderType::Verbs => mxl_sys::MXL_FABRICS_PROVIDER_VERBS,
+            ProviderType::Efa => mxl_sys::MXL_FABRICS_PROVIDER_EFA,
+            ProviderType::Shm => mxl_sys::MXL_FABRICS_PROVIDER_SHM,
         }
     }
 }
 
 impl From<&Provider> for mxl_sys::FabricsProvider {
     fn from(value: &Provider) -> Self {
-        match value {
-            Provider::Auto => mxl_sys::MXL_FABRICS_PROVIDER_AUTO,
-            Provider::Tcp => mxl_sys::MXL_FABRICS_PROVIDER_TCP,
-            Provider::Verbs => mxl_sys::MXL_FABRICS_PROVIDER_VERBS,
-            Provider::Efa => mxl_sys::MXL_FABRICS_PROVIDER_EFA,
-            Provider::Shm => mxl_sys::MXL_FABRICS_PROVIDER_SHM,
-        }
+        (&value.inner).into()
     }
 }
 
 impl Provider {
-    fn new(inner: FabricsProvider) -> Self {
-        inner.into()
+    fn new(ctx: Rc<FabricsInstanceContext>, inner: FabricsProvider) -> Self {
+        Self {
+            inner: inner.into(),
+            ctx,
+        }
     }
 
-    pub fn from_str(ctx: Rc<FabricsInstanceContext>, s: &str) -> Result<Provider> {
+    pub(crate) fn from_str(ctx: Rc<FabricsInstanceContext>, s: &str) -> Result<Provider> {
         let mut inner = FabricsProvider::default();
 
         Error::from_status(unsafe {
@@ -51,16 +64,17 @@ impl Provider {
                 .fabrics_provider_from_string(CString::new(s)?.as_ptr(), &mut inner)
         })?;
 
-        Ok(Self::new(inner))
+        Ok(Self::new(ctx, inner))
     }
 
-    pub fn to_string(&self, ctx: Rc<FabricsInstanceContext>) -> Result<String> {
+    pub(crate) fn to_string(&self) -> Result<String> {
         let mut size = 0;
 
-        let prov: mxl_sys::FabricsProvider = self.into();
+        let prov: mxl_sys::FabricsProvider = (&self.inner).into();
 
         Error::from_status(unsafe {
-            ctx.api()
+            self.ctx
+                .api()
                 .fabrics_provider_to_string(prov, std::ptr::null_mut(), &mut size)
         })?;
 
@@ -68,8 +82,11 @@ impl Provider {
         let out_string = unsafe { CString::from_vec_unchecked(vec![0; size - 1]) };
 
         Error::from_status(unsafe {
-            ctx.api()
-                .fabrics_provider_to_string(prov, out_string.as_ptr() as *mut i8, &mut size)
+            self.ctx.api().fabrics_provider_to_string(
+                prov,
+                out_string.as_ptr() as *mut i8,
+                &mut size,
+            )
         })?;
         out_string
             .into_string()

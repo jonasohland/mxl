@@ -6,8 +6,8 @@ use crate::{
 };
 
 pub struct GrainReadResult {
-    grain_index: u16,
-    slice_index: u16,
+    pub grain_index: u16,
+    pub slice_index: u16,
 }
 
 pub struct GrainTarget {

@@ -10,6 +10,22 @@ pub struct Config {
     device_support: bool,
 }
 
+impl Config {
+    pub fn new(
+        endpoint_addr: EndpointAddress,
+        provider: Provider,
+        regions: Regions,
+        device_support: bool,
+    ) -> Self {
+        Self {
+            endpoint_addr,
+            provider,
+            regions,
+            device_support,
+        }
+    }
+}
+
 impl TryFrom<&Config> for mxl_sys::FabricsTargetConfig {
     type Error = Error;
 
