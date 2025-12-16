@@ -4,13 +4,16 @@ use crate::error::{Error, Result};
 use mxl_sys::fabrics::FabricsTargetInfo;
 
 use crate::fabrics::instance::FabricsInstanceContext;
+
+/// The TargetInfo object holds the local fabric address, keys and memory region addresses for a target.
+/// It is returned after setting up a new target and must be passed to the initiator to connect it.
 pub struct TargetInfo {
     ctx: Rc<FabricsInstanceContext>,
     pub(crate) inner: FabricsTargetInfo,
 }
 
 impl TargetInfo {
-    pub(crate) fn new(ctx: Rc<FabricsInstanceContext>, inner: FabricsTargetInfo) -> Self {
+    fn new(ctx: Rc<FabricsInstanceContext>, inner: FabricsTargetInfo) -> Self {
         Self { ctx, inner }
     }
 
@@ -20,6 +23,9 @@ impl TargetInfo {
         Error::from_status(unsafe { self.ctx.api().fabrics_free_target_info(inner) })
     }
 
+    /// Parse a targetInfo object from its string representation.
+    /// Public visibility is set to crate only, because a `FabricsInstanceContext` is required.
+    /// See `FabricsInstance`.
     pub(crate) fn from_str(ctx: Rc<FabricsInstanceContext>, s: &str) -> Result<Self> {
         let mut inner = FabricsTargetInfo::default();
 
@@ -31,6 +37,7 @@ impl TargetInfo {
         Ok(Self::new(ctx, inner))
     }
 
+    /// Serialize a target info object obtained from mxlFabricsTargetSetup() into a string representation.
     pub fn to_string(&self) -> Result<String> {
         let mut size = 0;
         Error::from_status(unsafe {
@@ -41,7 +48,8 @@ impl TargetInfo {
             )
         })?;
 
-        // fabrics_target_info_to_string already includes space for null terminator. So we must remove it here, because CString includes it.
+        // The size returned by `fabrics_target_info_to_string` previous call already includes space for null terminator.
+        // Since CString ctor also includes the null terminated character, we must take the size minus 1.
         let out_string = unsafe { CString::from_vec_unchecked(vec![0; size - 1]) };
 
         Error::from_status(unsafe {

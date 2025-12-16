@@ -2,6 +2,9 @@ use std::rc::Rc;
 
 use crate::{Error, FlowReader, FlowWriter, Result, fabrics::instance::FabricsInstanceContext};
 
+/// A collection of memory regions that can be the target or the source of remote write operations.
+/// Can be obtained by using a flow reader or writer, and converting it to a regions collection
+/// with mxlFabricsRegionsForFlowReader() or mxlFabricsRegionsForFlowWriter().
 pub struct Regions {
     ctx: Rc<FabricsInstanceContext>,
     inner: mxl_sys::fabrics::FabricsRegions,
@@ -18,6 +21,10 @@ impl Regions {
         Regions { ctx, inner }
     }
 
+    /// Get the backing memory regions of a flow associated with a flow reader.
+    /// The regions will be used to register the shared memory of the reader as source of data transfer operations.
+    /// Public visibility is set to crate only, because a `FabricsInstanceContext` is required.
+    /// See `FabricsInstance`
     pub(crate) fn from_flow_reader(
         ctx: Rc<FabricsInstanceContext>,
         flow_reader: &FlowReader,
@@ -33,6 +40,10 @@ impl Regions {
         Ok(Self::new(ctx, out_regions))
     }
 
+    /// Get the backing memory regions of a flow associated with a flow writer.
+    ///The regions will be used to register the shared memory of the writer as the target of data transfer operations.
+    // Public visibility is set to crate only, because a `FabricsInstanceContext` is required.
+    /// See `FabricsInstance`
     pub(crate) fn from_flow_writer(
         ctx: Rc<FabricsInstanceContext>,
         flow_writer: &FlowWriter,
@@ -54,7 +65,5 @@ impl Drop for Regions {
         if !self.inner.is_null() {
             unsafe { self.ctx.api().fabrics_regions_free(self.inner) };
         }
-
-        // Clean up resources associated with Regions if necessary
     }
 }

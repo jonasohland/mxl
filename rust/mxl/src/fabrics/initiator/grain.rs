@@ -4,8 +4,8 @@ use crate::error::{Error, Result};
 use crate::fabrics::initiator::{Initiator, UnspecInitiator};
 use crate::fabrics::instance::FabricsInstanceContext;
 
-/// This is a grain-based initiator, used to transfer grains to targets. For type extension, see
-/// the `InitatorShared` trait.
+/// This is a grain-based initiator, used to transfer grains to targets.
+/// To get all the available methods, import the trait `InitiatorShared`.
 pub struct GrainInitiator {
     inner: UnspecInitiator,
 }
