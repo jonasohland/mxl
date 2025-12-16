@@ -9,16 +9,21 @@ use crate::fabrics::{instance::FabricsInstanceContext, target_info::TargetInfo};
 pub use config::Config;
 pub use grain::GrainTarget;
 
+/// Defines the basic requirements for behaving as a Target
 trait Target {
     fn ctx(&self) -> &Rc<FabricsInstanceContext>;
     fn inner(&self) -> mxl_sys::fabrics::FabricsTarget;
 }
 
+/// Trait to extend behavior of Targets.
 pub trait TargetShared {
     fn setup(&self, config: &Config) -> Result<TargetInfo>;
 }
 
 impl<T: Target> TargetShared for T {
+    /// Configure the target. After the target has been configured, it is ready to receive transfers from an initiator.
+    /// If additional connection setup is required by the underlying implementation it might not happen during the call to
+    /// setup(), but be deferred until the first call to mxlFabricsTargetTryNewGrain().
     fn setup(&self, config: &Config) -> Result<TargetInfo> {
         let mut info = mxl_sys::fabrics::FabricsTargetInfo::default();
         Error::from_status(unsafe {
@@ -51,7 +56,7 @@ impl UnspecTarget {
         Error::from_status(unsafe { self.ctx.api().fabrics_destroy_target(self.ctx.inner, inner) })
     }
 
-    /// Convert to a Grain Target
+    /// Convert to a Grain Target.
     pub fn into_grain_target(self) -> grain::GrainTarget {
         grain::GrainTarget::new(self)
     }

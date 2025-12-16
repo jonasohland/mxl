@@ -3,6 +3,7 @@ use crate::{
     fabrics::{config::EndpointAddress, provider::Provider, region::Regions},
 };
 
+/// Configuration object required to set up a target.
 pub struct Config {
     endpoint_addr: EndpointAddress,
     provider: Provider,

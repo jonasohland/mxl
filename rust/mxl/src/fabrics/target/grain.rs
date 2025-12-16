@@ -5,11 +5,14 @@ use crate::{
     fabrics::target::{Target, UnspecTarget},
 };
 
+/// Returned value from calling read* methods.
 pub struct GrainReadResult {
     pub grain_index: u16,
     pub slice_index: u16,
 }
 
+/// This is a grain-based target used to receive grains from an initiator.
+/// To get all the available methods, import the trait `TargetShared`.
 pub struct GrainTarget {
     inner: UnspecTarget,
 }
@@ -29,6 +32,7 @@ impl GrainTarget {
         Self { inner }
     }
 
+    /// Non-blocking accessor for a new grain.
     pub fn read(&self, timeout: Duration) -> Result<GrainReadResult> {
         let mut grain_index = 0u16;
         let mut slice_index = 0u16;
@@ -45,7 +49,7 @@ impl GrainTarget {
             slice_index,
         })
     }
-
+    /// Blocking accessor for a new grain.
     pub fn read_blocking(&self) -> Result<GrainReadResult> {
         let mut grain_index = 0u16;
         let mut slice_index = 0u16;

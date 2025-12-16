@@ -58,8 +58,8 @@ impl Drop for FabricsInstanceContext {
     }
 }
 
-/// This is merely a factory for creating Fabrics related objects such as Targets, Initiators, etc.
-/// The fabrics instance and its pointer are held in the FabricsInstanceContext.
+/// This is just a factory type for creating Fabrics related objects such as Targets, Initiators, etc.
+/// The fabrics instance and its pointer are held in the `FabricsInstanceContext` object`.
 pub struct FabricsInstance {
     ctx: Rc<FabricsInstanceContext>,
 }
@@ -68,26 +68,32 @@ impl FabricsInstance {
         Self { ctx }
     }
 
+    /// Create a fabrics target. The target is the receiver of write operations from an initiator.
     pub fn create_target(&self) -> Result<UnspecTarget> {
         create_target(&self.ctx)
     }
 
+    /// Create a fabrics initiator instance.
     pub fn create_initiator(&self) -> Result<UnspecInitiator> {
         create_initiator(&self.ctx)
     }
 
+    /// See Region::from_flow_reader().
     pub fn regions_from_reader(&self, flow_reader: &FlowReader) -> Result<Regions> {
         Regions::from_flow_reader(self.ctx.clone(), flow_reader)
     }
 
+    /// See Region::from_flow_writer().
     pub fn regions_from_writer(&self, flow_writer: &FlowWriter) -> Result<Regions> {
         Regions::from_flow_writer(self.ctx.clone(), flow_writer)
     }
 
+    /// See Provider::from_str().
     pub fn provider_from_str(&self, provider: &str) -> Result<Provider> {
         Provider::from_str(self.ctx.clone(), provider)
     }
 
+    /// See TargetInfo::from_str().
     pub fn target_info_from_str(&self, target_info: &str) -> Result<TargetInfo> {
         TargetInfo::from_str(self.ctx.clone(), target_info)
     }
