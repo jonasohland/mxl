@@ -13,36 +13,24 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow readers / write
     auto instance = mxlCreateInstance(domain.string().c_str(), opts);
     REQUIRE(instance != nullptr);
 
-    auto flowDef = mxl::tests::readFile("data/audio_flow.json");
+    mxlFlowWriter audioWriter;
+    mxlFlowWriter videoWriter;
+    mxlFlowWriter metaWriter;
     mxlFlowConfigInfo configInfo;
-    REQUIRE(mxlCreateFlow(instance, flowDef.c_str(), opts, &configInfo) == MXL_STATUS_OK);
+    auto flowDef = mxl::tests::readFile("data/audio_flow.json");
+    REQUIRE(mxlCreateFlowWriter(instance, flowDef.c_str(), opts, &audioWriter, &configInfo) == MXL_STATUS_OK);
     auto const audioFlowId = uuids::to_string(configInfo.common.id);
     flowDef = mxl::tests::readFile("data/v210_flow.json");
-    REQUIRE(mxlCreateFlow(instance, flowDef.c_str(), opts, &configInfo) == MXL_STATUS_OK);
+    REQUIRE(mxlCreateFlowWriter(instance, flowDef.c_str(), opts, &videoWriter, &configInfo) == MXL_STATUS_OK);
     auto const videoFlowId = uuids::to_string(configInfo.common.id);
-
     flowDef = mxl::tests::readFile("data/data_flow.json");
-    REQUIRE(mxlCreateFlow(instance, flowDef.c_str(), opts, &configInfo) == MXL_STATUS_OK);
+    REQUIRE(mxlCreateFlowWriter(instance, flowDef.c_str(), opts, &metaWriter, &configInfo) == MXL_STATUS_OK);
     auto const metaFlowId = uuids::to_string(configInfo.common.id);
 
     REQUIRE(audioFlowId != videoFlowId);
     REQUIRE(audioFlowId != metaFlowId);
     REQUIRE(videoFlowId != metaFlowId);
 
-    mxlFlowWriter audioWriter;
-    REQUIRE(mxlCreateFlowWriter(instance, audioFlowId.c_str(), "", &audioWriter) == MXL_STATUS_OK);
-    REQUIRE(audioWriter != nullptr);
-    mxlFlowWriter audioWriter2;
-    REQUIRE(mxlCreateFlowWriter(instance, audioFlowId.c_str(), "", &audioWriter2) == MXL_STATUS_OK);
-    REQUIRE(audioWriter2 != nullptr);
-    mxlFlowWriter videoWriter;
-    REQUIRE(mxlCreateFlowWriter(instance, videoFlowId.c_str(), "", &videoWriter) == MXL_STATUS_OK);
-    REQUIRE(videoWriter != nullptr);
-    mxlFlowWriter metaWriter;
-    REQUIRE(mxlCreateFlowWriter(instance, metaFlowId.c_str(), "", &metaWriter) == MXL_STATUS_OK);
-    REQUIRE(metaWriter != nullptr);
-
-    REQUIRE(audioWriter == audioWriter2);
     REQUIRE(audioWriter != videoWriter);
     REQUIRE(audioWriter != metaWriter);
     REQUIRE(videoWriter != metaWriter);
@@ -75,13 +63,8 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow readers / write
     REQUIRE(mxlReleaseFlowReader(instance, metaReader) == MXL_STATUS_OK);
 
     REQUIRE(mxlReleaseFlowWriter(instance, audioWriter) == MXL_STATUS_OK);
-    REQUIRE(mxlReleaseFlowWriter(instance, audioWriter2) == MXL_STATUS_OK);
     REQUIRE(mxlReleaseFlowWriter(instance, videoWriter) == MXL_STATUS_OK);
     REQUIRE(mxlReleaseFlowWriter(instance, metaWriter) == MXL_STATUS_OK);
-
-    REQUIRE(mxlDestroyFlow(instance, metaFlowId.c_str()) == MXL_STATUS_OK);
-    REQUIRE(mxlDestroyFlow(instance, videoFlowId.c_str()) == MXL_STATUS_OK);
-    REQUIRE(mxlDestroyFlow(instance, audioFlowId.c_str()) == MXL_STATUS_OK);
 
     REQUIRE(mxlDestroyInstance(instance) == MXL_STATUS_OK);
 }

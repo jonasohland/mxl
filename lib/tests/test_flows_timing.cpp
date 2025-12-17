@@ -35,14 +35,13 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Video Flow : Wait fo
     REQUIRE(instanceWriter != nullptr);
 
     auto flowDef = mxl::tests::readFile("data/v210_flow.json");
+    mxlFlowWriter writer;
     mxlFlowConfigInfo configInfo;
-    REQUIRE(mxlCreateFlow(instanceWriter, flowDef.c_str(), opts, &configInfo) == MXL_STATUS_OK);
-    auto const flowId = uuids::to_string(configInfo.common.id);
+    REQUIRE(mxlCreateFlowWriter(instanceWriter, flowDef.c_str(), opts, &writer, &configInfo) == MXL_STATUS_OK);
 
     mxlFlowReader reader;
+    auto const flowId = uuids::to_string(configInfo.common.id);
     REQUIRE(mxlCreateFlowReader(instanceReader, flowId.c_str(), "", &reader) == MXL_STATUS_OK);
-    mxlFlowWriter writer;
-    REQUIRE(mxlCreateFlowWriter(instanceWriter, flowId.c_str(), "", &writer) == MXL_STATUS_OK);
 
     auto const readerGrainIndex = mxlGetCurrentIndex(&configInfo.common.grainRate);
     auto const frameDurationNs = 1000000000 * configInfo.common.grainRate.denominator / configInfo.common.grainRate.numerator;
@@ -78,7 +77,6 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Video Flow : Wait fo
 
     REQUIRE(mxlReleaseFlowReader(instanceReader, reader) == MXL_STATUS_OK);
     REQUIRE(mxlReleaseFlowWriter(instanceWriter, writer) == MXL_STATUS_OK);
-    REQUIRE(mxlDestroyFlow(instanceWriter, flowId.c_str()) == MXL_STATUS_OK);
     REQUIRE(mxlDestroyInstance(instanceReader) == MXL_STATUS_OK);
     REQUIRE(mxlDestroyInstance(instanceWriter) == MXL_STATUS_OK);
 }

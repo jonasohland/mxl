@@ -336,14 +336,6 @@ public:
             }
         }
 
-        if (_flowExits)
-        {
-            if (status = mxlDestroyFlow(_instance, _config.flowID.c_str()); status != MXL_STATUS_OK)
-            {
-                MXL_ERROR("Failed to destroy flow with status '{}'", static_cast<int>(status));
-            }
-        }
-
         if (_instance != nullptr)
         {
             if (status = mxlDestroyInstance(_instance); status != MXL_STATUS_OK)
@@ -370,16 +362,8 @@ public:
         }
 
         mxlFlowConfigInfo configInfo;
-        status = mxlCreateFlow(_instance, flowDescriptor.c_str(), nullptr, &configInfo);
-        if (status != MXL_STATUS_OK)
-        {
-            MXL_ERROR("Failed to create flow with status '{}'", static_cast<int>(status));
-            return status;
-        }
-        _flowExits = true;
-
         // Create a flow writer for the given flow id.
-        status = mxlCreateFlowWriter(_instance, _config.flowID.c_str(), "", &_writer);
+        status = mxlCreateFlowWriter(_instance, flowDescriptor.c_str(), "", &_writer, &configInfo);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to create flow writer with status '{}'", static_cast<int>(status));
@@ -512,8 +496,6 @@ private:
     mxlFlowWriter _writer;
     mxlFabricsTarget _target;
     mxlTargetInfo _targetInfo;
-
-    bool _flowExits{false};
 };
 
 int main(int argc, char** argv)

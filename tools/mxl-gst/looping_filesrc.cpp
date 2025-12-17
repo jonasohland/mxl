@@ -82,8 +82,6 @@ public:
             if (flowWriterVideo)
             {
                 mxlReleaseFlowWriter(mxlInstance, flowWriterVideo);
-                auto id = uuids::to_string(videoFlowId);
-                mxlDestroyFlow(mxlInstance, id.c_str());
             }
 
             mxlDestroyInstance(mxlInstance);
@@ -246,14 +244,7 @@ public:
             videoFlowId = createVideoFlowJson(uri, width, height, videoGrainRate, true, colorimetry, flowDef);
 
             mxlFlowConfigInfo configInfo;
-            auto res = mxlCreateFlow(mxlInstance, flowDef.c_str(), nullptr, &configInfo);
-            if (res != MXL_STATUS_OK)
-            {
-                MXL_ERROR("Failed to create flow: {}", (int)res);
-                return false;
-            }
-
-            res = mxlCreateFlowWriter(mxlInstance, uuids::to_string(videoFlowId).c_str(), nullptr, &flowWriterVideo);
+            auto res = mxlCreateFlowWriter(mxlInstance, flowDef.c_str(), nullptr, &flowWriterVideo, &configInfo);
             if (res != MXL_STATUS_OK)
             {
                 MXL_ERROR("Failed to create flow writer: {}", (int)res);

@@ -448,16 +448,7 @@ namespace
                 throw std::runtime_error{"Failed to create MXL instance."};
             }
 
-            // Create the flow
-            if (auto const ret = ::mxlCreateFlow(_instance, flow_descriptor.c_str(), flowOptions.c_str(), &_configInfo); ret != MXL_STATUS_OK)
-            {
-                throw std::runtime_error{fmt::format("Failed to create flow with status code {}.", static_cast<int>(ret))};
-            }
-            _flowOpened = true;
-
-            // Create the flow writer
-            auto const flowID = to_string(uuids::uuid{_configInfo.common.id});
-            if (::mxlCreateFlowWriter(_instance, flowID.c_str(), "", &_writer) != MXL_STATUS_OK)
+            if (::mxlCreateFlowWriter(_instance, flow_descriptor.c_str(), flowOptions.c_str(), &_writer, &_configInfo) != MXL_STATUS_OK)
             {
                 throw std::runtime_error{"Failed to create flow writer."};
             }
@@ -468,13 +459,6 @@ namespace
             if (_writer != nullptr)
             {
                 ::mxlReleaseFlowWriter(_instance, _writer);
-            }
-
-            if (_flowOpened)
-            {
-                auto const flowID = to_string(uuids::uuid{_configInfo.common.id});
-                MXL_INFO("Destroying flow -> {}", flowID);
-                ::mxlDestroyFlow(_instance, flowID.c_str());
             }
 
             if (_instance != nullptr)
@@ -760,7 +744,6 @@ namespace
             : _instance{}
             , _writer{}
             , _configInfo{}
-            , _flowOpened{false}
         {}
 
     private:
@@ -768,7 +751,6 @@ namespace
 
         mxlFlowWriter _writer;
         mxlFlowConfigInfo _configInfo;
-        bool _flowOpened;
     };
 
     std::string readFile(std::string const& filepath)
