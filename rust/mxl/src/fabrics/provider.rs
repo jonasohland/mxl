@@ -5,7 +5,8 @@ use std::{ffi::CString, rc::Rc};
 
 use crate::fabrics::instance::FabricsInstanceContext;
 
-/// The provider corresponds to the transport used for transfers.
+/// The provider corresponds to the transport used for transfers. This is created from a
+/// [FabricsInstance](crate::FabricsInstance).
 #[derive(Clone)]
 pub struct Provider {
     inner: ProviderType,
@@ -54,6 +55,7 @@ impl From<&Provider> for mxl_sys::fabrics::FabricsProvider {
 }
 
 impl Provider {
+    #[doc(hidden)]
     fn new(ctx: Rc<FabricsInstanceContext>, inner: FabricsProvider) -> Self {
         Self {
             inner: inner.into(),
@@ -63,7 +65,7 @@ impl Provider {
 
     /// Convert a string to a fabrics provider enum value.
     /// Public visibility is set to crate only, because a `FabricsInstanceContext` is required.
-    /// See `FabricsInstance`.
+    /// See [FabricsInstance](crate::FabricsInstance).
     pub(crate) fn from_str(ctx: Rc<FabricsInstanceContext>, s: &str) -> Result<Provider> {
         let mut inner = FabricsProvider::default();
 

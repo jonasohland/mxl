@@ -17,6 +17,7 @@ pub struct GrainReadResult {
 /// This is a grain-based target used to receive grains from an initiator.
 /// To get all the available methods, import the trait `TargetShared`.
 pub struct GrainTarget {
+    #[doc(hidden)]
     inner: UnspecTarget,
 }
 
@@ -31,11 +32,12 @@ impl Target for GrainTarget {
 }
 
 impl GrainTarget {
+    #[doc(hidden)]
     pub(crate) fn new(inner: UnspecTarget) -> Self {
         Self { inner }
     }
 
-    /// Non-blocking accessor for a new grain.
+    ///Blocking accessor for a new grain.
     pub fn read(&self, timeout: Duration) -> Result<GrainReadResult> {
         let mut grain_index = 0u16;
         let mut slice_index = 0u16;
@@ -52,7 +54,7 @@ impl GrainTarget {
             slice_index,
         })
     }
-    /// Blocking accessor for a new grain.
+    /// Non-blocking accessor for a new grain.
     pub fn read_non_blocking(&self) -> Result<GrainReadResult> {
         let mut grain_index = 0u16;
         let mut slice_index = 0u16;

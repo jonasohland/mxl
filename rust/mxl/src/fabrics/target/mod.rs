@@ -35,14 +35,17 @@ impl<T: Target> TargetShared for T {
     }
 }
 
-/// This is an unspecified target. See `into_*_target` methods to convert into a specific target
-/// type.
+/// This is an unspecialized target. See `into_*_target` methods to convert into a specific target
+/// type. This is created via a [FabricsInstance](crate::fabrics::FabricsInstance).
 pub struct UnspecTarget {
+    #[doc(hidden)]
     ctx: Rc<FabricsInstanceContext>,
+    #[doc(hidden)]
     inner: mxl_sys::fabrics::FabricsTarget,
 }
 
 impl UnspecTarget {
+    #[doc(hidden)]
     pub(crate) fn new(
         ctx: Rc<FabricsInstanceContext>,
         target: mxl_sys::fabrics::FabricsTarget,
@@ -53,6 +56,16 @@ impl UnspecTarget {
     /// Convert to a Grain Target.
     pub fn into_grain_target(self) -> grain::GrainTarget {
         grain::GrainTarget::new(self)
+    }
+}
+
+impl Target for UnspecTarget {
+    fn ctx(&self) -> &Rc<FabricsInstanceContext> {
+        &self.ctx
+    }
+
+    fn inner(&self) -> mxl_sys::fabrics::FabricsTarget {
+        self.inner
     }
 }
 
@@ -68,7 +81,8 @@ impl Drop for UnspecTarget {
     }
 }
 
-/// Create a new unspecified target.
+/// Create a new unspecialized target.
+#[doc(hidden)]
 pub(crate) fn create_target(ctx: &Rc<FabricsInstanceContext>) -> Result<UnspecTarget> {
     let mut target = mxl_sys::fabrics::FabricsTarget::default();
     unsafe {
