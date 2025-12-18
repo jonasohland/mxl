@@ -4,16 +4,16 @@ use crate::{
 };
 
 /// Configuration object required to set up an initiator.
-pub struct Config {
-    endpoint_addr: EndpointAddress,
+pub struct Config<'a> {
+    endpoint_addr: EndpointAddress<'a>,
     provider: Provider,
     regions: Regions,
     device_support: bool,
 }
 
-impl Config {
+impl<'a> Config<'a> {
     pub fn new(
-        endpoint_addr: EndpointAddress,
+        endpoint_addr: EndpointAddress<'a>,
         provider: Provider,
         regions: Regions,
         device_support: bool,
@@ -27,7 +27,7 @@ impl Config {
     }
 }
 
-impl TryFrom<&Config> for mxl_sys::fabrics::FabricsInitiatorConfig {
+impl<'a> TryFrom<&Config<'a>> for mxl_sys::fabrics::FabricsInitiatorConfig {
     type Error = Error;
 
     fn try_from(value: &Config) -> Result<Self, Self::Error> {

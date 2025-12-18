@@ -8,6 +8,10 @@ pub struct GrainData<'a> {
 
     /// The total size of the grain payload, which may be larger than `payload.len()` if the grain is partial.
     pub total_size: usize,
+
+    /// The number of slices in the full grain. This is does not change depending on whether the
+    /// grain is partial or complete.
+    pub total_slices: u16,
 }
 
 impl<'a> GrainData<'a> {

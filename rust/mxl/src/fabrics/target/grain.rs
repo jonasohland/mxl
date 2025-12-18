@@ -1,8 +1,11 @@
-use std::time::Duration;
+use std::{rc::Rc, time::Duration};
 
 use crate::{
     Error, Result,
-    fabrics::target::{Target, UnspecTarget},
+    fabrics::{
+        instance::FabricsInstanceContext,
+        target::{Target, UnspecTarget},
+    },
 };
 
 /// Returned value from calling read* methods.
@@ -18,7 +21,7 @@ pub struct GrainTarget {
 }
 
 impl Target for GrainTarget {
-    fn ctx(&self) -> &std::rc::Rc<crate::fabrics::instance::FabricsInstanceContext> {
+    fn ctx(&self) -> &Rc<FabricsInstanceContext> {
         &self.inner.ctx
     }
 
@@ -50,7 +53,7 @@ impl GrainTarget {
         })
     }
     /// Blocking accessor for a new grain.
-    pub fn read_blocking(&self) -> Result<GrainReadResult> {
+    pub fn read_non_blocking(&self) -> Result<GrainReadResult> {
         let mut grain_index = 0u16;
         let mut slice_index = 0u16;
         Error::from_status(unsafe {

@@ -62,8 +62,8 @@ impl<'a> TargetEndpoint<'a> {
 
         let target_config = mxl::TargetConfig::new(
             EndpointAddress {
-                node: cli.node.clone(),
-                service: cli.service.clone(),
+                node: Some(&cli.node),
+                service: Some(&cli.service),
             },
             provider,
             regions,
@@ -111,8 +111,7 @@ impl<'a> TargetEndpoint<'a> {
                     break;
                 }
                 Err(e) => {
-                    println!("Error reading from target: {}.", e);
-                    break;
+                    return Err(e);
                 }
             }
         }
@@ -145,8 +144,8 @@ impl<'a> InitiatorEndpoint<'a> {
 
         let initiator_config = mxl::InitiatorConfig::new(
             EndpointAddress {
-                node: cli.node.clone(),
-                service: cli.service.clone(),
+                node: Some(&cli.node),
+                service: Some(&cli.service),
             },
             provider,
             regions,
@@ -190,18 +189,14 @@ impl<'a> InitiatorEndpoint<'a> {
 
         let mut grain_index = self.instance.get_current_index(&rate);
 
-        loop {
-            if !running.load(std::sync::atomic::Ordering::SeqCst) {
-                break;
-            }
-
+        // Main loop
+        while running.load(std::sync::atomic::Ordering::SeqCst) {
             match self
                 .flow_reader
                 .get_complete_grain(grain_index, Duration::from_millis(200))
             {
-                Ok(_grain) => {
-                    match self.initiator.transfer(grain_index, 0, 720) {
-                        //TODO:expose the end slice
+                Ok(grain) => {
+                    match self.initiator.transfer(grain_index, 0, grain.total_slices) {
                         Err(Error::NotReady) => {
                             // Retry the same grain
                             continue;
@@ -212,6 +207,7 @@ impl<'a> InitiatorEndpoint<'a> {
                         Ok(_) => {}
                     };
 
+                    // Transfer was posted, now wait for completion
                     loop {
                         match self.initiator.make_progress(Duration::from_millis(10)) {
                             Ok(_) => {
@@ -251,7 +247,6 @@ impl<'a> InitiatorEndpoint<'a> {
     }
 }
 
-//TODO: Fix broken destroy flow: FlowWriter should be destroyed before destroying the flow
 impl<'a> Drop for TargetEndpoint<'a> {
     fn drop(&mut self) {
         self.instance

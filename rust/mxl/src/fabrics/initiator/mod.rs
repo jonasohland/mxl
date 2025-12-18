@@ -98,16 +98,6 @@ impl UnspecInitiator {
         }
     }
 
-    pub(crate) fn destroy(mut self) -> Result<()> {
-        let mut inner = std::ptr::null_mut();
-        std::mem::swap(&mut self.inner, &mut inner);
-        Error::from_status(unsafe {
-            self.ctx
-                .api()
-                .fabrics_destroy_initiator(self.ctx.inner, inner)
-        })
-    }
-
     /// Convert to a Grain Initiator. A Grain Initiator allows to transfer "grains" only.
     pub fn into_grain_initiator(self) -> grain::GrainInitiator {
         grain::GrainInitiator::new(self)
