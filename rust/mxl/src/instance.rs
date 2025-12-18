@@ -5,10 +5,7 @@ use std::{ffi::CString, sync::Arc};
 
 #[cfg(feature = "mxl-fabrics-ofi")]
 use crate::api::MxlFabricsAPiHandle;
-use crate::{
-    Error, FlowConfigInfo, FlowReader, FlowWriter, Result, api::MxlApiHandle,
-    fabrics::FabricsInstance,
-};
+use crate::{Error, FlowConfigInfo, FlowReader, FlowWriter, Result, api::MxlApiHandle};
 
 /// This struct stores the context that is shared by all objects.
 /// It is separated out from `MxlInstance` so that it can be cloned
@@ -233,7 +230,7 @@ impl MxlInstance {
     pub fn create_fabrics_instance(
         &self,
         fabrics_api: &MxlFabricsAPiHandle,
-    ) -> Result<FabricsInstance> {
+    ) -> Result<crate::fabrics::FabricsInstance> {
         use crate::fabrics;
 
         fabrics::create_instance(&self.context, fabrics_api)
