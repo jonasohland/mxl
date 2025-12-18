@@ -10,10 +10,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use mxl::{
-    InitiatorShared, MxlFabricsApi, MxlInstance, OwnedGrainData, OwnedSamplesData, TargetInfo,
-    TargetShared, config::get_mxl_so_path,
-};
+use mxl::{MxlInstance, OwnedGrainData, OwnedSamplesData, config::get_mxl_so_path};
 use tracing::info;
 
 static LOG_ONCE: std::sync::Once = std::sync::Once::new();
@@ -162,22 +159,216 @@ fn get_flow_def() {
     mxl_instance.destroy().unwrap();
 }
 
-struct GrainTarget {
-    flow_info: mxl::FlowConfigInfo,
-    _flow_writer: mxl::FlowWriter,
-    target: mxl::GrainTarget,
-}
-impl GrainTarget {
-    pub fn inner(&self) -> &mxl::GrainTarget {
-        &self.target
+#[cfg(feature = "mxl-fabrics-ofi")]
+mod fabrics {
+    use mxl::{InitiatorShared, MxlFabricsApi, TargetInfo, TargetShared};
+
+    use super::*;
+
+    struct GrainTarget {
+        flow_info: mxl::FlowConfigInfo,
+        _flow_writer: mxl::FlowWriter,
+        target: mxl::GrainTarget,
     }
-    pub fn wait_for_completion(&self, initiator: &GrainInitiator, timeout: Duration) -> bool {
+    impl GrainTarget {
+        pub fn inner(&self) -> &mxl::GrainTarget {
+            &self.target
+        }
+        pub fn wait_for_completion(&self, initiator: &GrainInitiator, timeout: Duration) -> bool {
+            let now = SystemTime::now();
+            loop {
+                let _ = initiator.inner().make_progress_non_blocking(); //progress must be done
+                //manually on the initiator for the transfer to comlete.
+                if self.inner().read(Duration::from_millis(250)).is_ok() {
+                    // Completed!
+                    return true;
+                }
+
+                if now.elapsed().unwrap() > timeout {
+                    return false;
+                }
+            }
+        }
+    }
+
+    #[derive(Default)]
+    struct TargetBuilder<'a> {
+        flow_file: std::path::PathBuf,
+        provider: &'a str,
+        node: Option<&'a str>,
+        service: Option<&'a str>,
+    }
+    impl<'a> TargetBuilder<'a> {
+        pub fn new(flow_file: std::path::PathBuf) -> Self {
+            Self {
+                flow_file,
+                provider: "tcp",
+                ..Default::default()
+            }
+        }
+        pub fn provider(mut self, provider: &'a str) -> Self {
+            self.provider = provider;
+            self
+        }
+        pub fn node(mut self, node: &'a str) -> Self {
+            self.node = Some(node);
+            self
+        }
+        pub fn service(mut self, service: &'a str) -> Self {
+            self.service = Some(service);
+            self
+        }
+
+        pub fn build_grain(
+            self,
+            mxl_instance: &MxlInstance,
+            fabrics_api: &Arc<MxlFabricsApi>,
+        ) -> Result<(GrainTarget, TargetInfo), mxl::Error> {
+            let flow_def = read_flow_def(self.flow_file.as_path());
+            let flow_info = mxl_instance.create_flow(flow_def.as_str(), None)?;
+            let flow_id = flow_info.common().id().to_string();
+            let flow_writer = mxl_instance.create_flow_writer(flow_id.as_str())?;
+            let fabrics_instance = mxl_instance.create_fabrics_instance(fabrics_api)?;
+            let provider = fabrics_instance.provider_from_str(self.provider)?;
+            let target_regions = fabrics_instance.regions_from_writer(&flow_writer).unwrap();
+            let target_config = mxl::TargetConfig::new(
+                mxl::EndpointAddress {
+                    node: self.node,
+                    service: self.service,
+                },
+                provider.clone(),
+                target_regions,
+                false,
+            );
+            let target = fabrics_instance
+                .create_target()
+                .unwrap()
+                .into_grain_target();
+            let target_info = target.setup(&target_config)?;
+
+            Ok((
+                GrainTarget {
+                    flow_info,
+                    _flow_writer: flow_writer,
+                    target,
+                },
+                target_info,
+            ))
+        }
+    }
+
+    struct GrainInitiator {
+        _flow_reader: mxl::FlowReader,
+        initiator: mxl::GrainInitiator,
+    }
+    impl GrainInitiator {
+        pub fn add_target(&self, target_info: &TargetInfo) -> Result<(), mxl::Error> {
+            self.initiator.add_target(target_info)
+        }
+        pub fn inner(&self) -> &mxl::GrainInitiator {
+            &self.initiator
+        }
+        fn post_transfer(
+            &self,
+            grain_index: u64,
+            start_slice: u16,
+            end_slice: u16,
+            timeout: Duration,
+        ) -> bool {
+            let now = SystemTime::now();
+            loop {
+                let _ = self.inner().make_progress_non_blocking();
+                if self
+                    .inner()
+                    .transfer(grain_index, start_slice, end_slice)
+                    .is_ok()
+                {
+                    return true;
+                }
+
+                let elapsed = now.elapsed().unwrap();
+                if elapsed > timeout {
+                    return false;
+                }
+
+                let remain = timeout - elapsed;
+                std::thread::sleep(std::cmp::min(remain, Duration::from_millis(100)));
+            }
+        }
+    }
+
+    #[derive(Default)]
+    struct InitiatorBuilder<'a> {
+        flow_id: &'a str,
+        provider: &'a str,
+        node: Option<&'a str>,
+        service: Option<&'a str>,
+    }
+    impl<'a> InitiatorBuilder<'a> {
+        pub fn new(flow_id: &'a str) -> Self {
+            Self {
+                flow_id,
+                provider: "tcp",
+                ..Default::default()
+            }
+        }
+        pub fn provider(mut self, provider: &'a str) -> Self {
+            self.provider = provider;
+            self
+        }
+        pub fn node(mut self, node: &'a str) -> Self {
+            self.node = Some(node);
+            self
+        }
+        pub fn service(mut self, service: &'a str) -> Self {
+            self.service = Some(service);
+            self
+        }
+        pub fn build_grain(
+            self,
+            mxl_instance: &MxlInstance,
+            fabrics_api: &Arc<MxlFabricsApi>,
+        ) -> Result<GrainInitiator, mxl::Error> {
+            let fabrics_instance = mxl_instance.create_fabrics_instance(fabrics_api)?;
+            let provider = fabrics_instance.provider_from_str(self.provider)?;
+            let flow_reader = mxl_instance.create_flow_reader(self.flow_id)?;
+            let initiator_regions = fabrics_instance.regions_from_reader(&flow_reader)?;
+
+            let initiator_config = mxl::InitiatorConfig::new(
+                mxl::EndpointAddress {
+                    node: self.node,
+                    service: self.service,
+                },
+                provider,
+                initiator_regions,
+                false,
+            );
+            let initiator = fabrics_instance
+                .create_initiator()
+                .unwrap()
+                .into_grain_initiator();
+            initiator.setup(&initiator_config)?;
+
+            Ok(GrainInitiator {
+                _flow_reader: flow_reader,
+                initiator,
+            })
+        }
+    }
+    fn wait_for_connection(
+        target: &GrainTarget,
+        initiator: &GrainInitiator,
+        timeout: Duration,
+    ) -> bool {
         let now = SystemTime::now();
         loop {
-            let _ = initiator.inner().make_progress_non_blocking(); //progress must be done
-            //manually on the initiator for the transfer to comlete.
-            if self.inner().read(Duration::from_millis(250)).is_ok() {
-                // Completed!
+            let _ = target.inner().read_non_blocking();
+            if initiator
+                .inner()
+                .make_progress(Duration::from_millis(250))
+                .is_ok()
+            {
+                // Connected!
                 return true;
             }
 
@@ -186,254 +377,67 @@ impl GrainTarget {
             }
         }
     }
-}
 
-#[derive(Default)]
-struct TargetBuilder<'a> {
-    flow_file: std::path::PathBuf,
-    provider: &'a str,
-    node: Option<&'a str>,
-    service: Option<&'a str>,
-}
-impl<'a> TargetBuilder<'a> {
-    pub fn new(flow_file: std::path::PathBuf) -> Self {
-        Self {
-            flow_file,
-            provider: "tcp",
-            ..Default::default()
-        }
+    #[cfg(feature = "mxl-fabrics-ofi")]
+    #[test]
+    fn test_fabrics_connection() {
+        use mxl::config::get_mxl_fabrics_ofi_so_path;
+
+        let (mxl_instance, _domain_guard) = setup_test("fabrics_basic");
+
+        let fabrics_api = mxl::load_fabrics_api(get_mxl_fabrics_ofi_so_path()).unwrap();
+
+        let (target, target_info) = TargetBuilder::new("lib/tests/data/v210_flow.json".into())
+            .provider("tcp")
+            .node("127.0.0.1")
+            .service("0")
+            .build_grain(&mxl_instance, &fabrics_api)
+            .unwrap();
+        let initiator = InitiatorBuilder::new(target.flow_info.common().id().to_string().as_str())
+            .provider("tcp")
+            .node("127.0.0.1")
+            .service("0")
+            .build_grain(&mxl_instance, &fabrics_api)
+            .unwrap();
+        initiator.add_target(&target_info).unwrap();
+
+        assert!(wait_for_connection(
+            &target,
+            &initiator,
+            Duration::from_secs(5),
+        ));
     }
-    pub fn provider(mut self, provider: &'a str) -> Self {
-        self.provider = provider;
-        self
+
+    #[cfg(feature = "mxl-fabrics-ofi")]
+    #[test]
+    fn test_fabrics_grain_transfer() {
+        use mxl::config::get_mxl_fabrics_ofi_so_path;
+
+        let (mxl_instance, _domain_guard) = setup_test("fabrics_basic");
+
+        let fabrics_api = mxl::load_fabrics_api(get_mxl_fabrics_ofi_so_path()).unwrap();
+
+        let (target, target_info) = TargetBuilder::new("lib/tests/data/v210_flow.json".into())
+            .provider("tcp")
+            .node("127.0.0.1")
+            .service("0")
+            .build_grain(&mxl_instance, &fabrics_api)
+            .unwrap();
+        let initiator = InitiatorBuilder::new(target.flow_info.common().id().to_string().as_str())
+            .provider("tcp")
+            .node("127.0.0.1")
+            .service("0")
+            .build_grain(&mxl_instance, &fabrics_api)
+            .unwrap();
+        initiator.add_target(&target_info).unwrap();
+
+        assert!(wait_for_connection(
+            &target,
+            &initiator,
+            Duration::from_secs(5),
+        ));
+
+        assert!(initiator.post_transfer(0, 0, 1080, Duration::from_secs(5)));
+        assert!(target.wait_for_completion(&initiator, Duration::from_secs(5)));
     }
-    pub fn node(mut self, node: &'a str) -> Self {
-        self.node = Some(node);
-        self
-    }
-    pub fn service(mut self, service: &'a str) -> Self {
-        self.service = Some(service);
-        self
-    }
-
-    pub fn build_grain(
-        self,
-        mxl_instance: &MxlInstance,
-        fabrics_api: &Arc<MxlFabricsApi>,
-    ) -> Result<(GrainTarget, TargetInfo), mxl::Error> {
-        let flow_def = read_flow_def(self.flow_file.as_path());
-        let flow_info = mxl_instance.create_flow(flow_def.as_str(), None)?;
-        let flow_id = flow_info.common().id().to_string();
-        let flow_writer = mxl_instance.create_flow_writer(flow_id.as_str())?;
-        let fabrics_instance = mxl_instance.create_fabrics_instance(fabrics_api)?;
-        let provider = fabrics_instance.provider_from_str(self.provider)?;
-        let target_regions = fabrics_instance.regions_from_writer(&flow_writer).unwrap();
-        let target_config = mxl::TargetConfig::new(
-            mxl::EndpointAddress {
-                node: self.node,
-                service: self.service,
-            },
-            provider.clone(),
-            target_regions,
-            false,
-        );
-        let target = fabrics_instance
-            .create_target()
-            .unwrap()
-            .into_grain_target();
-        let target_info = target.setup(&target_config)?;
-
-        Ok((
-            GrainTarget {
-                flow_info,
-                _flow_writer: flow_writer,
-                target,
-            },
-            target_info,
-        ))
-    }
-}
-
-struct GrainInitiator {
-    _flow_reader: mxl::FlowReader,
-    initiator: mxl::GrainInitiator,
-}
-impl GrainInitiator {
-    pub fn add_target(&self, target_info: &TargetInfo) -> Result<(), mxl::Error> {
-        self.initiator.add_target(target_info)
-    }
-    pub fn inner(&self) -> &mxl::GrainInitiator {
-        &self.initiator
-    }
-    fn post_transfer(
-        &self,
-        grain_index: u64,
-        start_slice: u16,
-        end_slice: u16,
-        timeout: Duration,
-    ) -> bool {
-        let now = SystemTime::now();
-        loop {
-            let _ = self.inner().make_progress_non_blocking();
-            if self
-                .inner()
-                .transfer(grain_index, start_slice, end_slice)
-                .is_ok()
-            {
-                return true;
-            }
-
-            let elapsed = now.elapsed().unwrap();
-            if elapsed > timeout {
-                return false;
-            }
-
-            let remain = timeout - elapsed;
-            std::thread::sleep(std::cmp::min(remain, Duration::from_millis(100)));
-        }
-    }
-}
-
-#[derive(Default)]
-struct InitiatorBuilder<'a> {
-    flow_id: &'a str,
-    provider: &'a str,
-    node: Option<&'a str>,
-    service: Option<&'a str>,
-}
-impl<'a> InitiatorBuilder<'a> {
-    pub fn new(flow_id: &'a str) -> Self {
-        Self {
-            flow_id,
-            provider: "tcp",
-            ..Default::default()
-        }
-    }
-    pub fn provider(mut self, provider: &'a str) -> Self {
-        self.provider = provider;
-        self
-    }
-    pub fn node(mut self, node: &'a str) -> Self {
-        self.node = Some(node);
-        self
-    }
-    pub fn service(mut self, service: &'a str) -> Self {
-        self.service = Some(service);
-        self
-    }
-    pub fn build_grain(
-        self,
-        mxl_instance: &MxlInstance,
-        fabrics_api: &Arc<MxlFabricsApi>,
-    ) -> Result<GrainInitiator, mxl::Error> {
-        let fabrics_instance = mxl_instance.create_fabrics_instance(fabrics_api)?;
-        let provider = fabrics_instance.provider_from_str(self.provider)?;
-        let flow_reader = mxl_instance.create_flow_reader(self.flow_id)?;
-        let initiator_regions = fabrics_instance.regions_from_reader(&flow_reader)?;
-
-        let initiator_config = mxl::InitiatorConfig::new(
-            mxl::EndpointAddress {
-                node: self.node,
-                service: self.service,
-            },
-            provider,
-            initiator_regions,
-            false,
-        );
-        let initiator = fabrics_instance
-            .create_initiator()
-            .unwrap()
-            .into_grain_initiator();
-        initiator.setup(&initiator_config)?;
-
-        Ok(GrainInitiator {
-            _flow_reader: flow_reader,
-            initiator,
-        })
-    }
-}
-fn wait_for_connection(
-    target: &GrainTarget,
-    initiator: &GrainInitiator,
-    timeout: Duration,
-) -> bool {
-    let now = SystemTime::now();
-    loop {
-        let _ = target.inner().read_non_blocking();
-        if initiator
-            .inner()
-            .make_progress(Duration::from_millis(250))
-            .is_ok()
-        {
-            // Connected!
-            return true;
-        }
-
-        if now.elapsed().unwrap() > timeout {
-            return false;
-        }
-    }
-}
-
-#[cfg(feature = "mxl-fabrics-ofi")]
-#[test]
-fn test_fabrics_connection() {
-    use mxl::config::get_mxl_fabrics_ofi_so_path;
-
-    let (mxl_instance, _domain_guard) = setup_test("fabrics_basic");
-
-    let fabrics_api = mxl::load_fabrics_api(get_mxl_fabrics_ofi_so_path()).unwrap();
-
-    let (target, target_info) = TargetBuilder::new("lib/tests/data/v210_flow.json".into())
-        .provider("tcp")
-        .node("127.0.0.1")
-        .service("0")
-        .build_grain(&mxl_instance, &fabrics_api)
-        .unwrap();
-    let initiator = InitiatorBuilder::new(target.flow_info.common().id().to_string().as_str())
-        .provider("tcp")
-        .node("127.0.0.1")
-        .service("0")
-        .build_grain(&mxl_instance, &fabrics_api)
-        .unwrap();
-    initiator.add_target(&target_info).unwrap();
-
-    assert!(wait_for_connection(
-        &target,
-        &initiator,
-        Duration::from_secs(5),
-    ));
-}
-
-#[cfg(feature = "mxl-fabrics-ofi")]
-#[test]
-fn test_fabrics_grain_transfer() {
-    use mxl::config::get_mxl_fabrics_ofi_so_path;
-
-    let (mxl_instance, _domain_guard) = setup_test("fabrics_basic");
-
-    let fabrics_api = mxl::load_fabrics_api(get_mxl_fabrics_ofi_so_path()).unwrap();
-
-    let (target, target_info) = TargetBuilder::new("lib/tests/data/v210_flow.json".into())
-        .provider("tcp")
-        .node("127.0.0.1")
-        .service("0")
-        .build_grain(&mxl_instance, &fabrics_api)
-        .unwrap();
-    let initiator = InitiatorBuilder::new(target.flow_info.common().id().to_string().as_str())
-        .provider("tcp")
-        .node("127.0.0.1")
-        .service("0")
-        .build_grain(&mxl_instance, &fabrics_api)
-        .unwrap();
-    initiator.add_target(&target_info).unwrap();
-
-    assert!(wait_for_connection(
-        &target,
-        &initiator,
-        Duration::from_secs(5),
-    ));
-
-    assert!(initiator.post_transfer(0, 0, 1080, Duration::from_secs(5)));
-    assert!(target.wait_for_completion(&initiator, Duration::from_secs(5)));
 }

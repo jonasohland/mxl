@@ -3,7 +3,6 @@
 
 use std::{path::Path, sync::Arc};
 
-use mxl_sys::fabrics::libmxlfabrics;
 use mxl_sys::libmxl;
 
 use crate::Result;
@@ -18,13 +17,13 @@ pub fn load_api(path_to_so_file: impl AsRef<Path>) -> Result<MxlApiHandle> {
 }
 
 #[cfg(feature = "mxl-fabrics-ofi")]
-pub type MxlFabricsApi = libmxlfabrics;
+pub type MxlFabricsApi = mxl_sys::fabrics::libmxlfabrics;
 #[cfg(feature = "mxl-fabrics-ofi")]
 pub type MxlFabricsAPiHandle = Arc<MxlFabricsApi>;
 
 #[cfg(feature = "mxl-fabrics-ofi")]
 pub fn load_fabrics_api(path_to_so_file: impl AsRef<Path>) -> Result<MxlFabricsAPiHandle> {
     Ok(Arc::new(unsafe {
-        libmxlfabrics::new(path_to_so_file.as_ref().as_os_str())?
+        mxl_sys::fabrics::libmxlfabrics::new(path_to_so_file.as_ref().as_os_str())?
     }))
 }

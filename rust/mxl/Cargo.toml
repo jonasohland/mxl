@@ -24,3 +24,7 @@ ctrlc.workspace = true
 [features]
 mxl-not-built = ["mxl-sys/mxl-not-built"]
 mxl-fabrics-ofi = ["mxl-sys/mxl-fabrics-ofi"]
+
+[[example]]
+name = "fabrics"
+required-features = ["mxl-fabrics-ofi"]
