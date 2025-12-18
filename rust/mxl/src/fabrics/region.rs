@@ -32,7 +32,10 @@ impl Regions {
         let mut out_regions = mxl_sys::fabrics::FabricsRegions::default();
         Error::from_status(unsafe {
             ctx.api().fabrics_regions_for_flow_reader(
-                std::mem::transmute(flow_reader.inner()),
+                std::mem::transmute::<
+                    *mut mxl_sys::FlowReader_t,
+                    *mut mxl_sys::fabrics::FlowReader_t,
+                >(flow_reader.inner()),
                 &mut out_regions,
             )
         })?;
@@ -51,7 +54,10 @@ impl Regions {
         let mut out_regions = mxl_sys::fabrics::FabricsRegions::default();
         Error::from_status(unsafe {
             ctx.api().fabrics_regions_for_flow_writer(
-                std::mem::transmute(flow_writer.inner()),
+                std::mem::transmute::<
+                    *mut mxl_sys::FlowWriter_t,
+                    *mut mxl_sys::fabrics::FlowWriter_t,
+                >(flow_writer.inner()),
                 &mut out_regions,
             )
         })?;

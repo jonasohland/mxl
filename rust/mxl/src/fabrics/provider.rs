@@ -6,12 +6,14 @@ use std::{ffi::CString, rc::Rc};
 use crate::fabrics::instance::FabricsInstanceContext;
 
 /// The provider corresponds to the transport used for transfers.
+#[derive(Clone)]
 pub struct Provider {
     inner: ProviderType,
     ctx: Rc<FabricsInstanceContext>,
 }
 
 /// The available transports
+#[derive(Clone)]
 enum ProviderType {
     Auto,
     Tcp,

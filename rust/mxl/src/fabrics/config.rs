@@ -5,18 +5,25 @@ use crate::Error;
 /// Address of a logical network endpoint. This is analogous to a hostname and port number in classic ipv4 networking.
 /// The actual values for node and service vary between providers, but often an ip address as the node value and a port number as the service
 /// value are sufficient.
-pub struct EndpointAddress {
-    pub node: String,
-    pub service: String,
+pub struct EndpointAddress<'a> {
+    pub node: Option<&'a str>,
+    pub service: Option<&'a str>,
 }
 
-impl TryFrom<&EndpointAddress> for mxl_sys::fabrics::FabricsEndpointAddress {
+impl<'a> TryFrom<&EndpointAddress<'a>> for mxl_sys::fabrics::FabricsEndpointAddress {
     type Error = Error;
 
     fn try_from(value: &EndpointAddress) -> Result<Self, Self::Error> {
-        Ok(mxl_sys::fabrics::FabricsEndpointAddress {
-            node: CString::new(value.node.clone())?.into_raw(),
-            service: CString::new(value.service.clone())?.into_raw(),
-        })
+        let node = if let Some(node) = value.node {
+            CString::new(node)?.into_raw()
+        } else {
+            std::ptr::null_mut()
+        };
+        let service = if let Some(service) = value.service {
+            CString::new(service)?.into_raw()
+        } else {
+            std::ptr::null_mut()
+        };
+        Ok(mxl_sys::fabrics::FabricsEndpointAddress { node, service })
     }
 }

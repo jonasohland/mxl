@@ -17,12 +17,6 @@ impl TargetInfo {
         Self { ctx, inner }
     }
 
-    fn destroy(mut self) -> Result<()> {
-        let mut inner = std::ptr::null_mut();
-        std::mem::swap(&mut self.inner, &mut inner);
-        Error::from_status(unsafe { self.ctx.api().fabrics_free_target_info(inner) })
-    }
-
     /// Parse a targetInfo object from its string representation.
     /// Public visibility is set to crate only, because a `FabricsInstanceContext` is required.
     /// See `FabricsInstance`.

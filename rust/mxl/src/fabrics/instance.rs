@@ -17,9 +17,12 @@ pub(crate) fn create_instance(
 ) -> Result<FabricsInstance> {
     let mut inst = std::ptr::null_mut();
     unsafe {
-        Error::from_status(
-            fabrics_api.fabrics_create_instance(std::mem::transmute(ctx.instance), &mut inst),
-        )?;
+        Error::from_status(fabrics_api.fabrics_create_instance(
+            std::mem::transmute::<*mut mxl_sys::Instance_t, *mut mxl_sys::fabrics::Instance_t>(
+                ctx.instance,
+            ),
+            &mut inst,
+        ))?;
     }
     if inst.is_null() {
         return Err(Error::Other(
@@ -28,7 +31,7 @@ pub(crate) fn create_instance(
     }
 
     let ctx = Rc::new(FabricsInstanceContext {
-        parent_ctx: ctx.clone(),
+        _parent_ctx: ctx.clone(),
         api: fabrics_api.clone(),
         inner: inst,
     });
@@ -37,7 +40,7 @@ pub(crate) fn create_instance(
 }
 
 pub(crate) struct FabricsInstanceContext {
-    parent_ctx: Arc<InstanceContext>,
+    _parent_ctx: Arc<InstanceContext>,
     api: MxlFabricsAPiHandle,
     pub(crate) inner: mxl_sys::fabrics::FabricsInstance,
 }

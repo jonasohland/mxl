@@ -50,12 +50,6 @@ impl UnspecTarget {
         Self { ctx, inner: target }
     }
 
-    pub(crate) fn destroy(mut self) -> Result<()> {
-        let mut inner = std::ptr::null_mut();
-        std::mem::swap(&mut self.inner, &mut inner);
-        Error::from_status(unsafe { self.ctx.api().fabrics_destroy_target(self.ctx.inner, inner) })
-    }
-
     /// Convert to a Grain Target.
     pub fn into_grain_target(self) -> grain::GrainTarget {
         grain::GrainTarget::new(self)
