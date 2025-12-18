@@ -7,6 +7,7 @@ use crate::fabrics::instance::FabricsInstanceContext;
 /// This is a grain-based initiator, used to transfer grains to targets.
 /// To get all the available methods, import the trait `InitiatorShared`.
 pub struct GrainInitiator {
+    #[doc(hidden)]
     inner: UnspecInitiator,
 }
 
@@ -21,6 +22,7 @@ impl Initiator for GrainInitiator {
 }
 
 impl GrainInitiator {
+    #[doc(hidden)]
     pub(crate) fn new(inner: UnspecInitiator) -> Self {
         Self { inner }
     }

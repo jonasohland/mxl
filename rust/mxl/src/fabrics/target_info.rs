@@ -13,13 +13,14 @@ pub struct TargetInfo {
 }
 
 impl TargetInfo {
+    #[doc(hidden)]
     pub(crate) fn new(ctx: Rc<FabricsInstanceContext>, inner: FabricsTargetInfo) -> Self {
         Self { ctx, inner }
     }
 
     /// Parse a targetInfo object from its string representation.
     /// Public visibility is set to crate only, because a `FabricsInstanceContext` is required.
-    /// See `FabricsInstance`.
+    /// See [FabricsInstance](crate::FabricsInstance).
     pub(crate) fn from_str(ctx: Rc<FabricsInstanceContext>, s: &str) -> Result<Self> {
         let mut inner = FabricsTargetInfo::default();
 

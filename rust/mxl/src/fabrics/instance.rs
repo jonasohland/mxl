@@ -11,6 +11,7 @@ use crate::fabrics::target_info::TargetInfo;
 use crate::instance::InstanceContext;
 use crate::{FlowReader, FlowWriter};
 
+#[doc(hidden)]
 pub(crate) fn create_instance(
     ctx: &Arc<InstanceContext>,
     fabrics_api: &MxlFabricsAPiHandle,
@@ -40,8 +41,11 @@ pub(crate) fn create_instance(
 }
 
 pub(crate) struct FabricsInstanceContext {
+    #[doc(hidden)]
     _parent_ctx: Arc<InstanceContext>,
+    #[doc(hidden)]
     api: MxlFabricsAPiHandle,
+    #[doc(hidden)]
     pub(crate) inner: mxl_sys::fabrics::FabricsInstance,
 }
 
@@ -62,11 +66,14 @@ impl Drop for FabricsInstanceContext {
 }
 
 /// This is just a factory type for creating Fabrics related objects such as Targets, Initiators, etc.
-/// The fabrics instance and its pointer are held in the `FabricsInstanceContext` object`.
+/// The fabrics instance and its pointer are held in the `FabricsInstanceContext`` object.
+/// This is created via an [MxlInstance](crate::MxlInstance).
 pub struct FabricsInstance {
+    #[doc(hidden)]
     ctx: Rc<FabricsInstanceContext>,
 }
 impl FabricsInstance {
+    #[doc(hidden)]
     fn new(ctx: Rc<FabricsInstanceContext>) -> Self {
         Self { ctx }
     }
@@ -81,22 +88,18 @@ impl FabricsInstance {
         create_initiator(&self.ctx)
     }
 
-    /// See Region::from_flow_reader().
     pub fn regions_from_reader(&self, flow_reader: &FlowReader) -> Result<Regions> {
         Regions::from_flow_reader(self.ctx.clone(), flow_reader)
     }
 
-    /// See Region::from_flow_writer().
     pub fn regions_from_writer(&self, flow_writer: &FlowWriter) -> Result<Regions> {
         Regions::from_flow_writer(self.ctx.clone(), flow_writer)
     }
 
-    /// See Provider::from_str().
     pub fn provider_from_str(&self, provider: &str) -> Result<Provider> {
         Provider::from_str(self.ctx.clone(), provider)
     }
 
-    /// See TargetInfo::from_str().
     pub fn target_info_from_str(&self, target_info: &str) -> Result<TargetInfo> {
         TargetInfo::from_str(self.ctx.clone(), target_info)
     }

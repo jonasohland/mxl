@@ -42,7 +42,7 @@ pub trait InitiatorShared {
     fn make_progress(&self, timeout: Duration) -> Result<()>;
 }
 
-/// Implement these shared methods for any Iterator,
+/// Implement these shared methods for any Initiator.
 impl<I: Initiator> InitiatorShared for I {
     fn setup(&self, config: &Config) -> Result<()> {
         Error::from_status(unsafe {
@@ -81,13 +81,17 @@ impl<I: Initiator> InitiatorShared for I {
     }
 }
 
-/// This is an unspecified initiator. See `into_*_initiator` methods to convert to a specialization.
+/// This is an unspecialized initiator. See `into_*_initiator` methods to convert to a
+/// specialization. This is created via a [FabricsInstance](crate::fabrics::FabricsInstance).
 pub struct UnspecInitiator {
-    pub(crate) ctx: Rc<FabricsInstanceContext>,
+    #[doc(hidden)]
+    ctx: Rc<FabricsInstanceContext>,
+    #[doc(hidden)]
     inner: mxl_sys::fabrics::FabricsInitiator,
 }
 
 impl UnspecInitiator {
+    #[doc(hidden)]
     pub(crate) fn new(
         ctx: Rc<FabricsInstanceContext>,
         initiator: mxl_sys::fabrics::FabricsInitiator,
@@ -104,6 +108,16 @@ impl UnspecInitiator {
     }
 }
 
+impl Initiator for UnspecInitiator {
+    fn ctx(&self) -> &Rc<FabricsInstanceContext> {
+        &self.ctx
+    }
+
+    fn inner(&self) -> mxl_sys::fabrics::FabricsInitiator {
+        self.inner
+    }
+}
+
 impl Drop for UnspecInitiator {
     fn drop(&mut self) {
         if !self.inner.is_null() {
@@ -116,6 +130,7 @@ impl Drop for UnspecInitiator {
     }
 }
 
+#[doc(hidden)]
 pub(crate) fn create_initiator(ctx: &Rc<FabricsInstanceContext>) -> Result<UnspecInitiator> {
     let mut initiator = mxl_sys::fabrics::FabricsInitiator::default();
     unsafe {
