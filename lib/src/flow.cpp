@@ -178,9 +178,12 @@ mxlStatus mxlCreateFlowWriter(mxlInstance instance, char const* flowDef, char co
 
     try
     {
-        auto [nConfigInfo, nwriter] = cppInstance->createFlowWriter(flowDef, (options == nullptr) ? std::nullopt : std::make_optional(options));
-        *configInfo = nConfigInfo;
-        *writer = reinterpret_cast<mxlFlowWriter>(nwriter);
+        static_assert(std::is_trivially_copy_assignable_v<mxlFlowConfigInfo>, "The type mxlFlowConfigInfo must be trivially copy assignable.");
+        static_assert(std::is_nothrow_copy_assignable_v<mxlFlowConfigInfo>, "Copying mxlFlowConfigInfo cannot throw.");
+
+        auto [flowConfigInfo, flowWriter] = cppInstance->createFlowWriter(flowDef, (options == nullptr) ? std::nullopt : std::make_optional(options));
+        *configInfo = flowConfigInfo;
+        *writer = reinterpret_cast<mxlFlowWriter>(flowWriter);
     }
     catch (std::filesystem::filesystem_error const& e)
     {
