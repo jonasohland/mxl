@@ -244,11 +244,17 @@ public:
             videoFlowId = createVideoFlowJson(uri, width, height, videoGrainRate, true, colorimetry, flowDef);
 
             mxlFlowConfigInfo configInfo;
-            auto res = mxlCreateFlowWriter(mxlInstance, flowDef.c_str(), nullptr, &flowWriterVideo, &configInfo);
+            bool flowCreated = false;
+            auto res = mxlCreateFlowWriter(mxlInstance, flowDef.c_str(), nullptr, &flowWriterVideo, &configInfo, &flowCreated);
             if (res != MXL_STATUS_OK)
             {
                 MXL_ERROR("Failed to create flow writer: {}", (int)res);
                 return false;
+            }
+
+            if (!flowCreated)
+            {
+                MXL_WARN("Reusing existing flow.");
             }
 
             MXL_INFO("Video flow : {}", uuids::to_string(videoFlowId));

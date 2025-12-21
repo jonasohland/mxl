@@ -17,14 +17,18 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow readers / write
     mxlFlowWriter videoWriter;
     mxlFlowWriter metaWriter;
     mxlFlowConfigInfo configInfo;
+    bool flowWasCreated;
     auto flowDef = mxl::tests::readFile("data/audio_flow.json");
-    REQUIRE(mxlCreateFlowWriter(instance, flowDef.c_str(), opts, &audioWriter, &configInfo) == MXL_STATUS_OK);
+    REQUIRE(mxlCreateFlowWriter(instance, flowDef.c_str(), opts, &audioWriter, &configInfo, &flowWasCreated) == MXL_STATUS_OK);
+    REQUIRE(flowWasCreated);
     auto const audioFlowId = uuids::to_string(configInfo.common.id);
     flowDef = mxl::tests::readFile("data/v210_flow.json");
-    REQUIRE(mxlCreateFlowWriter(instance, flowDef.c_str(), opts, &videoWriter, &configInfo) == MXL_STATUS_OK);
+    REQUIRE(mxlCreateFlowWriter(instance, flowDef.c_str(), opts, &videoWriter, &configInfo, &flowWasCreated) == MXL_STATUS_OK);
+    REQUIRE(flowWasCreated);
     auto const videoFlowId = uuids::to_string(configInfo.common.id);
     flowDef = mxl::tests::readFile("data/data_flow.json");
-    REQUIRE(mxlCreateFlowWriter(instance, flowDef.c_str(), opts, &metaWriter, &configInfo) == MXL_STATUS_OK);
+    REQUIRE(mxlCreateFlowWriter(instance, flowDef.c_str(), opts, &metaWriter, &configInfo, &flowWasCreated) == MXL_STATUS_OK);
+    REQUIRE(flowWasCreated);
     auto const metaFlowId = uuids::to_string(configInfo.common.id);
 
     REQUIRE(audioFlowId != videoFlowId);
@@ -77,10 +81,13 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow deletion on wri
     mxlFlowWriter writerA = nullptr;
     mxlFlowWriter writerB = nullptr;
     mxlFlowConfigInfo flowConfig;
+    bool flowWasCreated = false;
 
     auto flowDef = mxl::tests::readFile("data/v210_flow.json");
-    REQUIRE(mxlCreateFlowWriter(instanceA, flowDef.c_str(), nullptr, &writerA, &flowConfig) == MXL_STATUS_OK);
-    REQUIRE(mxlCreateFlowWriter(instanceB, flowDef.c_str(), nullptr, &writerB, &flowConfig) == MXL_STATUS_OK);
+    REQUIRE(mxlCreateFlowWriter(instanceA, flowDef.c_str(), nullptr, &writerA, &flowConfig, &flowWasCreated) == MXL_STATUS_OK);
+    REQUIRE(flowWasCreated);
+    REQUIRE(mxlCreateFlowWriter(instanceB, flowDef.c_str(), nullptr, &writerB, &flowConfig, &flowWasCreated) == MXL_STATUS_OK);
+    REQUIRE_FALSE(flowWasCreated);
 
     auto id = uuids::to_string(flowConfig.common.id);
 
@@ -107,10 +114,13 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow deletion on ins
     mxlFlowWriter writerA = nullptr;
     mxlFlowWriter writerB = nullptr;
     mxlFlowConfigInfo flowConfig;
+    bool flowWasCreated = false;
 
     auto flowDef = mxl::tests::readFile("data/v210_flow.json");
-    REQUIRE(mxlCreateFlowWriter(instanceA, flowDef.c_str(), nullptr, &writerA, &flowConfig) == MXL_STATUS_OK);
-    REQUIRE(mxlCreateFlowWriter(instanceB, flowDef.c_str(), nullptr, &writerB, &flowConfig) == MXL_STATUS_OK);
+    REQUIRE(mxlCreateFlowWriter(instanceA, flowDef.c_str(), nullptr, &writerA, &flowConfig, &flowWasCreated) == MXL_STATUS_OK);
+    REQUIRE(flowWasCreated);
+    REQUIRE(mxlCreateFlowWriter(instanceB, flowDef.c_str(), nullptr, &writerB, &flowConfig, &flowWasCreated) == MXL_STATUS_OK);
+    REQUIRE_FALSE(flowWasCreated);
 
     auto id = uuids::to_string(flowConfig.common.id);
 

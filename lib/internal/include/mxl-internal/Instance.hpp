@@ -11,6 +11,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <tuple>
 #include <uuid.h>
 #include <mxl/mxl.h>
 #include <mxl/platform.h>
@@ -48,10 +49,7 @@ namespace mxl::lib
         ///
         /// \param[in] flowDef The json flow definition according to the NMOS Flow Resource json schema
         /// \param[in] options Additional options for flow creation
-        std::pair<mxlFlowConfigInfo, FlowWriter*> createFlowWriter(std::string const& flowDef, std::optional<std::string> options = {});
-
-        std::unique_ptr<FlowData> createOrOpenDiscreteFlowData(std::string const& flowDef, FlowParser const&, FlowOptionsParser const&);
-        std::unique_ptr<FlowData> createOrOpenContinuousFlowData(std::string const& flowDef, FlowParser const&, FlowOptionsParser const&);
+        std::tuple<mxlFlowConfigInfo, FlowWriter*, bool> createFlowWriter(std::string const& flowDef, std::optional<std::string> options = {});
 
     public:
         ///
@@ -131,6 +129,11 @@ namespace mxl::lib
         };
 
     private:
+        std::pair<std::unique_ptr<FlowData>, bool> createOrOpenDiscreteFlowData(std::string const& flowDef, FlowParser const&,
+            FlowOptionsParser const&);
+        std::pair<std::unique_ptr<FlowData>, bool> createOrOpenContinuousFlowData(std::string const& flowDef, FlowParser const&,
+            FlowOptionsParser const&);
+
         void fileChangedCallback(uuids::uuid const& flowId, WatcherType type);
 
         /// Parses the options json string (if non empty) and merges it with the optional

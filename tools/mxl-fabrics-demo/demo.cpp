@@ -362,12 +362,17 @@ public:
         }
 
         mxlFlowConfigInfo configInfo;
+        bool flowCreated = false;
         // Create a flow writer for the given flow id.
-        status = mxlCreateFlowWriter(_instance, flowDescriptor.c_str(), "", &_writer, &configInfo);
+        status = mxlCreateFlowWriter(_instance, flowDescriptor.c_str(), "", &_writer, &configInfo, &flowCreated);
         if (status != MXL_STATUS_OK)
         {
             MXL_ERROR("Failed to create flow writer with status '{}'", static_cast<int>(status));
             return status;
+        }
+        if (!flowCreated)
+        {
+            MXL_WARN("Reusing existing flow");
         }
 
         mxlRegions memoryRegions;

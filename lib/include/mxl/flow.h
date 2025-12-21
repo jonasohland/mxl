@@ -140,7 +140,7 @@ extern "C"
 
     MXL_EXPORT
     mxlStatus mxlCreateFlowWriter(mxlInstance instance, char const* flowDef, char const* options, mxlFlowWriter* writer,
-        mxlFlowConfigInfo* configInfo);
+        mxlFlowConfigInfo* configInfo, bool* created);
 
     MXL_EXPORT
     mxlStatus mxlReleaseFlowWriter(mxlInstance instance, mxlFlowWriter writer);

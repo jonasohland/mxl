@@ -161,7 +161,8 @@ mxlStatus mxlReleaseFlowReader(mxlInstance instance, mxlFlowReader reader)
 
 extern "C"
 MXL_EXPORT
-mxlStatus mxlCreateFlowWriter(mxlInstance instance, char const* flowDef, char const* options, mxlFlowWriter* writer, mxlFlowConfigInfo* configInfo)
+mxlStatus mxlCreateFlowWriter(mxlInstance instance, char const* flowDef, char const* options, mxlFlowWriter* writer, mxlFlowConfigInfo* configInfo,
+    bool* created)
 {
     if ((instance == nullptr) || (flowDef == nullptr) || (writer == nullptr))
     {
@@ -181,9 +182,19 @@ mxlStatus mxlCreateFlowWriter(mxlInstance instance, char const* flowDef, char co
         static_assert(std::is_trivially_copy_assignable_v<mxlFlowConfigInfo>, "The type mxlFlowConfigInfo must be trivially copy assignable.");
         static_assert(std::is_nothrow_copy_assignable_v<mxlFlowConfigInfo>, "Copying mxlFlowConfigInfo cannot throw.");
 
-        auto [flowConfigInfo, flowWriter] = cppInstance->createFlowWriter(flowDef, (options == nullptr) ? std::nullopt : std::make_optional(options));
-        *configInfo = flowConfigInfo;
+        auto [flowConfigInfo, flowWriter, flowCreated] = cppInstance->createFlowWriter(flowDef,
+            (options == nullptr) ? std::nullopt : std::make_optional(options));
+
         *writer = reinterpret_cast<mxlFlowWriter>(flowWriter);
+
+        if (configInfo != nullptr)
+        {
+            *configInfo = flowConfigInfo;
+        }
+        if (created != nullptr)
+        {
+            *created = flowCreated;
+        }
     }
     catch (std::filesystem::filesystem_error const& e)
     {

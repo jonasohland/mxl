@@ -220,21 +220,26 @@ namespace mxl::lib
         }
     }
 
-    std::pair<mxlFlowConfigInfo, FlowWriter*> Instance::createFlowWriter(std::string const& flowDef, std::optional<std::string> options)
+    std::tuple<mxlFlowConfigInfo, FlowWriter*, bool> Instance::createFlowWriter(std::string const& flowDef, std::optional<std::string> options)
     {
         auto const lock = std::lock_guard{_mutex};
         auto const parser = FlowParser{flowDef};
         auto const optionsParser = (options) ? FlowOptionsParser{*options} : FlowOptionsParser{};
+        auto created = false;
         auto flowData = std::unique_ptr<FlowData>{};
         FlowWriter* flowWriter = nullptr;
 
         if (auto const format = parser.getFormat(); mxlIsDiscreteDataFormat(format))
         {
-            flowData = createOrOpenDiscreteFlowData(flowDef, parser, optionsParser);
+            auto [rFlowData, rCreated] = createOrOpenDiscreteFlowData(flowDef, parser, optionsParser);
+            flowData = std::move(rFlowData);
+            created = rCreated;
         }
         else if (mxlIsContinuousDataFormat(format))
         {
-            flowData = createOrOpenContinuousFlowData(flowDef, parser, optionsParser);
+            auto [rFlowData, rWasCreated] = createOrOpenContinuousFlowData(flowDef, parser, optionsParser);
+            flowData = std::move(rFlowData);
+            created = rWasCreated;
         }
         else
         {
@@ -268,10 +273,10 @@ namespace mxl::lib
             flowWriter = (*_writers.try_emplace(pos, id, std::move(writer))).second.get();
         }
 
-        return {flowConfigInfo, flowWriter};
+        return {flowConfigInfo, flowWriter, created};
     }
 
-    std::unique_ptr<FlowData> Instance::createOrOpenDiscreteFlowData(std::string const& flowDef, FlowParser const& parser,
+    std::pair<std::unique_ptr<FlowData>, bool> Instance::createOrOpenDiscreteFlowData(std::string const& flowDef, FlowParser const& parser,
         FlowOptionsParser const& optionsParser)
     {
         // Read the mandatory grain_rate field
@@ -292,10 +297,10 @@ namespace mxl::lib
             optionsParser.getMaxSyncBatchSizeHint().value_or(batchSizeDefault),
             optionsParser.getMaxCommitBatchSizeHint().value_or(batchSizeDefault));
 
-        return std::move(flowData);
+        return {std::move(flowData), created};
     }
 
-    std::unique_ptr<FlowData> Instance::createOrOpenContinuousFlowData(std::string const& flowDef, FlowParser const& parser,
+    std::pair<std::unique_ptr<FlowData>, bool> Instance::createOrOpenContinuousFlowData(std::string const& flowDef, FlowParser const& parser,
         FlowOptionsParser const& optionsParser)
     {
         // Read the mandatory grain_rate field
@@ -322,7 +327,7 @@ namespace mxl::lib
             optionsParser.getMaxSyncBatchSizeHint().value_or(batchSizeDefault),
             optionsParser.getMaxCommitBatchSizeHint().value_or(batchSizeDefault));
 
-        return std::move(flowData);
+        return {std::move(flowData), created};
     }
 
     std::string Instance::getDomain() const

@@ -448,9 +448,15 @@ namespace
                 throw std::runtime_error{"Failed to create MXL instance."};
             }
 
-            if (::mxlCreateFlowWriter(_instance, flow_descriptor.c_str(), flowOptions.c_str(), &_writer, &_configInfo) != MXL_STATUS_OK)
+            bool flowWasCreated = false;
+            if (::mxlCreateFlowWriter(_instance, flow_descriptor.c_str(), flowOptions.c_str(), &_writer, &_configInfo, &flowWasCreated) !=
+                MXL_STATUS_OK)
             {
                 throw std::runtime_error{"Failed to create flow writer."};
+            }
+            if (!flowWasCreated)
+            {
+                MXL_WARN("Reusing existing flow.");
             }
         }
 

@@ -37,7 +37,9 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Video Flow : Wait fo
     auto flowDef = mxl::tests::readFile("data/v210_flow.json");
     mxlFlowWriter writer;
     mxlFlowConfigInfo configInfo;
-    REQUIRE(mxlCreateFlowWriter(instanceWriter, flowDef.c_str(), opts, &writer, &configInfo) == MXL_STATUS_OK);
+    bool flowWasCreated = false;
+    REQUIRE(mxlCreateFlowWriter(instanceWriter, flowDef.c_str(), opts, &writer, &configInfo, &flowWasCreated) == MXL_STATUS_OK);
+    REQUIRE(flowWasCreated);
 
     mxlFlowReader reader;
     auto const flowId = uuids::to_string(configInfo.common.id);
