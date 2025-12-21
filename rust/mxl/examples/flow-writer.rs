@@ -41,7 +41,8 @@ fn main() -> Result<(), mxl::Error> {
             &opts.flow_config_file, error
         ))
     })?;
-    let flow_config_info = mxl_instance.create_flow(flow_def.as_str(), None)?;
+
+    let (writer, flow_config_info) = mxl_instance.create_flow_writer(flow_def.as_str(), None)?;
 
     if flow_config_info.common().is_discrete_flow() {
         if opts.sample_batch_size.is_some() {
@@ -49,11 +50,17 @@ fn main() -> Result<(), mxl::Error> {
                 "Sample batch size is only relevant for \"continuous\" flows.".to_owned(),
             ));
         }
-        write_grains(mxl_instance, flow_config_info, opts.grain_or_sample_count)
+        write_grains(
+            mxl_instance,
+            flow_config_info,
+            writer.to_grain_writer()?,
+            opts.grain_or_sample_count,
+        )
     } else {
         write_samples(
             mxl_instance,
             flow_config_info,
+            writer.to_samples_writer()?,
             opts.grain_or_sample_count,
             opts.sample_batch_size,
         )
@@ -63,6 +70,7 @@ fn main() -> Result<(), mxl::Error> {
 pub fn write_grains(
     mxl_instance: mxl::MxlInstance,
     flow_config_info: mxl::FlowConfigInfo,
+    writer: mxl::GrainWriter,
     grain_count: Option<u64>,
 ) -> Result<(), mxl::Error> {
     let flow_id = flow_config_info.common().id().to_string();
@@ -72,9 +80,6 @@ pub fn write_grains(
         "Will write to flow \"{flow_id}\" with grain rate {}/{} starting from index {grain_index}.",
         grain_rate.numerator, grain_rate.denominator
     );
-    let writer = mxl_instance
-        .create_flow_writer(flow_id.as_str())?
-        .to_grain_writer()?;
 
     let mut remaining_grains = grain_count;
     loop {
@@ -107,13 +112,13 @@ pub fn write_grains(
 
     info!("Finished writing requested number of grains, deleting the flow.");
     writer.destroy()?;
-    mxl_instance.destroy_flow(flow_id.as_str())?;
     Ok(())
 }
 
 pub fn write_samples(
     mxl_instance: mxl::MxlInstance,
     flow_config_info: mxl::FlowConfigInfo,
+    writer: mxl::SamplesWriter,
     sample_count: Option<u64>,
     batch_size: Option<u64>,
 ) -> Result<(), mxl::Error> {
@@ -126,9 +131,6 @@ pub fn write_samples(
         "Will write to flow \"{flow_id}\" with sample rate {}/{}, using batches of size {batch_size} samples, first batch ending at index {samples_index}.",
         sample_rate.numerator, sample_rate.denominator
     );
-    let writer = mxl_instance
-        .create_flow_writer(flow_id.as_str())?
-        .to_samples_writer()?;
 
     let mut remaining_samples = sample_count;
     loop {
@@ -171,6 +173,5 @@ pub fn write_samples(
 
     info!("Finished writing requested number of samples, deleting the flow.");
     writer.destroy()?;
-    mxl_instance.destroy_flow(flow_id.as_str())?;
     Ok(())
 }

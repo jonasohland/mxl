@@ -86,58 +86,38 @@ impl MxlInstance {
         create_flow_reader(&self.context, flow_id)
     }
 
-    pub fn create_flow_writer(&self, flow_id: &str) -> Result<FlowWriter> {
-        let uuid = uuid::Uuid::parse_str(flow_id)
-            .map_err(|_| Error::Other("Invalid flow ID format.".to_string()))?;
-        let flow_id = CString::new(flow_id)?;
-        let options = CString::new("")?;
+    pub fn create_flow_writer(
+        &self,
+        flow_def: &str,
+        options: Option<&str>,
+    ) -> Result<(FlowWriter, FlowConfigInfo)> {
+        let flow_def = CString::new(flow_def)?;
+        let options = options.map(|opt| CString::new(opt)).transpose()?;
         let mut writer: mxl_sys::FlowWriter = std::ptr::null_mut();
+        let mut info_unsafe = std::mem::MaybeUninit::<mxl_sys::FlowConfigInfo>::uninit();
         unsafe {
             Error::from_status(self.context.api.create_flow_writer(
                 self.context.instance,
-                flow_id.as_ptr(),
-                options.as_ptr(),
+                flow_def.as_ptr(),
+                options.map(|cs| cs.as_ptr()).unwrap_or(std::ptr::null()),
                 &mut writer,
+                info_unsafe.as_mut_ptr(),
             ))?;
         }
         if writer.is_null() {
             return Err(Error::Other("Failed to create flow writer.".to_string()));
         }
-        Ok(FlowWriter::new(self.context.clone(), writer, uuid))
-    }
 
-    /// For now, we provide direct access to the MXL API for creating and
-    /// destroying flows. Maybe it would be worth to provide RAII wrapper...
-    /// Instead? As well?
-    pub fn create_flow(&self, flow_def: &str, options: Option<&str>) -> Result<FlowConfigInfo> {
-        let flow_def = CString::new(flow_def)?;
-        let options = CString::new(options.unwrap_or(""))?;
-        let mut info = std::mem::MaybeUninit::<mxl_sys::FlowConfigInfo>::uninit();
+        let info = unsafe { info_unsafe.assume_init() };
 
-        unsafe {
-            Error::from_status(self.context.api.create_flow(
-                self.context.instance,
-                flow_def.as_ptr(),
-                options.as_ptr(),
-                info.as_mut_ptr(),
-            ))?;
-        }
-
-        let info = unsafe { info.assume_init() };
-        Ok(FlowConfigInfo { value: info })
-    }
-
-    /// See `create_flow` for more info.
-    pub fn destroy_flow(&self, flow_id: &str) -> Result<()> {
-        let flow_id = CString::new(flow_id)?;
-        unsafe {
-            Error::from_status(
-                self.context
-                    .api
-                    .destroy_flow(self.context.instance, flow_id.as_ptr()),
-            )?;
-        }
-        Ok(())
+        Ok((
+            FlowWriter::new(
+                self.context.clone(),
+                writer,
+                uuid::Uuid::from_bytes(info.common.id),
+            ),
+            FlowConfigInfo { value: info },
+        ))
     }
 
     pub fn get_flow_def(&self, flow_id: &str) -> Result<String> {
