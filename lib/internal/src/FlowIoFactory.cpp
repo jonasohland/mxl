@@ -3,23 +3,10 @@
 
 #include "mxl-internal/FlowIoFactory.hpp"
 #include "mxl-internal/FlowWriterFactory.hpp"
+#include "DynamicPointerCast.hpp"
 
 namespace mxl::lib
 {
-    namespace
-    {
-        template<typename To, typename From>
-        std::unique_ptr<To> dynamic_pointer_cast(std::unique_ptr<From>&& source) noexcept
-        {
-            auto const p = dynamic_cast<To*>(source.get());
-            if (p != nullptr)
-            {
-                source.release();
-            }
-            return std::unique_ptr<To>{p};
-        }
-    }
-
     FlowIoFactory::FlowIoFactory() = default;
 
     FlowIoFactory::~FlowIoFactory() = default;

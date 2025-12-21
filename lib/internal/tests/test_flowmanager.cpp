@@ -2,16 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <chrono>
+#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
+#include <algorithm>
 #include <atomic>
 #include <filesystem>
+#include <list>
 #include <memory>
 #include <thread>
 #include <uuid.h>
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/format.h>
 #include "mxl-internal/FlowManager.hpp"
+#include "mxl-internal/Logging.hpp"
 #include "mxl-internal/PathUtils.hpp"
 #include "../../tests/Utils.hpp"
 
@@ -44,7 +48,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow Manager : Creat
     auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
 
     auto manager = std::make_shared<FlowManager>(domain);
-    auto flowData = manager->createDiscreteFlow(flowId, flowDef, MXL_DATA_FORMAT_VIDEO, 5, grainRate, payloadSize, 1, sliceSizes);
+    auto [created, flowData] = manager->createOrOpenDiscreteFlow(flowId, flowDef, MXL_DATA_FORMAT_VIDEO, 5, grainRate, payloadSize, 1, sliceSizes);
 
     REQUIRE(flowData != nullptr);
     REQUIRE(flowData->isValid());
@@ -92,20 +96,20 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow Manager : Creat
     }
     REQUIRE(grainCount == 5U);
 
-    // This should throw since the flow metadata will already exist.
-    REQUIRE_THROWS(
-        [&]()
-        {
-            manager->createDiscreteFlow(flowId, flowDef, MXL_DATA_FORMAT_VIDEO, 5, grainRate, payloadSize, 1, sliceSizes);
-        }());
-
-    // This should throw since the flow metadata will already exist.
-    REQUIRE_THROWS(
-        [&]()
-        {
-            auto const sampleRate = mxlRational{48000, 1};
-            manager->createContinuousFlow(flowId, flowDef, MXL_DATA_FORMAT_AUDIO, sampleRate, 8, sizeof(float), 8192);
-        }());
+    // // This should throw since the flow metadata will already exist.
+    // REQUIRE_THROWS(
+    //     [&]()
+    //     {
+    //         manager->createOrOpenDiscreteFlow(flowId, flowDef, MXL_DATA_FORMAT_VIDEO, 5, grainRate, payloadSize, 1, sliceSizes);
+    //     }());
+    //
+    // // This should throw since the flow metadata will already exist.
+    // REQUIRE_THROWS(
+    //     [&]()
+    //     {
+    //         auto const sampleRate = mxlRational{48000, 1};
+    //         manager->createOrOpenContinuousFlow(flowId, flowDef, MXL_DATA_FORMAT_AUDIO, sampleRate, 8, sizeof(float), 8192);
+    //     }());
 
     REQUIRE(manager->listFlows().size() == 1);
 
@@ -131,7 +135,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow Manager : Creat
     auto const sampleRate = mxlRational{48000, 1};
 
     auto manager = std::make_shared<FlowManager>(domain);
-    auto flowData = manager->createContinuousFlow(flowId, flowDef, MXL_DATA_FORMAT_AUDIO, sampleRate, 2, sizeof(float), 4096);
+    auto [created, flowData] = manager->createOrOpenContinuousFlow(flowId, flowDef, MXL_DATA_FORMAT_AUDIO, sampleRate, 2, sizeof(float), 4096);
 
     REQUIRE(flowData != nullptr);
     REQUIRE(flowData->isValid());
@@ -169,21 +173,21 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow Manager : Creat
     REQUIRE(!exists(grainDir));
 
     // This should throw since the flow metadata will already exist.
-    REQUIRE_THROWS(
-        [&]()
-        {
-            manager->createContinuousFlow(flowId, flowDef, MXL_DATA_FORMAT_AUDIO, sampleRate, 8, sizeof(float), 8192);
-        }());
+    // REQUIRE_THROWS(
+    //     [&]()
+    //     {
+    //         manager->createOrOpenContinuousFlow(flowId, flowDef, MXL_DATA_FORMAT_AUDIO, sampleRate, 8, sizeof(float), 8192);
+    //     }());
 
     auto const payloadSize = 1024;
     auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
 
-    // This should throw since the flow metadata will already exist.
+    // This should throw since the flow exists but is in a different format.
     REQUIRE_THROWS(
         [&]()
         {
             auto const grainRate = mxlRational{60000, 1001};
-            manager->createDiscreteFlow(flowId, flowDef, MXL_DATA_FORMAT_VIDEO, 5, grainRate, payloadSize, 1, sliceSizes);
+            manager->createOrOpenDiscreteFlow(flowId, flowDef, MXL_DATA_FORMAT_VIDEO, 5, grainRate, payloadSize, 1, sliceSizes);
         }());
 
     REQUIRE(manager->listFlows().size() == 1);
@@ -216,7 +220,8 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow Manager : Open,
         auto const payloadSize = 512;
         auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
 
-        auto flowData1 = manager->createDiscreteFlow(flowId1, flowDef1, MXL_DATA_FORMAT_VIDEO, 3, grainRate, payloadSize, 0, sliceSizes);
+        auto [created,
+            flowData1] = manager->createOrOpenDiscreteFlow(flowId1, flowDef1, MXL_DATA_FORMAT_VIDEO, 3, grainRate, payloadSize, 0, sliceSizes);
         REQUIRE(flowData1->grainCount() == 3U);
         // close writer
         flowData1.reset();
@@ -237,7 +242,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow Manager : Open,
     auto const flowDef2 = mxl::tests::readFile("data/audio_flow.json");
     auto const sampleRate = mxlRational{48000, 1};
     {
-        auto flowData2 = manager->createContinuousFlow(flowId2, flowDef2, MXL_DATA_FORMAT_AUDIO, sampleRate, 4, sizeof(float), 2048);
+        auto [created, flowData2] = manager->createOrOpenContinuousFlow(flowId2, flowDef2, MXL_DATA_FORMAT_AUDIO, sampleRate, 4, sizeof(float), 2048);
         REQUIRE(flowData2->channelCount() == 4U);
         flowData2.reset();
     }
@@ -308,9 +313,9 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow Manager : Open,
     auto const payloadSize = 512;
     auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
     auto const badId = *uuids::uuid::from_string("44444444-4444-4444-4444-444444444444");
-    REQUIRE_THROWS_AS(manager->createDiscreteFlow(badId, flowDef1, MXL_DATA_FORMAT_UNSPECIFIED, 1, grainRate, payloadSize, 1, sliceSizes),
+    REQUIRE_THROWS_AS(manager->createOrOpenDiscreteFlow(badId, flowDef1, MXL_DATA_FORMAT_UNSPECIFIED, 1, grainRate, payloadSize, 1, sliceSizes),
         std::runtime_error);
-    REQUIRE_THROWS_AS(manager->createContinuousFlow(badId, flowDef2, MXL_DATA_FORMAT_VIDEO, sampleRate, 1, 4, 1024), std::runtime_error);
+    REQUIRE_THROWS_AS(manager->createOrOpenContinuousFlow(badId, flowDef2, MXL_DATA_FORMAT_VIDEO, sampleRate, 1, 4, 1024), std::runtime_error);
 }
 
 // Re-creation after deletion
@@ -324,7 +329,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: re-crea
     auto const payloadSize = 512;
     auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
     // Create discrete flow #1
-    auto f1 = mgr->createDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes);
+    auto [created1, f1] = mgr->createOrOpenDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes);
     REQUIRE(f1);
     REQUIRE(mgr->listFlows().size() == 1);
 
@@ -333,7 +338,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: re-crea
     REQUIRE(mgr->listFlows().empty());
 
     // Re-create with same ID
-    auto f2 = mgr->createDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 2, rate, payloadSize, 1, sliceSizes);
+    auto [created2, f2] = mgr->createOrOpenDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 2, rate, payloadSize, 1, sliceSizes);
     REQUIRE(f2);
     REQUIRE(mgr->listFlows().size() == 1);
 }
@@ -349,7 +354,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: corrupt
     // Create and publish
     auto const payloadSize = 512;
     auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
-    auto flow = mgr->createDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes);
+    auto [created, flow] = mgr->createOrOpenDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes);
     flow.reset();
     REQUIRE(mgr->listFlows().size() == 1);
 
@@ -382,16 +387,13 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: concurr
     auto failure = std::atomic<int>{0};
     auto worker = [&](std::uint32_t payloadSize)
     {
-        try
+        auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
+        auto [created, f] = mgr->createOrOpenDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes);
+        if (created)
         {
-            auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
-            auto f = mgr->createDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes);
-            if (f)
-            {
-                ++success;
-            }
+            ++success;
         }
-        catch (...)
+        else
         {
             ++failure;
         }
@@ -418,7 +420,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: deleteF
 
     auto const payloadSize = 512;
     auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
-    auto f = mgr->createDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes);
+    auto [created, f] = mgr->createOrOpenDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes);
     f.reset();
     REQUIRE(mgr->listFlows().size() == 1);
 
@@ -461,7 +463,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: concurr
 
         auto const payloadSize = 512;
         auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
-        mgr->createDiscreteFlow(
+        mgr->createOrOpenDiscreteFlow(
             id, mxl::tests::readFile("data/v210_flow.json"), MXL_DATA_FORMAT_VIDEO, 1, mxlRational{50, 1}, payloadSize, 1, sliceSizes);
     }
 
@@ -502,7 +504,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: multipl
     auto const payloadSize = 512;
     auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
 
-    auto f1 = mgr1->createDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes);
+    auto f1 = mgr1->createOrOpenDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes);
     REQUIRE(mgr1->listFlows().size() == 1);
     // mgr2 should see it too
     REQUIRE(mgr2->listFlows().size() == 1);
@@ -530,9 +532,109 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: createF
     auto const payloadSize = 512;
     auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
 
-    REQUIRE_THROWS_AS(mgr->createDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes),
+    REQUIRE_THROWS_AS(mgr->createOrOpenDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, rate, payloadSize, 1, sliceSizes),
         std::filesystem::filesystem_error);
 
     // restore perms so we can clean up
     permissions(domain, std::filesystem::perms::owner_all, std::filesystem::perm_options::add);
+}
+
+TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: parallel flow writer creation", "[flow manager]")
+{
+    auto const numIterations = 10'000;
+    auto const numWorkers = 3;
+
+    struct Worker
+    {
+        std::unique_ptr<std::atomic<bool>> readySignal;
+        std::unique_ptr<FlowManager> mgr;
+        std::optional<std::thread> thread;
+    };
+
+    auto flowManager = std::make_unique<FlowManager>(domain);
+    auto workers = std::list<Worker>{};
+
+    auto createdSignal = std::atomic<int>{0};        // Signal from each worker that they are done creating/opening the flow.
+    auto numOpened = std::atomic<std::uint64_t>{0};  // Total number of flows that were opened.
+    auto numCreated = std::atomic<std::uint64_t>{0}; // Total number of flows that were created.
+
+    auto const def = mxl::tests::readFile("data/v210_flow.json");
+    auto const id = *uuids::uuid::from_string("5fbec3b1-1b0f-417d-9059-8b94a47197ed");
+    auto const payloadSize = 512;
+    auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};
+
+    auto workFn = [&](Worker* worker, int workerIndex)
+    {
+        for (auto i = 0; i < numIterations; ++i)
+        {
+            // Wait for the main threads signal to start
+            while (!worker->readySignal->exchange(false))
+            {
+            }
+
+            {
+                // Create or open the flow. This is where the race happenes. Only one of the workers should be able to create the flow (created ==
+                // true). The others should still receive an opened flow that is writable, but created should be false.
+                auto [created,
+                    flow] = worker->mgr->createOrOpenDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, mxlRational{50, 1}, payloadSize, 1, sliceSizes);
+
+                // Writes the current iteration number into the padding of the header of the first grain.
+                *(reinterpret_cast<std::uint64_t*>(&flow->grainAt(0)->header.pad) + workerIndex) = i;
+
+                // Increment either numCreated or numOpened.
+                (created ? &numCreated : &numOpened)->fetch_add(1);
+            }
+
+            // Signal that we have completed to iteration
+            createdSignal.fetch_add(1);
+        }
+    };
+
+    // Create and start all the workers.
+    for (auto i = 0; i < numWorkers; ++i)
+    {
+        auto& w = workers.emplace_back(std::make_unique<std::atomic<bool>>(false), std::make_unique<FlowManager>(domain), std::nullopt);
+        w.thread = std::thread{workFn, &w, i};
+    }
+
+    for (auto i = 0; i < numIterations; ++i)
+    {
+        // Signal all workers
+        std::ranges::for_each(workers, [](Worker& w) { w.readySignal->store(true); });
+
+        // Wait for the workers to have opened and written to the shared memory
+        while (createdSignal.load() != static_cast<int>(workers.size()))
+        {
+        }
+        createdSignal.store(0);
+
+        // The flow should exist
+        REQUIRE(flowDirectoryExists(uuids::to_string(id)));
+
+        {
+            // We should be able to open the flow.
+            auto [created,
+                flow] = flowManager->createOrOpenDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, mxlRational{50, 1}, payloadSize, 1, sliceSizes);
+            REQUIRE_FALSE(created); // The existing flow should be opened and not a new one created
+
+            // Prove that all workers have actually opened the same memory by checking the grain header padding.
+            // The workers should all have written the current iteration index here.
+            auto paddingStorage = reinterpret_cast<std::uint64_t*>(&flow->grainAt(0)->header.pad);
+            for (std::size_t w = 0; w < workers.size(); ++w)
+            {
+                REQUIRE(paddingStorage[w] == static_cast<std::uint64_t>(i));
+            }
+        }
+
+        // Delete the flow.
+        flowManager->deleteFlow(id);
+    }
+
+    std::ranges::for_each(workers, [](Worker& w) { w.thread->join(); });
+
+    // In each iteration the flow should have been created only once
+    REQUIRE(numCreated.load() == numIterations);
+
+    // In each iteration all workers that did not create the flow should have opened it.
+    REQUIRE(numOpened.load() == numIterations * (numWorkers - 1));
 }

@@ -83,6 +83,26 @@ namespace mxl::lib
         }
     }
 
+    bool PosixDiscreteFlowWriter::isExclusive() const
+    {
+        if (!_flowData)
+        {
+            return false;
+        }
+
+        return _flowData->isExclusive();
+    }
+
+    bool PosixDiscreteFlowWriter::makeExclusive()
+    {
+        if (!_flowData)
+        {
+            return false;
+        }
+
+        return _flowData->makeExclusive();
+    }
+
     mxlStatus PosixDiscreteFlowWriter::commit(mxlGrainInfo const& mxlGrainInfo)
     {
         if (_flowData)

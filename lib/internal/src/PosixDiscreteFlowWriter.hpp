@@ -64,6 +64,10 @@ namespace mxl::lib
         /** \see FlowWriter::flowRead */
         virtual void flowRead() override;
 
+        virtual bool isExclusive() const override;
+
+        virtual bool makeExclusive() override;
+
     private:
         /** The FlowData for the currently opened flow. null if no flow is opened. */
         std::unique_ptr<DiscreteFlowData> _flowData;

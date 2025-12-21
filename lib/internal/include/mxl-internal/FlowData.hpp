@@ -33,11 +33,14 @@ namespace mxl::lib
         constexpr FlowState* flowState() noexcept;
         constexpr FlowState const* flowState() const noexcept;
 
+        bool isExclusive() const;
+        bool makeExclusive();
+
         virtual ~FlowData();
 
     protected:
         constexpr explicit FlowData(SharedMemoryInstance<Flow>&& flowSegement) noexcept;
-        FlowData(char const* flowFilePath, AccessMode mode);
+        FlowData(char const* flowFilePath, AccessMode mode, bool exclusive);
 
     private:
         SharedMemoryInstance<Flow> _flow;

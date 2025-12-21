@@ -59,6 +59,11 @@ namespace mxl::lib
         /** \see FlowWriter::flowRead */
         virtual void flowRead() override;
 
+        [[nodiscard]]
+        virtual bool isExclusive() const override;
+
+        virtual bool makeExclusive() override;
+
     private:
         bool signalCompletedBatch() noexcept;
 

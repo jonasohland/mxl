@@ -63,10 +63,10 @@ namespace mxl::lib
         /// \param[in] maxSyncBatchSizeHintOpt Optional max sync batch size hint.
         /// \param[in] maxCommitBatchSizeHintOpt Optional max commit batch size hint
         ///
-        std::unique_ptr<DiscreteFlowData> createDiscreteFlow(uuids::uuid const& flowId, std::string const& flowDef, mxlDataFormat flowFormat,
-            std::size_t grainCount, mxlRational const& grainRate, std::size_t grainPayloadSize, std::size_t grainNumOfSlices,
-            std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN> grainSliceLengths, std::uint32_t maxSyncBatchSizeHintOpt = 1,
-            std::uint32_t maxCommitBatchSizeHintOpt = 1);
+        std::pair<bool, std::unique_ptr<DiscreteFlowData>> createOrOpenDiscreteFlow(uuids::uuid const& flowId, std::string const& flowDef,
+            mxlDataFormat flowFormat, std::size_t grainCount, mxlRational const& grainRate, std::size_t grainPayloadSize,
+            std::size_t grainNumOfSlices, std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN> grainSliceLengths,
+            std::uint32_t maxSyncBatchSizeHintOpt = 1, std::uint32_t maxCommitBatchSizeHintOpt = 1);
 
         ///
         /// Create a new continuous flow together with its associated channel store and open it in read-write mode.
@@ -81,8 +81,8 @@ namespace mxl::lib
         /// \param[in] maxSyncBatchSizeHintOpt Optional max sync batch size hint.
         /// \param[in] maxCommitBatchSizeHintOpt Optional max commit batch size hint
         ///
-        std::unique_ptr<ContinuousFlowData> createContinuousFlow(uuids::uuid const& flowId, std::string const& flowDef, mxlDataFormat flowFormat,
-            mxlRational const& sampleRate, std::size_t channelCount, std::size_t sampleWordSize, std::size_t bufferLength,
+        std::pair<bool, std::unique_ptr<ContinuousFlowData>> createOrOpenContinuousFlow(uuids::uuid const& flowId, std::string const& flowDef,
+            mxlDataFormat flowFormat, mxlRational const& sampleRate, std::size_t channelCount, std::size_t sampleWordSize, std::size_t bufferLength,
             std::uint32_t maxSyncBatchSizeHintOpt = 1, std::uint32_t maxCommitBatchSizeHintOpt = 1);
 
         /// Open an existing flow by id.

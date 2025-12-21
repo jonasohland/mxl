@@ -14,7 +14,7 @@ namespace mxl::lib
     {
     public:
         explicit ContinuousFlowData(SharedMemoryInstance<Flow>&& flowSegement) noexcept;
-        ContinuousFlowData(char const* flowFilePath, AccessMode mode);
+        ContinuousFlowData(char const* flowFilePath, AccessMode mode, bool exclusive);
 
         constexpr std::size_t channelCount() const noexcept;
         constexpr std::size_t sampleWordSize() const noexcept;
@@ -46,8 +46,8 @@ namespace mxl::lib
         , _sampleWordSize{1U}
     {}
 
-    inline ContinuousFlowData::ContinuousFlowData(char const* flowFilePath, AccessMode mode)
-        : FlowData{flowFilePath, mode}
+    inline ContinuousFlowData::ContinuousFlowData(char const* flowFilePath, AccessMode mode, bool exclusive)
+        : FlowData{flowFilePath, mode, exclusive}
         , _channelBuffers{}
         , _sampleWordSize{1U}
     {}
@@ -79,7 +79,7 @@ namespace mxl::lib
             if (auto const buffersLength = channelCount * bufferLength; buffersLength > 0U)
             {
                 auto const mode = this->created() ? AccessMode::CREATE_READ_WRITE : this->accessMode();
-                _channelBuffers = SharedMemorySegment{grainFilePath, mode, buffersLength * sampleWordSize};
+                _channelBuffers = SharedMemorySegment{grainFilePath, mode, buffersLength * sampleWordSize, false};
 
                 auto const mappedSize = _channelBuffers.mappedSize();
                 _sampleWordSize = (sampleWordSize != 0U) ? sampleWordSize : ((mappedSize >= buffersLength) ? (mappedSize / buffersLength) : 1U);

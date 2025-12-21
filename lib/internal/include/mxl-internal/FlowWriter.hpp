@@ -59,6 +59,18 @@ namespace mxl::lib
          */
         virtual void flowRead() = 0;
 
+        /**
+         * Check if this is the only writer for this flow.
+         */
+        virtual bool isExclusive() const = 0;
+
+        /**
+         * Try to turn this into a exclusive writer.
+         * \return true if the operation was successful and this is the only writer, false if the operation was not successful because there are other
+         * active writers for this flow.
+         */
+        virtual bool makeExclusive() = 0;
+
         /** Destructor. */
         virtual ~FlowWriter();
 

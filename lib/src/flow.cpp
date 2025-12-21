@@ -69,38 +69,6 @@ mxlStatus mxlIsFlowActive(mxlInstance instance, char const* flowId, bool* isActi
 
 extern "C"
 MXL_EXPORT
-mxlStatus mxlDestroyFlow(mxlInstance instance, char const* flowId)
-{
-    try
-    {
-        if (auto const cppInstance = to_Instance(instance); cppInstance != nullptr)
-        {
-            if (flowId != nullptr)
-            {
-                auto const id = uuids::uuid::from_string(flowId);
-                if (id.has_value())
-                {
-                    auto const found = cppInstance->deleteFlow(*id);
-                    return (found) ? MXL_STATUS_OK : MXL_ERR_FLOW_NOT_FOUND;
-                }
-            }
-        }
-
-        return MXL_ERR_INVALID_ARG;
-    }
-    catch (std::exception const& e)
-    {
-        MXL_ERROR("Failed to destroy flow : {}", e.what());
-    }
-    catch (...)
-    {
-        MXL_ERROR("Failed to destroy flow : {}", "An unknown error occured.");
-    }
-    return MXL_ERR_UNKNOWN;
-}
-
-extern "C"
-MXL_EXPORT
 mxlStatus mxlGetFlowDef(mxlInstance instance, char const* flowId, char* buffer, size_t* bufferSize)
 {
     if (flowId == nullptr || bufferSize == nullptr)
@@ -203,21 +171,26 @@ mxlStatus mxlCreateFlowWriter(mxlInstance instance, char const* flowDef, char co
     auto flowData = std::unique_ptr<FlowData>{};
     auto cppInstance = to_Instance(instance);
 
+    if (cppInstance == nullptr)
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
+
     try
     {
-        flowData = cppInstance->createFlow(flowDef, (options == nullptr) ? std::string{} : options);
-        *configInfo = flowData->flowInfo()->config;
+        auto [nConfigInfo, nwriter] = cppInstance->createFlowWriter(flowDef, (options == nullptr) ? std::nullopt : std::make_optional(options));
+        *configInfo = nConfigInfo;
+        *writer = reinterpret_cast<mxlFlowWriter>(nwriter);
     }
     catch (std::filesystem::filesystem_error const& e)
     {
-        MXL_ERROR("Failed to create flow : {}", e.what());
+        MXL_ERROR("Failed to create flow writer: {}", e.what());
         auto const code = e.code();
         if ((code == std::errc::permission_denied) || (code == std::errc::operation_not_permitted) || (code == std::errc::read_only_file_system))
         {
-            MXL_ERROR("Filesystem permission/access error: {}", code.message());
             return MXL_ERR_PERMISSION_DENIED;
         }
-        else // We could handle EEXIST here and remove the existing flow if it is no longer active
+        else
         {
             MXL_ERROR("Filesystem error: {}", code.message());
             return MXL_ERR_UNKNOWN;
@@ -230,18 +203,6 @@ mxlStatus mxlCreateFlowWriter(mxlInstance instance, char const* flowDef, char co
     }
     catch (...)
     {
-        return MXL_ERR_UNKNOWN;
-    }
-
-    try
-    {
-        *writer = reinterpret_cast<mxlFlowWriter>(cppInstance->getFlowWriter(uuids::to_string(flowData->flowInfo()->config.common.id)));
-    }
-    catch (std::exception const& ex)
-    {
-        MXL_ERROR("Failed to get a flow writer: {}", ex.what());
-
-        cppInstance->deleteFlow(flowData->flowInfo()->config.common.id);
         return MXL_ERR_UNKNOWN;
     }
 
@@ -261,7 +222,10 @@ mxlStatus mxlReleaseFlowWriter(mxlInstance instance, mxlFlowWriter writer)
     auto const cppInstance = to_Instance(instance);
     auto const cppWriter = to_FlowWriter(writer);
 
-    auto id = cppWriter->getId();
+    if ((cppInstance == nullptr) || (cppWriter == nullptr))
+    {
+        return MXL_ERR_INVALID_ARG;
+    }
 
     try
     {
@@ -270,19 +234,7 @@ mxlStatus mxlReleaseFlowWriter(mxlInstance instance, mxlFlowWriter writer)
     catch (std::exception const& ex)
     {
         MXL_ERROR("Failed to release writer: {}", ex.what());
-        err = MXL_ERR_UNKNOWN;
-    }
-
-    try
-    {
-        if (!cppInstance->deleteFlow(id))
-        {
-            MXL_WARN("Failed to delete flow for released writer");
-        }
-    }
-    catch (std::exception const& ex)
-    {
-        MXL_ERROR("Failed to delete flow for released writer: {}", ex.what());
+        return MXL_ERR_UNKNOWN;
     }
 
     return err;

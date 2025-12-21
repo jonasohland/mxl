@@ -68,3 +68,57 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow readers / write
 
     REQUIRE(mxlDestroyInstance(instance) == MXL_STATUS_OK);
 }
+
+TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow deletion on writer release", "[instance]")
+{
+    auto instanceA = mxlCreateInstance(domain.string().c_str(), nullptr);
+    auto instanceB = mxlCreateInstance(domain.string().c_str(), nullptr);
+
+    mxlFlowWriter writerA = nullptr;
+    mxlFlowWriter writerB = nullptr;
+    mxlFlowConfigInfo flowConfig;
+
+    auto flowDef = mxl::tests::readFile("data/v210_flow.json");
+    REQUIRE(mxlCreateFlowWriter(instanceA, flowDef.c_str(), nullptr, &writerA, &flowConfig) == MXL_STATUS_OK);
+    REQUIRE(mxlCreateFlowWriter(instanceB, flowDef.c_str(), nullptr, &writerB, &flowConfig) == MXL_STATUS_OK);
+
+    auto id = uuids::to_string(flowConfig.common.id);
+
+    // The flow directory should exists after the flow has been created
+    REQUIRE(flowDirectoryExists(id));
+
+    // The flow directory should still exists after the first writer has been released
+    mxlReleaseFlowWriter(instanceA, writerA);
+    REQUIRE(flowDirectoryExists(id));
+
+    // The flow directory should have been removed after the second writer has been released
+    mxlReleaseFlowWriter(instanceB, writerB);
+    REQUIRE_FALSE(flowDirectoryExists(id));
+
+    REQUIRE(mxlDestroyInstance(instanceA) == MXL_STATUS_OK);
+    REQUIRE(mxlDestroyInstance(instanceB) == MXL_STATUS_OK);
+}
+
+TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow deletion on instance destruction", "[instance]")
+{
+    auto instanceA = mxlCreateInstance(domain.string().c_str(), nullptr);
+    auto instanceB = mxlCreateInstance(domain.string().c_str(), nullptr);
+
+    mxlFlowWriter writerA = nullptr;
+    mxlFlowWriter writerB = nullptr;
+    mxlFlowConfigInfo flowConfig;
+
+    auto flowDef = mxl::tests::readFile("data/v210_flow.json");
+    REQUIRE(mxlCreateFlowWriter(instanceA, flowDef.c_str(), nullptr, &writerA, &flowConfig) == MXL_STATUS_OK);
+    REQUIRE(mxlCreateFlowWriter(instanceB, flowDef.c_str(), nullptr, &writerB, &flowConfig) == MXL_STATUS_OK);
+
+    auto id = uuids::to_string(flowConfig.common.id);
+
+    REQUIRE(flowDirectoryExists(id));
+
+    mxlDestroyInstance(instanceA);
+    REQUIRE(flowDirectoryExists(id));
+
+    mxlDestroyInstance(instanceB);
+    REQUIRE_FALSE(flowDirectoryExists(id));
+}

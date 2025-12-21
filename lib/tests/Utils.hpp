@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include "mxl-internal/PathUtils.hpp"
 
 #ifdef __APPLE__
 #   include <stdexcept>
@@ -53,6 +54,12 @@ namespace mxl::tests
     protected:
         /// The path to the domain
         std::filesystem::path domain;
+
+        [[nodiscard]]
+        bool flowDirectoryExists(std::string const& id) const
+        {
+            return std::filesystem::exists(lib::makeFlowDirectoryName(domain, id));
+        }
 
     private:
         /// Remove the domain folder if it exists

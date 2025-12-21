@@ -3,10 +3,13 @@
 
 #include "mxl-internal/FlowManager.hpp"
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <ios>
+#include <memory>
 #include <stdexcept>
 #include <system_error>
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <mxl/flow.h>
@@ -15,6 +18,8 @@
 #include "mxl-internal/PathUtils.hpp"
 #include "mxl-internal/SharedMemory.hpp"
 #include "mxl-internal/Timing.hpp"
+#include "Deferred.hpp"
+#include "DynamicPointerCast.hpp"
 
 namespace mxl::lib
 {
@@ -46,13 +51,26 @@ namespace mxl::lib
             return pathBuffer;
         }
 
-        void publishFlowDirectory(std::filesystem::path const& source, std::filesystem::path const& dest)
+        bool publishFlowDirectory(std::filesystem::path const& source, std::filesystem::path const& dest)
         {
             permissions(source,
                 std::filesystem::perms::group_read | std::filesystem::perms::group_exec | std::filesystem::perms::others_read |
                     std::filesystem::perms::others_exec,
                 std::filesystem::perm_options::add);
-            rename(source, dest);
+
+            if (::renameat2(AT_FDCWD, source.c_str(), AT_FDCWD, dest.c_str(), RENAME_NOREPLACE) < 0)
+            {
+                auto const error = errno;
+                switch (error)
+                {
+                    case EEXIST:    return false;
+                    case ENOTEMPTY: return false;
+                    default:
+                        throw std::system_error{error, std::system_category(), "Failed to publish flow directory by renaming it to its public name."};
+                }
+            }
+
+            return true;
         }
 
         /**
@@ -140,8 +158,8 @@ namespace mxl::lib
         }
     }
 
-    std::unique_ptr<DiscreteFlowData> FlowManager::createDiscreteFlow(uuids::uuid const& flowId, std::string const& flowDef, mxlDataFormat flowFormat,
-        std::size_t grainCount, mxlRational const& grainRate, std::size_t grainPayloadSize, std::size_t grainNumOfSlices,
+    std::pair<bool, std::unique_ptr<DiscreteFlowData>> FlowManager::createOrOpenDiscreteFlow(uuids::uuid const& flowId, std::string const& flowDef,
+        mxlDataFormat flowFormat, std::size_t grainCount, mxlRational const& grainRate, std::size_t grainPayloadSize, std::size_t grainNumOfSlices,
         std::array<uint32_t, MXL_MAX_PLANES_PER_GRAIN> grainSliceLengths, std::uint32_t maxSyncBatchSizeHintOpt,
         std::uint32_t maxCommitBatchSizeHintOpt)
     {
@@ -155,72 +173,85 @@ namespace mxl::lib
         }
 
         auto const tempDirectory = createTemporaryFlowDirectory(_mxlDomain);
-        try
+        auto _ = defer(
+            [&]() noexcept
+            {
+                std::error_code ec;
+                std::filesystem::remove_all(tempDirectory, ec);
+                if (ec)
+                {
+                    MXL_WARN("Failed to remove temporary flow directory: {}", ec.message());
+                }
+            });
+
+        // Write the json file to disk.
+        writeFlowDescriptor(tempDirectory, flowDef);
+
+        // Create the dummy file.
+        auto readAccessFile = makeFlowAccessFilePath(tempDirectory);
+        if (auto out = std::ofstream{readAccessFile, std::ios::out | std::ios::trunc}; !out)
         {
-            // Write the json file to disk.
-            writeFlowDescriptor(tempDirectory, flowDef);
-
-            // Create the dummy file.
-            auto readAccessFile = makeFlowAccessFilePath(tempDirectory);
-            if (auto out = std::ofstream{readAccessFile, std::ios::out | std::ios::trunc}; !out)
-            {
-                throw std::filesystem::filesystem_error{
-                    "Failed to create flow access file.", readAccessFile, std::make_error_code(std::errc::file_exists)};
-            }
-
-            auto const flowDataPath = makeFlowDataFilePath(tempDirectory);
-            auto flowData = std::make_unique<DiscreteFlowData>(flowDataPath.string().c_str(), AccessMode::CREATE_READ_WRITE);
-
-            auto& info = *flowData->flowInfo();
-            info.version = FLOW_DATA_VERSION;
-            info.size = sizeof info;
-            info.config.common = initCommonFlowConfigInfo(flowId, flowFormat, grainRate, maxSyncBatchSizeHintOpt, maxCommitBatchSizeHintOpt);
-            info.config.discrete = {};
-            info.config.discrete.grainCount = grainCount;
-            std::copy(grainSliceLengths.begin(), grainSliceLengths.end(), info.config.discrete.sliceSizes);
-
-            info.runtime = initFlowRuntimeInfo();
-
-            auto& state = *flowData->flowState();
-            state = initFlowState(flowDataPath);
-
-            auto const grainDir = makeGrainDirectoryName(tempDirectory);
-            if (!create_directory(grainDir))
-            {
-                throw std::filesystem::filesystem_error{"Could not create grain directory.", grainDir, std::make_error_code(std::errc::io_error)};
-            }
-
-            for (auto i = std::size_t{0}; i < grainCount; ++i)
-            {
-                auto const grainPath = makeGrainDataFilePath(grainDir, i);
-                MXL_TRACE("Creating grain: {}", grainPath.string());
-
-                // \todo Handle payload stored device memory
-                auto const grain = flowData->emplaceGrain(grainPath.string().c_str(), grainPayloadSize);
-                auto& gInfo = grain->header.info;
-                gInfo.grainSize = grainPayloadSize;
-                gInfo.totalSlices = grainNumOfSlices;
-                gInfo.validSlices = 0;
-                gInfo.version = GRAIN_HEADER_VERSION;
-                gInfo.size = sizeof gInfo;
-            }
-
-            auto const finalDir = makeFlowDirectoryName(_mxlDomain, uuidString);
-            publishFlowDirectory(tempDirectory, finalDir);
-
-            return flowData;
+            throw std::filesystem::filesystem_error{
+                "Failed to create flow access file.", readAccessFile, std::make_error_code(std::errc::file_exists)};
         }
-        catch (...)
+
+        auto const flowDataPath = makeFlowDataFilePath(tempDirectory);
+        auto flowData = std::make_unique<DiscreteFlowData>(flowDataPath.string().c_str(), AccessMode::CREATE_READ_WRITE, false);
+
+        auto& info = *flowData->flowInfo();
+        info.version = FLOW_DATA_VERSION;
+        info.size = sizeof info;
+        info.config.common = initCommonFlowConfigInfo(flowId, flowFormat, grainRate, maxSyncBatchSizeHintOpt, maxCommitBatchSizeHintOpt);
+        info.config.discrete = {};
+        info.config.discrete.grainCount = grainCount;
+        std::copy(grainSliceLengths.begin(), grainSliceLengths.end(), info.config.discrete.sliceSizes);
+
+        info.runtime = initFlowRuntimeInfo();
+
+        auto& state = *flowData->flowState();
+        state = initFlowState(flowDataPath);
+
+        auto const grainDir = makeGrainDirectoryName(tempDirectory);
+        if (!create_directory(grainDir))
         {
-            auto ec = std::error_code{};
-            remove_all(tempDirectory, ec);
-            throw;
+            throw std::filesystem::filesystem_error{"Could not create grain directory.", grainDir, std::make_error_code(std::errc::io_error)};
+        }
+
+        for (auto i = std::size_t{0}; i < grainCount; ++i)
+        {
+            auto const grainPath = makeGrainDataFilePath(grainDir, i);
+            MXL_TRACE("Creating grain: {}", grainPath.string());
+
+            // \todo Handle payload stored device memory
+            auto const grain = flowData->emplaceGrain(grainPath.string().c_str(), grainPayloadSize);
+            auto& gInfo = grain->header.info;
+            gInfo.grainSize = grainPayloadSize;
+            gInfo.totalSlices = grainNumOfSlices;
+            gInfo.validSlices = 0;
+            gInfo.version = GRAIN_HEADER_VERSION;
+            gInfo.size = sizeof gInfo;
+        }
+
+        auto const finalDir = makeFlowDirectoryName(_mxlDomain, uuidString);
+        if (publishFlowDirectory(tempDirectory, finalDir))
+        {
+            return {true, std::move(flowData)};
+        }
+        else
+        {
+            auto existingFlowData = dynamic_pointer_cast<DiscreteFlowData>(openFlow(flowId, AccessMode::READ_WRITE));
+            if (!existingFlowData)
+            {
+                throw std::runtime_error("Could not open existing flow because it is of a different format");
+            }
+
+            return {false, std::move(existingFlowData)};
         }
     }
 
-    std::unique_ptr<ContinuousFlowData> FlowManager::createContinuousFlow(uuids::uuid const& flowId, std::string const& flowDef,
-        mxlDataFormat flowFormat, mxlRational const& sampleRate, std::size_t channelCount, std::size_t sampleWordSize, std::size_t bufferLength,
-        std::uint32_t maxSyncBatchSizeHintOpt, std::uint32_t maxCommitBatchSizeHintOpt)
+    std::pair<bool, std::unique_ptr<ContinuousFlowData>> FlowManager::createOrOpenContinuousFlow(uuids::uuid const& flowId,
+        std::string const& flowDef, mxlDataFormat flowFormat, mxlRational const& sampleRate, std::size_t channelCount, std::size_t sampleWordSize,
+        std::size_t bufferLength, std::uint32_t maxSyncBatchSizeHintOpt, std::uint32_t maxCommitBatchSizeHintOpt)
     {
         auto const uuidString = uuids::to_string(flowId);
         MXL_DEBUG("Create continuous flow. id: {}, channel count: {}, word size: {}, buffer length: {}",
@@ -242,7 +273,7 @@ namespace mxl::lib
             writeFlowDescriptor(tempDirectory, flowDef);
 
             auto const flowDataPath = makeFlowDataFilePath(tempDirectory);
-            auto flowData = std::make_unique<ContinuousFlowData>(flowDataPath.string().c_str(), AccessMode::CREATE_READ_WRITE);
+            auto flowData = std::make_unique<ContinuousFlowData>(flowDataPath.string().c_str(), AccessMode::CREATE_READ_WRITE, false);
 
             auto& info = *flowData->flowInfo();
             info.version = FLOW_DATA_VERSION;
@@ -260,9 +291,20 @@ namespace mxl::lib
             flowData->openChannelBuffers(makeChannelDataFilePath(tempDirectory).string().c_str(), sampleWordSize);
 
             auto const finalDir = makeFlowDirectoryName(_mxlDomain, uuidString);
-            publishFlowDirectory(tempDirectory, finalDir);
+            if (publishFlowDirectory(tempDirectory, finalDir))
+            {
+                return {true, std::move(flowData)};
+            }
+            else
+            {
+                auto existingFlowData = dynamic_pointer_cast<ContinuousFlowData>(openFlow(flowId, AccessMode::READ_WRITE));
+                if (!existingFlowData)
+                {
+                    throw std::runtime_error("Could not open existing flow because it is of a different format");
+                }
 
-            return flowData;
+                return {false, std::move(existingFlowData)};
+            }
         }
         catch (...)
         {
@@ -285,7 +327,7 @@ namespace mxl::lib
         // Verify that the flow file exists.
         if (auto const flowFile = makeFlowDataFilePath(base); exists(flowFile))
         {
-            auto flowSegment = SharedMemoryInstance<Flow>{flowFile.string().c_str(), in_mode, 0U};
+            auto flowSegment = SharedMemoryInstance<Flow>{flowFile.string().c_str(), in_mode, 0U, false};
             if (flowSegment.get()->info.version != FLOW_DATA_VERSION)
             {
                 throw std::invalid_argument{

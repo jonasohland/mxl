@@ -96,6 +96,24 @@ namespace mxl::lib
         _stopping = true;
         _watcher->stop();
         MXL_DEBUG("Instance destroyed.");
+
+        for (auto& [id, writer] : _writers)
+        {
+            try
+            {
+                if (writer.get()->isExclusive() || writer.get()->makeExclusive())
+                {
+                    MXL_WARN("Cleaning up flow '{}' of leaked flow writer.", uuids::to_string(id));
+
+                    _flowManager.deleteFlow(id);
+                }
+            }
+            catch (std::exception const& ex)
+            {
+                MXL_ERROR("Failed to clean up leaked flow writer: {}", ex.what());
+            }
+        }
+
         spdlog::default_logger()->flush();
     }
 
@@ -171,37 +189,6 @@ namespace mxl::lib
         }
     }
 
-    FlowWriter* Instance::getFlowWriter(std::string const& flowId)
-    {
-        auto const id = uuids::uuid::from_string(flowId);
-        // FIXME: Check result of the from_string operation.
-
-        auto const lock = std::lock_guard{_mutex};
-        if (auto const pos = _writers.find(*id); pos != _writers.end())
-        {
-            auto& v = (*pos).second;
-            v.addReference();
-            return v.get();
-        }
-        else
-        {
-            auto flowData = _flowManager.openFlow(*id, AccessMode::READ_WRITE);
-            auto writer = _flowIoFactory->createFlowWriter(_flowManager, *id, std::move(flowData));
-
-            if (dynamic_cast<ContinuousFlowWriter*>(writer.get()) == nullptr)
-            {
-                // FIXME: This leaks if the map insertion throws an exception.
-                //     Delegate the watch handling to the writer itself by
-                //     passing it a reference to the DomainWatcher.
-                //
-                //     Doing it like this would also get rid of the ugly cast
-                //     to decide whether or not to install the watch.
-                _watcher->addFlow(*id, WatcherType::WRITER);
-            }
-            return (*_writers.try_emplace(pos, *id, std::move(writer))).second.get();
-        }
-    }
-
     void Instance::releaseWriter(FlowWriter* writer)
     {
         if (writer)
@@ -215,6 +202,13 @@ namespace mxl::lib
                     if ((*pos).second.releaseReference())
                     {
                         removeFlowWatch = (dynamic_cast<ContinuousFlowWriter*>((*pos).second.get()) == nullptr);
+
+                        // Delete if flow if we are the last writer.
+                        if (writer->isExclusive() || writer->makeExclusive())
+                        {
+                            _flowManager.deleteFlow(id);
+                        }
+
                         _writers.erase(pos);
                     }
                 }
@@ -226,65 +220,109 @@ namespace mxl::lib
         }
     }
 
-    std::unique_ptr<FlowData> Instance::createFlow(std::string const& flowDef, std::string const& options)
+    std::pair<mxlFlowConfigInfo, FlowWriter*> Instance::createFlowWriter(std::string const& flowDef, std::optional<std::string> options)
     {
-        // Parse the json flow resource
+        auto const lock = std::lock_guard{_mutex};
         auto const parser = FlowParser{flowDef};
-        auto const optionsParser = FlowOptionsParser{options};
+        auto const optionsParser = (options) ? FlowOptionsParser{*options} : FlowOptionsParser{};
+        auto flowData = std::unique_ptr<FlowData>{};
+        FlowWriter* flowWriter = nullptr;
 
-        // Create the flow using the flow manager
         if (auto const format = parser.getFormat(); mxlIsDiscreteDataFormat(format))
         {
-            // Read the mandatory grain_rate field
-            auto const grainRate = parser.getGrainRate();
-            // Compute the grain count based on our configured history duration
-            auto const grainCount = _historyDuration * grainRate.numerator / (1'000'000'000ULL * grainRate.denominator);
-
-            auto const batchSizeDefault = parser.getTotalPayloadSlices();
-
-            return _flowManager.createDiscreteFlow(parser.getId(),
-                flowDef,
-                parser.getFormat(),
-                grainCount,
-                grainRate,
-                parser.getPayloadSize(),
-                parser.getTotalPayloadSlices(),
-                parser.getPayloadSliceLengths(),
-                optionsParser.getMaxSyncBatchSizeHint().value_or(batchSizeDefault),
-                optionsParser.getMaxCommitBatchSizeHint().value_or(batchSizeDefault));
+            flowData = createOrOpenDiscreteFlowData(flowDef, parser, optionsParser);
         }
         else if (mxlIsContinuousDataFormat(format))
         {
-            // Read the mandatory grain_rate field
-            auto const sampleRate = parser.getGrainRate();
-            // Compute the grain count based on our configured history duration
-            auto const bufferLength = _historyDuration * sampleRate.numerator / (1'000'000'000ULL * sampleRate.denominator);
-
-            auto const sampleWordSize = parser.getPayloadSize();
-            // FIXME: The page size is just an educated guess to round to for good measure
-            auto const lengthPerPage = 4096U / sampleWordSize;
-
-            auto const pageAlignedLength = ((bufferLength + lengthPerPage - 1U) / lengthPerPage) * lengthPerPage;
-
-            // Default to 10ms worth of samples
-            auto batchSizeDefault = parser.getGrainRate().numerator / (100U * parser.getGrainRate().denominator);
-
-            return _flowManager.createContinuousFlow(parser.getId(),
-                flowDef,
-                parser.getFormat(),
-                sampleRate,
-                parser.getChannelCount(),
-                sampleWordSize,
-                pageAlignedLength,
-                optionsParser.getMaxSyncBatchSizeHint().value_or(batchSizeDefault),
-                optionsParser.getMaxCommitBatchSizeHint().value_or(batchSizeDefault));
+            flowData = createOrOpenContinuousFlowData(flowDef, parser, optionsParser);
         }
-        throw std::runtime_error("Unsupported flow format.");
+        else
+        {
+            throw std::runtime_error("Invalid flow format.");
+        }
+
+        auto id = uuids::uuid{flowData->flowInfo()->config.common.id};
+        auto flowConfigInfo = flowData->flowInfo()->config;
+
+        if (auto const pos = _writers.find(id); pos != _writers.end())
+        {
+            auto& v = (*pos).second;
+            v.addReference();
+            flowWriter = v.get();
+        }
+        else
+        {
+            auto writer = _flowIoFactory->createFlowWriter(_flowManager, id, std::move(flowData));
+
+            if (dynamic_cast<ContinuousFlowWriter*>(writer.get()) == nullptr)
+            {
+                // FIXME: This leaks if the map insertion throws an exception.
+                //     Delegate the watch handling to the writer itself by
+                //     passing it a reference to the DomainWatcher.
+                //
+                //     Doing it like this would also get rid of the ugly cast
+                //     to decide whether or not to install the watch.
+                _watcher->addFlow(id, WatcherType::WRITER);
+            }
+
+            flowWriter = (*_writers.try_emplace(pos, id, std::move(writer))).second.get();
+        }
+
+        return {flowConfigInfo, flowWriter};
     }
 
-    bool Instance::deleteFlow(uuids::uuid const& flowId)
+    std::unique_ptr<FlowData> Instance::createOrOpenDiscreteFlowData(std::string const& flowDef, FlowParser const& parser,
+        FlowOptionsParser const& optionsParser)
     {
-        return _flowManager.deleteFlow(flowId);
+        // Read the mandatory grain_rate field
+        auto const grainRate = parser.getGrainRate();
+        // Compute the grain count based on our configured history duration
+        auto const grainCount = _historyDuration * grainRate.numerator / (1'000'000'000ULL * grainRate.denominator);
+
+        auto const batchSizeDefault = parser.getTotalPayloadSlices();
+
+        auto [created, flowData] = _flowManager.createOrOpenDiscreteFlow(parser.getId(),
+            flowDef,
+            parser.getFormat(),
+            grainCount,
+            grainRate,
+            parser.getPayloadSize(),
+            parser.getTotalPayloadSlices(),
+            parser.getPayloadSliceLengths(),
+            optionsParser.getMaxSyncBatchSizeHint().value_or(batchSizeDefault),
+            optionsParser.getMaxCommitBatchSizeHint().value_or(batchSizeDefault));
+
+        return std::move(flowData);
+    }
+
+    std::unique_ptr<FlowData> Instance::createOrOpenContinuousFlowData(std::string const& flowDef, FlowParser const& parser,
+        FlowOptionsParser const& optionsParser)
+    {
+        // Read the mandatory grain_rate field
+        auto const sampleRate = parser.getGrainRate();
+        // Compute the grain count based on our configured history duration
+        auto const bufferLength = _historyDuration * sampleRate.numerator / (1'000'000'000ULL * sampleRate.denominator);
+
+        auto const sampleWordSize = parser.getPayloadSize();
+        // FIXME: The page size is just an educated guess to round to for good measure
+        auto const lengthPerPage = 4096U / sampleWordSize;
+
+        auto const pageAlignedLength = ((bufferLength + lengthPerPage - 1U) / lengthPerPage) * lengthPerPage;
+
+        // Default to 10ms worth of samples
+        auto batchSizeDefault = parser.getGrainRate().numerator / (100U * parser.getGrainRate().denominator);
+
+        auto [created, flowData] = _flowManager.createOrOpenContinuousFlow(parser.getId(),
+            flowDef,
+            parser.getFormat(),
+            sampleRate,
+            parser.getChannelCount(),
+            sampleWordSize,
+            pageAlignedLength,
+            optionsParser.getMaxSyncBatchSizeHint().value_or(batchSizeDefault),
+            optionsParser.getMaxCommitBatchSizeHint().value_or(batchSizeDefault));
+
+        return std::move(flowData);
     }
 
     std::string Instance::getDomain() const

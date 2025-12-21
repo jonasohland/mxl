@@ -17,6 +17,8 @@ namespace mxl::lib
     class MXL_EXPORT FlowOptionsParser
     {
     public:
+        FlowOptionsParser() = default;
+
         /**
          * Parses a json of flow options
          *

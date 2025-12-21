@@ -145,4 +145,24 @@ namespace mxl::lib
 
     void PosixContinuousFlowWriter::flowRead()
     {}
+
+    bool PosixContinuousFlowWriter::isExclusive() const
+    {
+        if (!_flowData)
+        {
+            throw std::runtime_error("Flow writer not initialized");
+        }
+
+        return _flowData->isExclusive();
+    }
+
+    bool PosixContinuousFlowWriter::makeExclusive()
+    {
+        if (!_flowData)
+        {
+            throw std::runtime_error("Flow writer not initialized");
+        }
+
+        return _flowData->makeExclusive();
+    }
 }

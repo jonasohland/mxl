@@ -40,7 +40,7 @@ TEST_CASE("Create", "[shared mem]")
     REQUIRE_THROWS(
         [&]()
         {
-            reader = mxl::lib::SharedMemoryInstance<Payload>{p.string().c_str(), mxl::lib::AccessMode::READ_ONLY, 0};
+            reader = mxl::lib::SharedMemoryInstance<Payload>{p.string().c_str(), mxl::lib::AccessMode::READ_ONLY, 0, false};
         }());
 
     REQUIRE(!reader);
@@ -61,7 +61,7 @@ TEST_CASE("Create", "[shared mem]")
     REQUIRE_THROWS(
         [&]()
         {
-            writer = mxl::lib::SharedMemoryInstance<Payload>{p.string().c_str(), mxl::lib::AccessMode::READ_WRITE, 0};
+            writer = mxl::lib::SharedMemoryInstance<Payload>{p.string().c_str(), mxl::lib::AccessMode::READ_WRITE, 0, false};
         }());
 
     REQUIRE(!writer);
@@ -74,7 +74,7 @@ TEST_CASE("Create", "[shared mem]")
     REQUIRE_NOTHROW(
         [&]()
         {
-            writer = mxl::lib::SharedMemoryInstance<Payload>{p.string().c_str(), mxl::lib::AccessMode::CREATE_READ_WRITE, EXTRA_SIZE};
+            writer = mxl::lib::SharedMemoryInstance<Payload>{p.string().c_str(), mxl::lib::AccessMode::CREATE_READ_WRITE, EXTRA_SIZE, false};
         }());
 
     // Confirm that the mapping is valid
@@ -96,7 +96,7 @@ TEST_CASE("Create", "[shared mem]")
     REQUIRE_NOTHROW(
         [&]()
         {
-            reader = mxl::lib::SharedMemoryInstance<Payload>{p.string().c_str(), mxl::lib::AccessMode::READ_ONLY, 0};
+            reader = mxl::lib::SharedMemoryInstance<Payload>{p.string().c_str(), mxl::lib::AccessMode::READ_ONLY, 0, false};
         }());
 
     // Confirm that the mapping is valid

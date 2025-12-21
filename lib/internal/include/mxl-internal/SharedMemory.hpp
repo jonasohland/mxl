@@ -5,7 +5,9 @@
 
 #include <cstddef>
 #include <new>
+#include <stdexcept>
 #include <utility>
+#include <mxl-internal/Logging.hpp>
 #include <mxl/platform.h>
 
 namespace mxl::lib
@@ -69,7 +71,7 @@ namespace mxl::lib
          * \param payloadSize The minimum expected size of the shared memory
          * \throw If opening or creating the shared memory segment fails.
          */
-        SharedMemoryBase(char const* path, AccessMode mode, std::size_t payloadSize);
+        SharedMemoryBase(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive);
 
         /** Destructor. */
         ~SharedMemoryBase();
@@ -96,6 +98,30 @@ namespace mxl::lib
          */
         constexpr void const* cdata() const noexcept;
 
+        /**
+         * Check if the advisory lock for the shared memory file mapped by this objects
+         * is exclusive or shared.
+         * \throws If there is no lock at all, because either this is a read-only mapping of the memory, or because the object is in an invalid state.
+         */
+        [[nodiscard]]
+        constexpr bool isExclusive() const;
+
+        /**
+         * Upgrade the lock held by the process for the shared memory file that is mapped by this object to an exclusive lock.
+         * \return Returns true if the upgrade was successful. Returns false if another process also holds a shared lock and acquiring an exclusive
+         * lock would be a blocking operation.
+         * \throw std::runtime_error If this is a read-only mapping of the memory or if the object is in an invalid state.
+         */
+        bool makeExclusive();
+
+    private:
+        enum class LockType
+        {
+            None,
+            Exclusive,
+            Shared
+        };
+
     private:
         /** File descriptor of the shared memory object. */
         int _fd;
@@ -109,6 +135,8 @@ namespace mxl::lib
         void* _data;
         /** The size of the mapped region in bytes. */
         std::size_t _mappedSize;
+        /** The type of advisory lock that is held for the mapped file */
+        LockType _lockType;
     };
 
     struct SharedMemorySegment : SharedMemoryBase
@@ -116,7 +144,7 @@ namespace mxl::lib
         constexpr SharedMemorySegment() noexcept;
         constexpr SharedMemorySegment(SharedMemorySegment&& other) noexcept;
 
-        SharedMemorySegment(char const* path, AccessMode mode, std::size_t payloadSize);
+        SharedMemorySegment(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive);
 
         using SharedMemoryBase::cdata;
         using SharedMemoryBase::data;
@@ -147,7 +175,7 @@ namespace mxl::lib
          * \param extraSize Add this size to the shared memory in addition to sizeof(T)
          * \return true on success. false on conflicts or failure to create resources on disk.
          */
-        SharedMemoryInstance(char const* path, AccessMode mode, std::size_t payloadSize);
+        SharedMemoryInstance(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive);
 
         SharedMemoryInstance& operator=(SharedMemoryInstance other) noexcept;
 
@@ -166,6 +194,9 @@ namespace mxl::lib
          *         not currently represent a mapped segment.
          */
         constexpr T const* get() const noexcept;
+
+        using SharedMemoryBase::isExclusive;
+        using SharedMemoryBase::makeExclusive;
     };
 
     /** ADL compatible shwap function for SharedMemorySegment. */
@@ -181,6 +212,7 @@ namespace mxl::lib
         , _mode{AccessMode::READ_ONLY}
         , _data{nullptr}
         , _mappedSize{0}
+        , _lockType(LockType::None)
     {}
 
     constexpr SharedMemoryBase::SharedMemoryBase(SharedMemoryBase&& other) noexcept
@@ -228,6 +260,7 @@ namespace mxl::lib
         cx_swap(_mode, other._mode);
         cx_swap(_data, other._data);
         cx_swap(_mappedSize, other._mappedSize);
+        cx_swap(_lockType, other._lockType);
     }
 
     constexpr void* SharedMemoryBase::data() noexcept
@@ -245,6 +278,16 @@ namespace mxl::lib
         return _data;
     }
 
+    constexpr bool SharedMemoryBase::isExclusive() const
+    {
+        if (_lockType == LockType::None)
+        {
+            throw std::runtime_error("");
+        }
+
+        return _lockType == LockType::Exclusive;
+    }
+
     constexpr SharedMemorySegment::SharedMemorySegment() noexcept
         : SharedMemoryBase{}
     {}
@@ -253,8 +296,8 @@ namespace mxl::lib
         : SharedMemoryBase{std::move(other)}
     {}
 
-    inline SharedMemorySegment::SharedMemorySegment(char const* path, AccessMode mode, std::size_t payloadSize)
-        : SharedMemoryBase{path, mode, payloadSize}
+    inline SharedMemorySegment::SharedMemorySegment(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive)
+        : SharedMemoryBase{path, mode, payloadSize, exclusive}
     {}
 
     inline SharedMemorySegment& SharedMemorySegment::operator=(SharedMemorySegment other) noexcept
@@ -284,11 +327,16 @@ namespace mxl::lib
     {}
 
     template<typename T>
-    inline SharedMemoryInstance<T>::SharedMemoryInstance(char const* path, AccessMode mode, std::size_t payloadSize)
-        : SharedMemoryBase{path, mode, payloadSize + sizeof(T)}
+    inline SharedMemoryInstance<T>::SharedMemoryInstance(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive)
+        : SharedMemoryBase{path, mode, payloadSize + sizeof(T), exclusive}
     {
         if (created())
         {
+            if (this->mappedSize() < (payloadSize + sizeof(T)))
+            {
+                throw std::runtime_error("Cannot initialize shared memory instance because not enough memory was mapped.");
+            }
+
             new (data()) T{};
         }
     }
