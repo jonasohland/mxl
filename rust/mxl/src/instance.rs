@@ -92,7 +92,7 @@ impl MxlInstance {
         options: Option<&str>,
     ) -> Result<(FlowWriter, FlowConfigInfo)> {
         let flow_def = CString::new(flow_def)?;
-        let options = options.map(|opt| CString::new(opt)).transpose()?;
+        let options = options.map(CString::new).transpose()?;
         let mut writer: mxl_sys::FlowWriter = std::ptr::null_mut();
         let mut info_unsafe = std::mem::MaybeUninit::<mxl_sys::FlowConfigInfo>::uninit();
         unsafe {
