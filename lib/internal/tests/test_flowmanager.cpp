@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <chrono>
-#include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
@@ -96,20 +95,27 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow Manager : Creat
     }
     REQUIRE(grainCount == 5U);
 
-    // // This should throw since the flow metadata will already exist.
-    // REQUIRE_THROWS(
-    //     [&]()
-    //     {
-    //         manager->createOrOpenDiscreteFlow(flowId, flowDef, MXL_DATA_FORMAT_VIDEO, 5, grainRate, payloadSize, 1, sliceSizes);
-    //     }());
-    //
-    // // This should throw since the flow metadata will already exist.
-    // REQUIRE_THROWS(
-    //     [&]()
-    //     {
-    //         auto const sampleRate = mxlRational{48000, 1};
-    //         manager->createOrOpenContinuousFlow(flowId, flowDef, MXL_DATA_FORMAT_AUDIO, sampleRate, 8, sizeof(float), 8192);
-    //     }());
+    // Should not throw, existing flow should be opened.
+    {
+        auto [created, flow] = manager->createOrOpenDiscreteFlow(flowId, flowDef, MXL_DATA_FORMAT_VIDEO, 5, grainRate, payloadSize, 1, sliceSizes);
+        REQUIRE_FALSE(created);
+    }
+
+    bool thrown = false;
+    // Should throw, because the existing flow is a discrete flow.
+    try
+    {
+        auto const sampleRate = mxlRational{48000, 1};
+        auto [flow, created] = manager->createOrOpenContinuousFlow(flowId, flowDef, MXL_DATA_FORMAT_AUDIO, sampleRate, 8, sizeof(float), 8192);
+    }
+    catch (std::exception const& ex)
+    {
+        MXL_ERROR(ex.what());
+        thrown = true;
+    }
+
+    // For some reason REQUIRE_THROWS([](){}) does not work as expected.
+    REQUIRE(thrown);
 
     REQUIRE(manager->listFlows().size() == 1);
 
@@ -172,12 +178,10 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Flow Manager : Creat
     auto const grainDir = makeGrainDirectoryName(flowDirectory);
     REQUIRE(!exists(grainDir));
 
-    // This should throw since the flow metadata will already exist.
-    // REQUIRE_THROWS(
-    //     [&]()
-    //     {
-    //         manager->createOrOpenContinuousFlow(flowId, flowDef, MXL_DATA_FORMAT_AUDIO, sampleRate, 8, sizeof(float), 8192);
-    //     }());
+    {
+        auto [created, flowData] = manager->createOrOpenContinuousFlow(flowId, flowDef, MXL_DATA_FORMAT_AUDIO, sampleRate, 8, sizeof(float), 8192);
+        REQUIRE_FALSE(created);
+    }
 
     auto const payloadSize = 1024;
     auto const sliceSizes = std::array<std::uint32_t, MXL_MAX_PLANES_PER_GRAIN>{payloadSize, 0, 0, 0};

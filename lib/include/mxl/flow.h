@@ -148,7 +148,7 @@ extern "C"
      * \param[in] options (optional) Additional options, can be NULL
      * \param[out] writer A pointer to a memory location where the created flow writer will be written.
      * \param[out] configInfo (optional) Used to return information about the opened flow. Can be NULL.
-     * \param[out] created (optional) If not NULLL, will be set to true if a new flow was created, false if an existing flow was opened.
+     * \param[out] created (optional) If not NULL, will be set to true if a new flow was created, false if an existing flow was opened.
      */
     MXL_EXPORT
     mxlStatus mxlCreateFlowWriter(mxlInstance instance, char const* flowDef, char const* options, mxlFlowWriter* writer,
