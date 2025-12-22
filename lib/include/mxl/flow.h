@@ -138,6 +138,18 @@ extern "C"
     typedef struct mxlFlowReader_t* mxlFlowReader;
     typedef struct mxlFlowWriter_t* mxlFlowWriter;
 
+    /**
+     * Attempt to create a flow writer for a given flow definition. If the flow does not exist already, it is created and 'created' will be set to
+     * true. If the flow exists, it will be opened and 'created' will be set to false. If the flow exists already it is not guaranteed that the flow
+     * definition of the existing flow is exactly equal to the flow definition supplied in flowDef. The definition of the existing flow can be
+     * retrieved using mxlGetFlowDef().
+     * \param[in] instance The mxl instance created using mxlCreateInstance
+     * \param[in] flowDef The flow definition from which a flow should be created if there is not already a flow with the same flow id.
+     * \param[in] options (optional) Additional options, can be NULL
+     * \param[out] writer A pointer to a memory location where the created flow writer will be written.
+     * \param[out] configInfo (optional) Used to return information about the opened flow. Can be NULL.
+     * \param[out] created (optional) If not NULLL, will be set to true if a new flow was created, false if an existing flow was opened.
+     */
     MXL_EXPORT
     mxlStatus mxlCreateFlowWriter(mxlInstance instance, char const* flowDef, char const* options, mxlFlowWriter* writer,
         mxlFlowConfigInfo* configInfo, bool* created);
