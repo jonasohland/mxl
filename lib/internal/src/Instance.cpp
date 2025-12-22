@@ -203,7 +203,7 @@ namespace mxl::lib
                     {
                         removeFlowWatch = (dynamic_cast<ContinuousFlowWriter*>((*pos).second.get()) == nullptr);
 
-                        // Delete if flow if we are the last writer.
+                        // Delete the flow if we are the last writer.
                         if (writer->isExclusive() || writer->makeExclusive())
                         {
                             _flowManager.deleteFlow(id);

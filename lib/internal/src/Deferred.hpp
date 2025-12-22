@@ -20,7 +20,7 @@ namespace mxl::lib
         Deferred& operator=(Deferred<F> const&) = delete;
         Deferred& operator=(Deferred<F>&&) = delete;
 
-        /** \brief Calles the deferred function
+        /** \brief Calls the deferred function
          */
         constexpr ~Deferred() noexcept(std::is_nothrow_invocable_v<F>)
         {

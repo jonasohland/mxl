@@ -577,7 +577,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: paralle
             }
 
             {
-                // Create or open the flow. This is where the race happenes. Only one of the workers should be able to create the flow (created ==
+                // Create or open the flow. This is where the race happens. Only one of the workers should be able to create the flow (created ==
                 // true). The others should still receive an opened flow that is writable, but created should be false.
                 auto [created,
                     flow] = worker->mgr->createOrOpenDiscreteFlow(id, def, MXL_DATA_FORMAT_VIDEO, 1, mxlRational{50, 1}, payloadSize, 1, sliceSizes);
