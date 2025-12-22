@@ -282,7 +282,7 @@ namespace mxl::lib
     {
         if (_lockType == LockType::None)
         {
-            throw std::runtime_error("");
+            throw std::runtime_error("Cannot check the lock type of an invalid or read-only shared memory segment");
         }
 
         return _lockType == LockType::Exclusive;
