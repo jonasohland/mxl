@@ -4,7 +4,7 @@
 mod common;
 
 use clap::Parser;
-use tracing::info;
+use tracing::{info, warn};
 
 use mxl::config::get_mxl_so_path;
 
@@ -42,7 +42,11 @@ fn main() -> Result<(), mxl::Error> {
         ))
     })?;
 
-    let (writer, flow_config_info) = mxl_instance.create_flow_writer(flow_def.as_str(), None)?;
+    let (writer, flow_config_info, was_created) =
+        mxl_instance.create_flow_writer(flow_def.as_str(), None)?;
+    if !was_created {
+        warn!("Reusing existing flow.");
+    }
 
     if flow_config_info.common().is_discrete_flow() {
         if opts.sample_batch_size.is_some() {

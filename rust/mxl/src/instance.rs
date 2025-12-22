@@ -90,11 +90,12 @@ impl MxlInstance {
         &self,
         flow_def: &str,
         options: Option<&str>,
-    ) -> Result<(FlowWriter, FlowConfigInfo)> {
+    ) -> Result<(FlowWriter, FlowConfigInfo, bool)> {
         let flow_def = CString::new(flow_def)?;
         let options = options.map(CString::new).transpose()?;
         let mut writer: mxl_sys::FlowWriter = std::ptr::null_mut();
         let mut info_unsafe = std::mem::MaybeUninit::<mxl_sys::FlowConfigInfo>::uninit();
+        let mut was_created = false;
         unsafe {
             Error::from_status(self.context.api.create_flow_writer(
                 self.context.instance,
@@ -102,6 +103,7 @@ impl MxlInstance {
                 options.map(|cs| cs.as_ptr()).unwrap_or(std::ptr::null()),
                 &mut writer,
                 info_unsafe.as_mut_ptr(),
+                &mut was_created,
             ))?;
         }
         if writer.is_null() {
@@ -117,6 +119,7 @@ impl MxlInstance {
                 uuid::Uuid::from_bytes(info.common.id),
             ),
             FlowConfigInfo { value: info },
+            was_created,
         ))
     }
 

@@ -86,12 +86,13 @@ fn read_flow_def<P: AsRef<std::path::Path>>(path: P) -> String {
 #[test]
 fn basic_mxl_grain_writing_reading() {
     let (mxl_instance, _domain_guard) = setup_test("grains");
-    let (flow_writer, flow_config_info) = mxl_instance
+    let (flow_writer, flow_config_info, was_created) = mxl_instance
         .create_flow_writer(
             read_flow_def("lib/tests/data/v210_flow.json").as_str(),
             None,
         )
         .unwrap();
+    assert!(was_created);
     let flow_id = flow_config_info.common().id().to_string();
     let grain_writer = flow_writer.to_grain_writer().unwrap();
     let flow_reader = mxl_instance.create_flow_reader(flow_id.as_str()).unwrap();
@@ -114,12 +115,13 @@ fn basic_mxl_grain_writing_reading() {
 #[test]
 fn basic_mxl_samples_writing_reading() {
     let (mxl_instance, _domain_guard) = setup_test("samples");
-    let (flow_writer, flow_config_info) = mxl_instance
+    let (flow_writer, flow_config_info, was_created) = mxl_instance
         .create_flow_writer(
             read_flow_def("lib/tests/data/audio_flow.json").as_str(),
             None,
         )
         .unwrap();
+    assert!(was_created);
     let flow_id = flow_config_info.common().id().to_string();
     let samples_writer = flow_writer.to_samples_writer().unwrap();
     let flow_reader = mxl_instance.create_flow_reader(flow_id.as_str()).unwrap();
@@ -146,9 +148,10 @@ fn basic_mxl_samples_writing_reading() {
 fn get_flow_def() {
     let (mxl_instance, _domain_guard) = setup_test("flow_def");
     let flow_def = read_flow_def("lib/tests/data/v210_flow.json");
-    let (flow_writer, flow_info) = mxl_instance
+    let (flow_writer, flow_info, was_created) = mxl_instance
         .create_flow_writer(flow_def.as_str(), None)
         .unwrap();
+    assert!(was_created);
     let flow_id = flow_info.common().id().to_string();
     let retrieved_flow_def = mxl_instance.get_flow_def(flow_id.as_str()).unwrap();
     assert_eq!(flow_def, retrieved_flow_def);
