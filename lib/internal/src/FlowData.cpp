@@ -5,8 +5,8 @@
 
 namespace mxl::lib
 {
-    FlowData::FlowData(char const* flowFilePath, AccessMode mode, bool exclusive)
-        : _flow{flowFilePath, mode, 0U, exclusive}
+    FlowData::FlowData(char const* flowFilePath, AccessMode mode, LockMode lockMode)
+        : _flow{flowFilePath, mode, 0U, lockMode}
     {
         // see: https://en.cppreference.com/w/cpp/types/has_unique_object_representations.html
         static_assert(std::has_unique_object_representations_v<::mxlFlowInfo>,

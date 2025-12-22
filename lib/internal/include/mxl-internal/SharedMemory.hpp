@@ -12,6 +12,12 @@
 
 namespace mxl::lib
 {
+    enum class LockMode
+    {
+        Exclusive,
+        Shared
+    };
+
     enum class AccessMode
     {
         READ_ONLY,
@@ -71,7 +77,7 @@ namespace mxl::lib
          * \param payloadSize The minimum expected size of the shared memory
          * \throw If opening or creating the shared memory segment fails.
          */
-        SharedMemoryBase(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive);
+        SharedMemoryBase(char const* path, AccessMode mode, std::size_t payloadSize, LockMode lockMode);
 
         /** Destructor. */
         ~SharedMemoryBase();
@@ -144,7 +150,7 @@ namespace mxl::lib
         constexpr SharedMemorySegment() noexcept;
         constexpr SharedMemorySegment(SharedMemorySegment&& other) noexcept;
 
-        SharedMemorySegment(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive);
+        SharedMemorySegment(char const* path, AccessMode mode, std::size_t payloadSize, LockMode lockMode);
 
         using SharedMemoryBase::cdata;
         using SharedMemoryBase::data;
@@ -175,7 +181,7 @@ namespace mxl::lib
          * \param extraSize Add this size to the shared memory in addition to sizeof(T)
          * \return true on success. false on conflicts or failure to create resources on disk.
          */
-        SharedMemoryInstance(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive);
+        SharedMemoryInstance(char const* path, AccessMode mode, std::size_t payloadSize, LockMode lockMode);
 
         SharedMemoryInstance& operator=(SharedMemoryInstance other) noexcept;
 
@@ -296,8 +302,8 @@ namespace mxl::lib
         : SharedMemoryBase{std::move(other)}
     {}
 
-    inline SharedMemorySegment::SharedMemorySegment(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive)
-        : SharedMemoryBase{path, mode, payloadSize, exclusive}
+    inline SharedMemorySegment::SharedMemorySegment(char const* path, AccessMode mode, std::size_t payloadSize, LockMode lockMode)
+        : SharedMemoryBase{path, mode, payloadSize, lockMode}
     {}
 
     inline SharedMemorySegment& SharedMemorySegment::operator=(SharedMemorySegment other) noexcept
@@ -327,8 +333,8 @@ namespace mxl::lib
     {}
 
     template<typename T>
-    inline SharedMemoryInstance<T>::SharedMemoryInstance(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive)
-        : SharedMemoryBase{path, mode, payloadSize + sizeof(T), exclusive}
+    inline SharedMemoryInstance<T>::SharedMemoryInstance(char const* path, AccessMode mode, std::size_t payloadSize, LockMode lockMode)
+        : SharedMemoryBase{path, mode, payloadSize + sizeof(T), lockMode}
     {
         if (created())
         {

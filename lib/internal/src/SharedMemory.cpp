@@ -20,7 +20,7 @@
 namespace mxl::lib
 {
     MXL_EXPORT
-    SharedMemoryBase::SharedMemoryBase(char const* path, AccessMode mode, std::size_t payloadSize, bool exclusive)
+    SharedMemoryBase::SharedMemoryBase(char const* path, AccessMode mode, std::size_t payloadSize, LockMode lockMode)
         : SharedMemoryBase{}
     {
         constexpr auto const OMODE_CREATE = O_EXCL | O_CREAT | O_RDWR | O_CLOEXEC;
@@ -51,7 +51,7 @@ namespace mxl::lib
         {
             auto lockFlags = LOCK_NB;
 
-            if (exclusive)
+            if (lockMode == LockMode::Exclusive)
             {
                 lockFlags |= LOCK_EX;
                 _lockType = LockType::Exclusive;

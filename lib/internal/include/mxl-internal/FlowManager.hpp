@@ -62,6 +62,8 @@ namespace mxl::lib
         /// \param[in] grainSliceLengths Length of each slice in bytes.
         /// \param[in] maxSyncBatchSizeHintOpt Optional max sync batch size hint.
         /// \param[in] maxCommitBatchSizeHintOpt Optional max commit batch size hint
+        /// \return (created, flowData) If the flow was created, the first returnd value is true. If the flow was opened instead, false will be
+        /// returned. The second returned value is the flow data of the opened or created flow.
         ///
         std::pair<bool, std::unique_ptr<DiscreteFlowData>> createOrOpenDiscreteFlow(uuids::uuid const& flowId, std::string const& flowDef,
             mxlDataFormat flowFormat, std::size_t grainCount, mxlRational const& grainRate, std::size_t grainPayloadSize,
@@ -80,6 +82,8 @@ namespace mxl::lib
         /// \param[in] bufferLength The length of each channel buffer in samples.
         /// \param[in] maxSyncBatchSizeHintOpt Optional max sync batch size hint.
         /// \param[in] maxCommitBatchSizeHintOpt Optional max commit batch size hint
+        /// \return (created, flowData) If the flow was created, the first returnd value is true. If the flow was opened instead, false will be
+        /// returned. The second returned value is the flow data of the opened or created flow.
         ///
         std::pair<bool, std::unique_ptr<ContinuousFlowData>> createOrOpenContinuousFlow(uuids::uuid const& flowId, std::string const& flowDef,
             mxlDataFormat flowFormat, mxlRational const& sampleRate, std::size_t channelCount, std::size_t sampleWordSize, std::size_t bufferLength,

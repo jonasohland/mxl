@@ -17,7 +17,7 @@ namespace mxl::lib
     {
     public:
         explicit DiscreteFlowData(SharedMemoryInstance<Flow>&& flowSegement) noexcept;
-        DiscreteFlowData(char const* flowFilePath, AccessMode mode, bool exclusive);
+        DiscreteFlowData(char const* flowFilePath, AccessMode mode, LockMode lockMode);
 
         std::size_t grainCount() const noexcept;
 
@@ -44,8 +44,8 @@ namespace mxl::lib
         _grains.reserve(flowInfo()->config.discrete.grainCount);
     }
 
-    inline DiscreteFlowData::DiscreteFlowData(char const* flowFilePath, AccessMode mode, bool exclusive)
-        : FlowData{flowFilePath, mode, exclusive}
+    inline DiscreteFlowData::DiscreteFlowData(char const* flowFilePath, AccessMode mode, LockMode lockMode)
+        : FlowData{flowFilePath, mode, lockMode}
         , _grains{}
     {
         _grains.reserve(flowInfo()->config.discrete.grainCount);
@@ -59,7 +59,7 @@ namespace mxl::lib
     inline Grain* DiscreteFlowData::emplaceGrain(char const* grainFilePath, std::size_t grainPayloadSize)
     {
         auto const mode = this->created() ? AccessMode::CREATE_READ_WRITE : this->accessMode();
-        auto grain = SharedMemoryInstance<Grain>{grainFilePath, mode, grainPayloadSize, false};
+        auto grain = SharedMemoryInstance<Grain>{grainFilePath, mode, grainPayloadSize, LockMode::Shared};
 
         if (!this->created())
         {

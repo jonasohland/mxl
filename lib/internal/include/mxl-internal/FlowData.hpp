@@ -40,7 +40,7 @@ namespace mxl::lib
 
     protected:
         constexpr explicit FlowData(SharedMemoryInstance<Flow>&& flowSegement) noexcept;
-        FlowData(char const* flowFilePath, AccessMode mode, bool exclusive);
+        FlowData(char const* flowFilePath, AccessMode mode, LockMode lockMode);
 
     private:
         SharedMemoryInstance<Flow> _flow;

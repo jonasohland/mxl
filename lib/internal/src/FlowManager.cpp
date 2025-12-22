@@ -196,7 +196,7 @@ namespace mxl::lib
         }
 
         auto const flowDataPath = makeFlowDataFilePath(tempDirectory);
-        auto flowData = std::make_unique<DiscreteFlowData>(flowDataPath.string().c_str(), AccessMode::CREATE_READ_WRITE, false);
+        auto flowData = std::make_unique<DiscreteFlowData>(flowDataPath.string().c_str(), AccessMode::CREATE_READ_WRITE, LockMode::Shared);
 
         auto& info = *flowData->flowInfo();
         info.version = FLOW_DATA_VERSION;
@@ -273,7 +273,7 @@ namespace mxl::lib
             writeFlowDescriptor(tempDirectory, flowDef);
 
             auto const flowDataPath = makeFlowDataFilePath(tempDirectory);
-            auto flowData = std::make_unique<ContinuousFlowData>(flowDataPath.string().c_str(), AccessMode::CREATE_READ_WRITE, false);
+            auto flowData = std::make_unique<ContinuousFlowData>(flowDataPath.string().c_str(), AccessMode::CREATE_READ_WRITE, LockMode::Shared);
 
             auto& info = *flowData->flowInfo();
             info.version = FLOW_DATA_VERSION;
@@ -327,7 +327,7 @@ namespace mxl::lib
         // Verify that the flow file exists.
         if (auto const flowFile = makeFlowDataFilePath(base); exists(flowFile))
         {
-            auto flowSegment = SharedMemoryInstance<Flow>{flowFile.string().c_str(), in_mode, 0U, false};
+            auto flowSegment = SharedMemoryInstance<Flow>{flowFile.string().c_str(), in_mode, 0U, LockMode::Shared};
             if (flowSegment.get()->info.version != FLOW_DATA_VERSION)
             {
                 throw std::invalid_argument{
