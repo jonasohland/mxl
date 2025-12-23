@@ -18,7 +18,7 @@ trait Initiator {
 }
 
 /// Trait to extend behavior of Initiators.
-pub trait InitiatorShared {
+pub trait InitiatorExt {
     ///  Configure the initiator.
     fn setup(&self, config: &Config) -> Result<()>;
 
@@ -43,7 +43,7 @@ pub trait InitiatorShared {
 }
 
 /// Implement these shared methods for any Initiator.
-impl<I: Initiator> InitiatorShared for I {
+impl<I: Initiator> InitiatorExt for I {
     fn setup(&self, config: &Config) -> Result<()> {
         Error::from_status(unsafe {
             self.ctx()
@@ -84,14 +84,11 @@ impl<I: Initiator> InitiatorShared for I {
 /// This is an unspecialized initiator. See `into_*_initiator` methods to convert to a
 /// specialization. This is created via a [FabricsInstance](crate::fabrics::FabricsInstance).
 pub struct UnspecInitiator {
-    #[doc(hidden)]
     ctx: Rc<FabricsInstanceContext>,
-    #[doc(hidden)]
     inner: mxl_sys::fabrics::FabricsInitiator,
 }
 
 impl UnspecInitiator {
-    #[doc(hidden)]
     pub(crate) fn new(
         ctx: Rc<FabricsInstanceContext>,
         initiator: mxl_sys::fabrics::FabricsInitiator,

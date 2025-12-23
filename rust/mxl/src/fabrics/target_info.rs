@@ -13,7 +13,6 @@ pub struct TargetInfo {
 }
 
 impl TargetInfo {
-    #[doc(hidden)]
     pub(crate) fn new(ctx: Rc<FabricsInstanceContext>, inner: FabricsTargetInfo) -> Self {
         Self { ctx, inner }
     }

@@ -6,7 +6,7 @@ use crate::{Error, FlowReader, FlowWriter, Result, fabrics::instance::FabricsIns
 /// Can be obtained by using a flow reader or writer, and converting it to a regions collection
 /// with mxlFabricsRegionsForFlowReader() or mxlFabricsRegionsForFlowWriter().
 ///
-/// This is created from a [FabricsInstance](crate::FabricsInstance).
+/// This is created from a [FabricsInstance](crate::fabrics::FabricsInstance).
 pub struct Regions {
     ctx: Rc<FabricsInstanceContext>,
     inner: mxl_sys::fabrics::FabricsRegions,
@@ -19,7 +19,6 @@ impl From<&Regions> for mxl_sys::fabrics::FabricsRegions {
 }
 
 impl Regions {
-    #[doc(hidden)]
     fn new(ctx: Rc<FabricsInstanceContext>, inner: mxl_sys::fabrics::FabricsRegions) -> Self {
         Regions { ctx, inner }
     }

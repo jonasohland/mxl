@@ -164,17 +164,20 @@ fn get_flow_def() {
 
 #[cfg(feature = "mxl-fabrics-ofi")]
 mod fabrics {
-    use mxl::{InitiatorShared, MxlFabricsApi, TargetInfo, TargetShared};
+    use mxl::{
+        MxlFabricsApi,
+        fabrics::{InitiatorExt, TargetInfo, TargetExt},
+    };
 
     use super::*;
 
     struct GrainTarget {
         flow_info: mxl::FlowConfigInfo,
         _flow_writer: mxl::FlowWriter,
-        target: mxl::GrainTarget,
+        target: mxl::fabrics::GrainTarget,
     }
     impl GrainTarget {
-        pub fn inner(&self) -> &mxl::GrainTarget {
+        pub fn inner(&self) -> &mxl::fabrics::GrainTarget {
             &self.target
         }
         pub fn wait_for_completion(&self, initiator: &GrainInitiator, timeout: Duration) -> bool {
@@ -234,8 +237,8 @@ mod fabrics {
             let fabrics_instance = mxl_instance.create_fabrics_instance(fabrics_api)?;
             let provider = fabrics_instance.provider_from_str(self.provider)?;
             let target_regions = fabrics_instance.regions_from_writer(&flow_writer).unwrap();
-            let target_config = mxl::TargetConfig::new(
-                mxl::EndpointAddress {
+            let target_config = mxl::fabrics::TargetConfig::new(
+                mxl::fabrics::EndpointAddress {
                     node: self.node,
                     service: self.service,
                 },
@@ -262,13 +265,13 @@ mod fabrics {
 
     struct GrainInitiator {
         _flow_reader: mxl::FlowReader,
-        initiator: mxl::GrainInitiator,
+        initiator: mxl::fabrics::GrainInitiator,
     }
     impl GrainInitiator {
         pub fn add_target(&self, target_info: &TargetInfo) -> Result<(), mxl::Error> {
             self.initiator.add_target(target_info)
         }
-        pub fn inner(&self) -> &mxl::GrainInitiator {
+        pub fn inner(&self) -> &mxl::fabrics::GrainInitiator {
             &self.initiator
         }
         fn post_transfer(
@@ -337,8 +340,8 @@ mod fabrics {
             let flow_reader = mxl_instance.create_flow_reader(self.flow_id)?;
             let initiator_regions = fabrics_instance.regions_from_reader(&flow_reader)?;
 
-            let initiator_config = mxl::InitiatorConfig::new(
-                mxl::EndpointAddress {
+            let initiator_config = mxl::fabrics::InitiatorConfig::new(
+                mxl::fabrics::EndpointAddress {
                     node: self.node,
                     service: self.service,
                 },

@@ -15,9 +15,8 @@ pub struct GrainReadResult {
 }
 
 /// This is a grain-based target used to receive grains from an initiator.
-/// To get all the available methods, import the trait `TargetShared`.
+/// To get all the available methods, import the trait `TargetExt`.
 pub struct GrainTarget {
-    #[doc(hidden)]
     inner: UnspecTarget,
 }
 
@@ -32,7 +31,6 @@ impl Target for GrainTarget {
 }
 
 impl GrainTarget {
-    #[doc(hidden)]
     pub(crate) fn new(inner: UnspecTarget) -> Self {
         Self { inner }
     }

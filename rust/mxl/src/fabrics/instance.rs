@@ -11,7 +11,6 @@ use crate::fabrics::target_info::TargetInfo;
 use crate::instance::InstanceContext;
 use crate::{FlowReader, FlowWriter};
 
-#[doc(hidden)]
 pub(crate) fn create_instance(
     ctx: &Arc<InstanceContext>,
     fabrics_api: &MxlFabricsAPiHandle,
@@ -41,11 +40,8 @@ pub(crate) fn create_instance(
 }
 
 pub(crate) struct FabricsInstanceContext {
-    #[doc(hidden)]
     _parent_ctx: Arc<InstanceContext>,
-    #[doc(hidden)]
     api: MxlFabricsAPiHandle,
-    #[doc(hidden)]
     pub(crate) inner: mxl_sys::fabrics::FabricsInstance,
 }
 
@@ -69,11 +65,9 @@ impl Drop for FabricsInstanceContext {
 /// The fabrics instance and its pointer are held in the `FabricsInstanceContext`` object.
 /// This is created via an [MxlInstance](crate::MxlInstance).
 pub struct FabricsInstance {
-    #[doc(hidden)]
     ctx: Rc<FabricsInstanceContext>,
 }
 impl FabricsInstance {
-    #[doc(hidden)]
     fn new(ctx: Rc<FabricsInstanceContext>) -> Self {
         Self { ctx }
     }
