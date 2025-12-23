@@ -22,8 +22,6 @@ pub use samples::{
 };
 
 #[cfg(feature = "mxl-fabrics-ofi")]
-mod fabrics;
+pub mod fabrics;
 #[cfg(feature = "mxl-fabrics-ofi")]
 pub use api::{MxlFabricsApi, load_fabrics_api};
-#[cfg(feature = "mxl-fabrics-ofi")]
-pub use fabrics::*;

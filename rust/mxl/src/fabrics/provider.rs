@@ -6,7 +6,7 @@ use std::{ffi::CString, rc::Rc};
 use crate::fabrics::instance::FabricsInstanceContext;
 
 /// The provider corresponds to the transport used for transfers. This is created from a
-/// [FabricsInstance](crate::FabricsInstance).
+/// [FabricsInstance](crate::fabrics::FabricsInstance).
 #[derive(Clone)]
 pub struct Provider {
     inner: ProviderType,
@@ -55,7 +55,6 @@ impl From<&Provider> for mxl_sys::fabrics::FabricsProvider {
 }
 
 impl Provider {
-    #[doc(hidden)]
     fn new(ctx: Rc<FabricsInstanceContext>, inner: FabricsProvider) -> Self {
         Self {
             inner: inner.into(),

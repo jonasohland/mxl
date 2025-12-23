@@ -5,10 +5,12 @@ use std::{
 
 use clap::Parser;
 use mxl::{
-    EndpointAddress, Error, FabricsInstance, FlowConfigInfo, GrainInitiator, GrainReader,
-    GrainTarget, GrainWriter, InitiatorShared, MxlFabricsApi, MxlInstance, TargetInfo,
-    TargetShared,
+    Error, FlowConfigInfo, GrainReader, GrainWriter, MxlFabricsApi, MxlInstance,
     config::{get_mxl_fabrics_ofi_so_path, get_mxl_so_path},
+    fabrics::{
+        EndpointAddress, FabricsInstance, GrainInitiator, GrainTarget, InitiatorConfig,
+        InitiatorExt, TargetConfig, TargetExt, TargetInfo,
+    },
 };
 
 #[derive(Debug, Parser)]
@@ -60,7 +62,7 @@ impl<'a> TargetEndpoint<'a> {
         let regions = fabrics_instance.regions_from_writer(&writer)?;
         let provider = fabrics_instance.provider_from_str(&cli.provider)?;
 
-        let target_config = mxl::TargetConfig::new(
+        let target_config = TargetConfig::new(
             EndpointAddress {
                 node: Some(&cli.node),
                 service: Some(&cli.service),
@@ -142,7 +144,7 @@ impl<'a> InitiatorEndpoint<'a> {
         let regions = fabrics_instance.regions_from_reader(&flow_reader)?;
         let provider = fabrics_instance.provider_from_str(&cli.provider)?;
 
-        let initiator_config = mxl::InitiatorConfig::new(
+        let initiator_config = InitiatorConfig::new(
             EndpointAddress {
                 node: Some(&cli.node),
                 service: Some(&cli.service),

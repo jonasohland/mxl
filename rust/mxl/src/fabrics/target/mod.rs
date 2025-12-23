@@ -16,11 +16,11 @@ trait Target {
 }
 
 /// Trait to extend behavior of Targets.
-pub trait TargetShared {
+pub trait TargetExt {
     fn setup(&self, config: &Config) -> Result<TargetInfo>;
 }
 
-impl<T: Target> TargetShared for T {
+impl<T: Target> TargetExt for T {
     /// Configure the target. After the target has been configured, it is ready to receive transfers from an initiator.
     /// If additional connection setup is required by the underlying implementation it might not happen during the call to
     /// setup(), but be deferred until the first call to mxlFabricsTargetTryNewGrain().
@@ -38,14 +38,11 @@ impl<T: Target> TargetShared for T {
 /// This is an unspecialized target. See `into_*_target` methods to convert into a specific target
 /// type. This is created via a [FabricsInstance](crate::fabrics::FabricsInstance).
 pub struct UnspecTarget {
-    #[doc(hidden)]
     ctx: Rc<FabricsInstanceContext>,
-    #[doc(hidden)]
     inner: mxl_sys::fabrics::FabricsTarget,
 }
 
 impl UnspecTarget {
-    #[doc(hidden)]
     pub(crate) fn new(
         ctx: Rc<FabricsInstanceContext>,
         target: mxl_sys::fabrics::FabricsTarget,
