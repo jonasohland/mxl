@@ -49,7 +49,7 @@ jobs:
           pull_title: '[Backport to ${target_branch}] ${pull_title}'
           add_labels: 'backport,automation'
 
-  # This jobs is triggered when a *merged* PR is *labeled*
+  # This job is triggered when a *merged* PR is *labeled*, once per label
   backport-labeled:
     name: "PR labeled: create backport PR"
     runs-on: ubuntu-latest
