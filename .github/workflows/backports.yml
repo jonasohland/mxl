@@ -15,10 +15,21 @@ jobs:
     if: github.event.pull_request.merged
     steps:
       - uses: actions/checkout@v4
+      - name: Get target branch
+        id: target-branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUM: ${{ github.event.number }}
+        run: |
+          labels="$(gh api repos/jonasohland/mxl-backport-testing/pulls/${PR_NUM} | jq -r '.labels | .[].name' | grep 'backport/.*')"
+          if [[ -z "${labels}" ]]; then echo "No backport labels"; exit 0; fi
+          echo "target-branches=$(sed -nE 's%backport/(.*)%release/\1%p' <<<"${labels}" | tr '\n' ' ' | xargs)" >>$GITHUB_OUTPUT
+          echo "backport=true" >> $GITHUB_OUTPUT
       - name: Create backport pull requests
+        if: "${{ steps.target-branch.outputs.backport == 'true' }}"
         uses: korthout/backport-action@v4
         with:
-          label_pattern: ^backport/([^ ]+)$
+          target_branches: ${{ steps.target-branch.outputs.target-branches }}
           branch_name: backport/${pull_number}/-/${target_branch}
           copy_assignees: true
           copy_requested_reviewers: true
