@@ -45,7 +45,7 @@ quality an official release is made and a commit that increments the `PATCH` com
 
 ## Backports of features and fixes
 Bug fixes and improvements that are contributed to `main` can be ported back to one or more release branches. This is done through an automated process on GitHub. A maintainer has to attach a label of the form: `backport/${version}` to the pull request for the feature or bugfix. A workflow will run when the original pull request is merged and has this label attached, that will create a new branch from the current tip of the specified release branch of `${version}`, cherry-pick all commits from the original pull request branch onto this branch and open a new pull request to merge this branch into the release branch of ${version}. Multiple releases can be targeted for the backport by adding multiple labels to the pull request.
-
+Backports will also be initiated when a label is added to a pull request that is closed and merged.
 
 ## Maintenances Window
 
