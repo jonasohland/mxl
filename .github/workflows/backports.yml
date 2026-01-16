@@ -21,7 +21,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUM: ${{ github.event.number }}
         run: |
-          labels="$(gh api repos/jonasohland/mxl-backport-testing/pulls/${PR_NUM} | jq -r '.labels | .[].name' | grep 'backport/.*')" || true
+          labels="$(gh api repos/dmf-mxl/mxl/pulls/${PR_NUM} | jq -r '.labels | .[].name' | grep 'backport/.*')" || true
           if [[ -z "${labels}" ]]; then echo "No backport labels"; exit 0; fi
           echo "target-branches=$(sed -nE 's%backport/(.*)%release/\1%p' <<<"${labels}" | tr '\n' ' ' | xargs)" >>$GITHUB_OUTPUT
           echo "backport=true" >> $GITHUB_OUTPUT
