@@ -35,8 +35,8 @@ jobs:
       - name: Create backport pull requests
         uses: korthout/backport-action@v4
         with:
-          label_pattern: a^
-          target_branches: ${{ matrix.target-branch }}
+          label_pattern: a^ # We don't need the action to match the labels, we have done that in the prev. job, so we use the pattern 'a^' that never matches anything.
+          target_branches: ${{ matrix.target-branch }} # We pass the branches here instead of relying on the label matching logic of the imported action.
           branch_name: backport/${pull_number}/-/${target_branch}
           copy_assignees: true
           copy_requested_reviewers: true
