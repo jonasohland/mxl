@@ -11,7 +11,7 @@ permissions:
 jobs:
   # These jobs are triggered when a PR is closed. The second job will only run when the first job
   # finds labels matching: backport/.*
-  inspect-closed:
+  inspect:
     name: "Process PR labels"
     runs-on: ubuntu-latest
     if: github.event.pull_request.merged && (github.event.action == 'closed' || (github.event.action == 'labeled' && startsWith(github.event.label.name, 'backport/')))
@@ -22,14 +22,14 @@ jobs:
         id: target-branches
         # this line produces an output like: `target-branches=["release/v1.0.0","release/v1.1.0"]` or `target-branches=[]`
         run: printf 'target-branches=%s\n' "$(echo -e "${{ ((github.event.action == 'closed') && join(github.event.pull_request.labels.*.name, '\n')) || github.event.label.name }}" | sed -nE 's%backport/(.*)%\"release/\1\"%p' | jq -cs '.')" >>"${GITHUB_OUTPUT}"
-  backport-closed:
+  backport:
     name: "Create backport PR"
     runs-on: ubuntu-latest
-    needs: inspect-closed
-    if: ${{ needs.inspect-closed.outputs.target-branches != '[]' }} # Don't run if no backport/* labels were found by the prev. job
+    needs: inspect
+    if: ${{ needs.inspect.outputs.target-branches != '[]' }} # Don't run if no backport/* labels were found by the prev. job
     strategy:
       matrix:
-        target-branch: ${{ fromJSON(needs.inspect-closed.outputs.target-branches) }}
+        target-branch: ${{ fromJSON(needs.inspect.outputs.target-branches) }}
     steps:
       - uses: actions/checkout@v4
       - name: Create backport pull requests
