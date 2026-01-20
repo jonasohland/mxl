@@ -6,12 +6,12 @@
 #include <cstdint>
 #include <atomic>
 #include <filesystem>
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <variant>
 #include <unistd.h>
 #include <uuid.h>
 #include <mxl/platform.h>
@@ -19,12 +19,7 @@
 namespace mxl::lib
 {
 
-    /// Direction of the watcher
-    enum class WatcherType
-    {
-        READER,
-        WRITER
-    };
+    class DiscreteFlowWriter;
 
     /// Entry stored in the unordered_maps
     struct DomainWatcherRecord
@@ -35,15 +30,13 @@ namespace mxl::lib
         uuids::uuid id;
         /// file being watched
         std::string fileName;
-        /// direction of the watch
-        WatcherType type;
-        /// use count (many readers and writers can point to the same watch/flow
-        uint16_t count;
 
-        /// records are considered equals if their IDs and Types are equals.
-        bool operator==(DomainWatcherRecord const& other) const
+        DiscreteFlowWriter* fw;
+
+        [[nodiscard]]
+        bool operator==(DomainWatcherRecord const& other) const noexcept
         {
-            return id == other.id && type == other.type;
+            return id == other.id && fw == other.fw;
         }
     };
 
@@ -61,8 +54,6 @@ namespace mxl::lib
     class MXL_EXPORT DomainWatcher
     {
     public:
-        using Callback = std::function<void(uuids::uuid const&, WatcherType in_type)>;
-
         typedef std::shared_ptr<DomainWatcher> ptr;
 
         ///
@@ -70,26 +61,15 @@ namespace mxl::lib
         /// \param in_domain The mxl domain path to monitor.
         /// \param in_callback Function to be called when a monitored file's attributes change.
         ///
-        explicit DomainWatcher(std::filesystem::path const& in_domain, Callback in_callback);
+        explicit DomainWatcher(std::filesystem::path const& in_domain);
 
         ///
         /// Destructor that stops the event loop, removes all watches, and closes file descriptors.
         ///
         ~DomainWatcher();
 
-        ///
-        /// Adds a file to be watched for attribute changes and deletion.
-        /// \param in_flowId the id of the flow to be monitored for attrib changes
-        /// \return The current use count of this watched flow + type.
-        ///
-        int16_t addFlow(uuids::uuid const& in_flowId, WatcherType in_type);
-
-        ///
-        /// Removes a flow from being watched.
-        /// \param in_flowId the flow to remove
-        /// \return The current use count of this watched flow + type.  -1 if the watch did not exist.
-        ///
-        int16_t removeFlow(uuids::uuid const& in_flowId, WatcherType in_type);
+        void addFlow(DiscreteFlowWriter* writer, uuids::uuid id);
+        void removeFlow(DiscreteFlowWriter* writer, uuids::uuid id);
 
         ///
         /// Stops the running thread
@@ -99,14 +79,18 @@ namespace mxl::lib
             _running = false;
         }
 
+        std::size_t count(uuids::uuid) noexcept;
+        std::size_t size() noexcept;
+
     private:
+        void addRecord(DomainWatcherRecord record);
+        void removeRecord(DomainWatcherRecord const& record);
+
         /// Event loop that waits for inotify file change events and processes them.
         /// (invokes the callback)
         void processEvents();
         /// The monitored domain
         std::filesystem::path _domain;
-        /// The callback to invoke when a file changed
-        Callback _callback;
 
 #ifdef __APPLE__
         int _kq;
@@ -118,7 +102,7 @@ namespace mxl::lib
 #endif
 
         /// Map of watch descriptors to file records.  Multiple records could use the same watchfd
-        std::unordered_multimap<int, DomainWatcherRecord::ptr> _watches;
+        std::unordered_multimap<int, DomainWatcherRecord> _watches;
         /// Prodect maps
         std::mutex _mutex;
         /// Controls the event processing thread

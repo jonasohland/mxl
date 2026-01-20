@@ -4,6 +4,7 @@
 #include "mxl-internal/DomainWatcher.hpp"
 #include <cstdint>
 #include <cstring>
+#include <algorithm>
 #include <filesystem>
 #include <memory>
 #include <mutex>
@@ -14,6 +15,7 @@
 #include <unistd.h>
 #include <uuid.h>
 #include <mxl/platform.h>
+#include "mxl-internal/DiscreteFlowWriter.hpp"
 #include "mxl-internal/Logging.hpp"
 #include "mxl-internal/PathUtils.hpp"
 
@@ -26,9 +28,8 @@
 
 namespace mxl::lib
 {
-    DomainWatcher::DomainWatcher(std::filesystem::path const& in_domain, Callback in_callback)
+    DomainWatcher::DomainWatcher(std::filesystem::path const& in_domain)
         : _domain{in_domain}
-        , _callback{std::move(in_callback)}
         , _running{true}
     {
         // Validate that the domain path is a directory
@@ -140,128 +141,111 @@ namespace mxl::lib
 #endif
     }
 
-    int16_t DomainWatcher::addFlow(uuids::uuid const& in_flowId, WatcherType in_type)
+    std::size_t DomainWatcher::count(uuids::uuid id) noexcept
     {
-        auto id = uuids::to_string(in_flowId);
-        MXL_DEBUG("Add Flow : {}", id);
-
-        // Create a record for this watched file
-        auto record = std::make_shared<DomainWatcherRecord>();
-        record->count = 0;
-        record->id = in_flowId;
-        record->type = in_type;
-
-        auto const flowDirectory = makeFlowDirectoryName(_domain, id);
-        record->fileName = (in_type == WatcherType::READER) ? makeFlowDataFilePath(flowDirectory) : makeFlowAccessFilePath(flowDirectory);
-
-        // try to find it in the maps.
-        std::lock_guard<std::mutex> lock(_mutex);
-        int16_t useCount = 0;
-        bool found = false;
-
-        // Check if this flow is already being watched
-        for (auto const& [wd, rec] : _watches)
+        auto lock = std::lock_guard{_mutex};
+        auto it = std::ranges::find_if(_watches, [id](std::pair<int const&, DomainWatcherRecord const&> it) { return it.second.id == id; });
+        if (it == _watches.end())
         {
-            if (*rec == *record)
-            {
-                found = true;
-                rec->count++;
-                useCount = rec->count;
-            }
+            return 0;
         }
 
-        if (!found)
-        {
-            MXL_DEBUG("Record for {} not found, creating one.", id);
-            record->count = 1;
-
-#ifdef __APPLE__
-            int wd = open(record->fileName.c_str(), O_EVTONLY);
-#elif defined __linux__
-            // if not found, add the watch and add it to the maps
-            int wd = inotify_add_watch(_inotifyFd, record->fileName.c_str(), ((in_type == WatcherType::READER) ? IN_MODIFY : IN_ACCESS) | IN_ATTRIB);
-#endif
-            if (wd == -1)
-            {
-                auto const error = errno;
-                MXL_ERROR("Failed to add watch for file '{}': {}", record->fileName, std::strerror(error));
-                throw std::system_error(error, std::generic_category(), "Failed to add watch for file: " + record->fileName);
-            }
-            else
-            {
-                MXL_DEBUG("Added watch {} for file: {}", wd, record->fileName);
-            }
-            _watches.emplace(wd, record);
-            useCount = record->count;
-        }
-        return useCount;
+        return _watches.count(it->first);
     }
 
-    int16_t DomainWatcher::removeFlow(uuids::uuid const& in_flowId, WatcherType in_type)
+    std::size_t DomainWatcher::size() noexcept
     {
-        auto id = uuids::to_string(in_flowId);
+        auto lock = std::lock_guard{_mutex};
+        return _watches.size();
+    }
 
-        // Create a record for this watched file
-        auto record = std::make_shared<DomainWatcherRecord>();
-        record->count = 0;
-        record->id = in_flowId;
-        record->type = in_type;
-        record->fileName = _domain / id;
-
-        int16_t useCount = -1;
-        std::lock_guard<std::mutex> lock(_mutex);
-
-        // Find the watch record that matches this flow
-        for (auto const& [wd, rec] : _watches)
+    void DomainWatcher::addFlow(DiscreteFlowWriter* writer, uuids::uuid id)
+    {
+        auto record = DomainWatcherRecord{
+            .id = id,
+            .fileName = makeFlowAccessFilePath(makeFlowDirectoryName(_domain, uuids::to_string(id))),
+            .fw = writer,
+        };
         {
-            if (*rec == *record)
-            {
-                if (rec->count == 1)
-                {
-#ifdef __APPLE__
-                    if (::close(wd) == -1)
-                    {
-                        MXL_ERROR("Error closing file descriptor {} for '{}'", wd, rec->fileName);
-                    }
-#elif defined __linux__
-                    auto f = std::filesystem::path{rec->fileName};
-                    // Try to remove the watch only if the file still exists.
-                    if (exists(f) && (inotify_rm_watch(_inotifyFd, wd) == -1))
-                    {
-                        auto const error = errno;
-                        MXL_ERROR("Failed to remove inotify watch (wd={}) for '{}': {}", wd, rec->fileName, std::strerror(error));
-                        // Continue with cleanup despite failure
-                    }
-#endif
-                    rec->count--;
-                    useCount = rec->count;
+            std::lock_guard<std::mutex> lock(_mutex);
+            int existingWd = -1;
 
-                    // Find all elements for that watch descriptor and remove the one that matches the record.
-                    auto range = _watches.equal_range(wd);
-                    for (auto it = range.first; it != range.second; ++it)
-                    {
-                        if (*it->second == *record)
-                        {
-                            _watches.erase(it);
-                            break;
-                        }
-                    }
-                }
-                else if (rec->count == 0)
+            // Check if this flow is already being watched
+            for (auto const& [wd, rec] : _watches)
+            {
+                if (rec == record)
                 {
-                    MXL_DEBUG("Should not have 0 use-count record");
-                    useCount = -1;
+                    existingWd = wd;
+                    break;
+                }
+            }
+
+            if (existingWd == -1)
+            {
+                MXL_DEBUG("Record for {} not found, creating one.", uuids::to_string(record.id));
+
+#ifdef __APPLE__
+                int wd = open(record->fileName.c_str(), O_EVTONLY);
+#elif defined __linux__
+                // if not found, add the watch and add it to the maps
+                existingWd = inotify_add_watch(_inotifyFd, record.fileName.c_str(), IN_ACCESS | IN_ATTRIB);
+#endif
+                if (existingWd == -1)
+                {
+                    auto const error = errno;
+                    MXL_ERROR("Failed to add watch for file '{}': {}", record.fileName, std::strerror(error));
+                    throw std::system_error(error, std::generic_category(), "Failed to add watch for file: " + record.fileName);
                 }
                 else
                 {
-                    rec->count--;
-                    useCount = rec->count;
+                    MXL_DEBUG("Added watch {} for file: {}", existingWd, record.fileName);
                 }
-                break;
+            }
+
+            _watches.emplace(existingWd, std::move(record));
+        }
+    }
+
+    void DomainWatcher::removeFlow(DiscreteFlowWriter* writer, uuids::uuid id)
+    {
+        auto record = DomainWatcherRecord{
+            .id = id,
+            .fileName = makeFlowAccessFilePath(makeFlowDirectoryName(_domain, uuids::to_string(id))),
+            .fw = writer,
+        };
+        {
+            auto lock = std::lock_guard<std::mutex>{_mutex};
+
+            // Remove the record for this writer
+            auto it = std::ranges::find_if(_watches,
+                [record](std::pair<int const&, DomainWatcherRecord const&> item) { return item.second == record; });
+            if (it == _watches.end())
+            {
+                return;
+            }
+
+            auto const wd = it->first;
+            _watches.erase(it);
+
+            // Remove the watch if there are no more writers interested in notification for this flow.
+            if (!_watches.contains(wd))
+            {
+#ifdef __APPLE__
+                if (::close(wd) == -1)
+                {
+                    MXL_ERROR("Error closing file descriptor {} for '{}'", wd, rec->fileName);
+                }
+#elif defined __linux__
+                if (::inotify_rm_watch(_inotifyFd, wd) == -1)
+                {
+                    fmt::println("remove {}", wd);
+                    auto const error = errno;
+                    MXL_ERROR("Failed to remove inotify watch (wd={}) for '{}': {}", wd, record.fileName, std::strerror(error));
+                    // Continue with cleanup despite failure
+                }
+#endif
             }
         }
-
-        return useCount;
     }
 
     void DomainWatcher::processEvents()
@@ -309,7 +293,7 @@ namespace mxl::lib
                 for (int eventIndex = 0; eventIndex < eventCount; eventIndex++)
                 {
                     DomainWatcherRecord* rec = (DomainWatcherRecord*)eventData[eventIndex].udata;
-                    _callback(rec->id, rec->type);
+                    it->second.fw->flowRead();
                 }
             }
         }
@@ -320,7 +304,7 @@ namespace mxl::lib
 
         while (_running)
         {
-            int nfds = epoll_wait(_epollFd, events, 1, 250);
+            int nfds = ::epoll_wait(_epollFd, events, 1, 250);
             if (nfds == -1)
             {
                 auto const error = errno;
@@ -337,7 +321,7 @@ namespace mxl::lib
             }
 
             // We have an inotify event ready
-            ssize_t length = read(_inotifyFd, buffer, sizeof(buffer));
+            ::ssize_t length = ::read(_inotifyFd, buffer, sizeof(buffer));
             if (length == -1)
             {
                 auto const error = errno;
@@ -353,19 +337,19 @@ namespace mxl::lib
                 continue; // nothing to read (should not happen if nfds > 0)
             }
 
-            std::lock_guard<std::mutex> lock(_mutex);
+            auto lock = std::lock_guard<std::mutex>{_mutex};
             for (char* ptr = buffer; ptr < buffer + length;)
             {
-                struct inotify_event* event = reinterpret_cast<struct inotify_event*>(ptr);
+                auto const* event = reinterpret_cast<struct ::inotify_event const*>(ptr);
 
-                auto it = _watches.find(event->wd);
-                if (it != _watches.end())
+                auto range = _watches.equal_range(event->wd);
+                for (auto it = range.first; it != range.second; ++it)
                 {
                     if ((event->mask & (IN_ACCESS | IN_MODIFY | IN_ATTRIB)) != 0)
                     {
                         try
                         {
-                            _callback(it->second->id, it->second->type);
+                            it->second.fw->flowRead();
                         }
                         catch (std::exception const& e)
                         {
@@ -377,7 +361,7 @@ namespace mxl::lib
                         }
                     }
                 }
-                ptr += sizeof(struct inotify_event) + event->len;
+                ptr += sizeof(struct ::inotify_event) + event->len;
             }
         }
 #endif

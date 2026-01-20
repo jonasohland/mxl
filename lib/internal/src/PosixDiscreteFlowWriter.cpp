@@ -17,11 +17,27 @@
 
 namespace mxl::lib
 {
-    PosixDiscreteFlowWriter::PosixDiscreteFlowWriter(FlowManager const&, uuids::uuid const& flowId, std::unique_ptr<DiscreteFlowData>&& data)
+    PosixDiscreteFlowWriter::PosixDiscreteFlowWriter(FlowManager const&, uuids::uuid const& flowId, std::unique_ptr<DiscreteFlowData>&& data,
+        std::shared_ptr<DomainWatcher> const& watcher)
         : DiscreteFlowWriter{flowId}
         , _flowData{std::move(data)}
         , _currentIndex{MXL_UNDEFINED_INDEX}
-    {}
+        , _watcher(watcher)
+    {
+        _watcher->addFlow(this, flowId);
+    }
+
+    PosixDiscreteFlowWriter::~PosixDiscreteFlowWriter()
+    {
+        try
+        {
+            _watcher->removeFlow(this, _flowData->flowInfo()->config.common.id);
+        }
+        catch (...)
+        {
+            MXL_ERROR("Bug: exception while removing flow writer from watcher in destructor");
+        }
+    }
 
     FlowData const& PosixDiscreteFlowWriter::getFlowData() const
     {

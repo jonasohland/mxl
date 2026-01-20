@@ -9,6 +9,7 @@
 #include <mxl/mxl.h>
 #include "mxl-internal/DiscreteFlowData.hpp"
 #include "mxl-internal/DiscreteFlowWriter.hpp"
+#include "mxl-internal/DomainWatcher.hpp"
 
 namespace mxl::lib
 {
@@ -26,7 +27,10 @@ namespace mxl::lib
          * \param[in] manager A referene to the flow manager used to obtain
          *         additional information about the flows context.
          */
-        PosixDiscreteFlowWriter(FlowManager const& manager, uuids::uuid const& flowId, std::unique_ptr<DiscreteFlowData>&& data);
+        PosixDiscreteFlowWriter(FlowManager const& manager, uuids::uuid const& flowId, std::unique_ptr<DiscreteFlowData>&& data,
+            DomainWatcher::ptr const& watcher);
+
+        ~PosixDiscreteFlowWriter() override;
 
     public:
         /**
@@ -73,5 +77,7 @@ namespace mxl::lib
         std::unique_ptr<DiscreteFlowData> _flowData;
         /** The currently opened grain index. MXL_UNDEFINED_INDEX if no grain is currently opened. */
         std::uint64_t _currentIndex;
+
+        DomainWatcher::ptr _watcher;
     };
 }
