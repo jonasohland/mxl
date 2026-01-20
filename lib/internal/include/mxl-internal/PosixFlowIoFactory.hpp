@@ -3,12 +3,15 @@
 
 #pragma once
 
+#include "mxl-internal/DomainWatcher.hpp"
 #include "mxl-internal/FlowIoFactory.hpp"
 
 namespace mxl::lib
 {
     struct MXL_EXPORT PosixFlowIoFactory : FlowIoFactory
     {
+        PosixFlowIoFactory(DomainWatcher::ptr);
+
         /** \see FlowReaderFactory::createDiscreteFlowReader() */
         virtual std::unique_ptr<DiscreteFlowReader> createDiscreteFlowReader(FlowManager const& manager, uuids::uuid const& flowId,
             std::unique_ptr<DiscreteFlowData>&& data) const override;
@@ -23,5 +26,8 @@ namespace mxl::lib
             std::unique_ptr<ContinuousFlowData>&& data) const override;
 
         ~PosixFlowIoFactory();
+
+    private:
+        DomainWatcher::ptr _watcher;
     };
 }

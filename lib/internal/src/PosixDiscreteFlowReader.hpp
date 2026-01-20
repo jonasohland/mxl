@@ -10,6 +10,7 @@
 #include <mxl/mxl.h>
 #include "mxl-internal/DiscreteFlowData.hpp"
 #include "mxl-internal/DiscreteFlowReader.hpp"
+#include "mxl-internal/DomainWatcher.hpp"
 
 namespace mxl::lib
 {
