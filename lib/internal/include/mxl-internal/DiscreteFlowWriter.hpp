@@ -22,6 +22,8 @@ namespace mxl::lib
 
         virtual mxlStatus cancel() = 0;
 
+        virtual void flowRead() = 0;
+
     protected:
         using FlowWriter::FlowWriter;
     };
