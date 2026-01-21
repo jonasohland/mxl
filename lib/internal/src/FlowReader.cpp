@@ -3,7 +3,6 @@
 
 #include "mxl-internal/FlowReader.hpp"
 #include <utility>
-#include "mxl-internal/DomainWatcher.hpp"
 
 namespace mxl::lib
 {
@@ -17,8 +16,7 @@ namespace mxl::lib
         , _domain{domain}
     {}
 
-    FlowReader::FlowReader::~FlowReader()
-    {}
+    FlowReader::FlowReader::~FlowReader() = default;
 
     uuids::uuid const& FlowReader::getId() const
     {
