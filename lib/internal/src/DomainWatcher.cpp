@@ -185,7 +185,7 @@ namespace mxl::lib
                 MXL_DEBUG("Record for {} not found, creating one.", uuids::to_string(record.id));
 
 #ifdef __APPLE__
-                int wd = open(record->fileName.c_str(), O_EVTONLY);
+                existingWd = ::open(record->fileName.c_str(), O_EVTONLY);
 #elif defined __linux__
                 // if not found, add the watch and add it to the maps
                 existingWd = ::inotify_add_watch(_inotifyFd, record.fileName.c_str(), IN_ACCESS | IN_ATTRIB);
