@@ -34,9 +34,9 @@ namespace mxl::lib
         /// \param[in] mxlDomain The directory where the shared memory files will be created
         /// \param[in] options Additional options. \todo Not implemented yet.
         /// \param[in] flowIoFactory A factory used to create flow readers for flows of different types.
-        ///
+        /// \param[in] watcher A DomainWatcher that is shared with the flowIoFactory
         Instance(std::filesystem::path const& mxlDomain, std::string const& options, std::unique_ptr<FlowIoFactory>&& flowIoFactory,
-            DomainWatcher::ptr);
+            DomainWatcher::ptr watcher);
 
         /// Dtor. Release all readers and writers.
         ~Instance();
