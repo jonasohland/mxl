@@ -78,6 +78,9 @@ namespace mxl::lib
         /** The currently opened grain index. MXL_UNDEFINED_INDEX if no grain is currently opened. */
         std::uint64_t _currentIndex;
 
+        // The watcher reference needs live in the most derived class of `FlowWriter` because it only synchronizes with the `DomainWatcher` thread
+        // while the destructor runs. If it was inside the `FlowWriter` destructor itself, the domain watcher thread could call `flowRead()` of a
+        // already destructed instance of `PosixDiscreteFlowWriter` which would result in a `pure virtual function called` exception.
         DomainWatcher::ptr _watcher;
     };
 }
