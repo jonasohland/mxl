@@ -414,126 +414,29 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher suppor
     REQUIRE(watcher->count(flowId) == 0);
 }
 
-// TEST_CASE("DomainWatcher ctor throws on invalid domain path", "[domainwatcher]")
-// {
-//     // Point at a path that cannot be used as a directory (e.g. a regular file)
-//     auto tmp = std::filesystem::temp_directory_path() / "not_a_dir";
-//     std::ofstream{tmp}.close(); // create a plain file
-//     REQUIRE_THROWS_AS(mxl::lib::DomainWatcher(tmp, nullptr), std::filesystem::filesystem_error);
-// }
-//
-// TEST_CASE("DomainWatcher allows re-add after full remove", "[domainwatcher]")
-// {
-//     // Create domain and file
-//     auto domain = std::filesystem::temp_directory_path() / "mxl_dw_readd";
-//     std::filesystem::remove_all(domain);
-//     std::filesystem::create_directories(domain);
-//     auto flowId = *uuids::uuid::from_string("abcdefab-1234-5678-9abc-abcdefabcdef");
-//     auto flowDir = mxl::lib::makeFlowDirectoryName(domain, uuids::to_string(flowId));
-//     std::filesystem::create_directories(flowDir);
-//     auto file = mxl::lib::makeFlowDataFilePath(flowDir);
-//     std::ofstream{file}.close();
-//
-//     DomainWatcher watcher(domain, nullptr);
-//     // Add once, remove fully, then add again—should succeed twice
-//     REQUIRE(watcher.addFlow(flowId, WatcherType::READER) == 1);
-//     REQUIRE(watcher.removeFlow(flowId, WatcherType::READER) == 0);
-//     REQUIRE(watcher.addFlow(flowId, WatcherType::READER) == 1);
-// }
-//
-// TEST_CASE("DomainWatcher triggers WRITER callback on access file modifications", "[domainwatcher]")
-// {
-//     // Ensure a WRITER‐type watcher actually fires when the access file changes
-//     auto const homeDir = std::getenv("HOME");
-//     REQUIRE(homeDir != nullptr);
-//
-//     auto domainPath = std::filesystem::path{homeDir} / "mxl_test_writer_event";
-//     remove_all(domainPath);
-//     create_directories(domainPath);
-//
-//     // Synchronization primitives for the callback
-//     auto mtx = std::mutex{};
-//     auto cv = std::condition_variable{};
-//     auto notified = bool{false};
-//     auto cbId = uuids::uuid{};
-//     auto cbType = mxl::lib::WatcherType{};
-//
-//     // Install watcher
-//     auto watcher = mxl::lib::DomainWatcher{domainPath,
-//         [&](uuids::uuid id, mxl::lib::WatcherType type)
-//         {
-//             auto const lock = std::lock_guard{mtx};
-//             notified = true;
-//             cbId = id;
-//             cbType = type;
-//             cv.notify_one();
-//         }};
-//
-//     // Prepare flow directory & files
-//     auto const flowIdStr = std::string{"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"};
-//     auto flowDir = makeFlowDirectoryName(domainPath, flowIdStr);
-//     create_directories(flowDir);
-//     auto flowId = *uuids::uuid::from_string(flowIdStr);
-//     auto dataFile = makeFlowDataFilePath(flowDir);
-//     auto accFile = makeFlowAccessFilePath(flowDir);
-//     std::ofstream{dataFile}.close();
-//     std::ofstream{accFile}.close();
-//
-//     // Add a WRITER watch
-//     REQUIRE(watcher.addFlow(flowId, mxl::lib::WatcherType::WRITER) == 1);
-//
-//     // Give the thread time to register
-//     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-//
-//     // Simulate what a real reader does: update the access file timestamp
-//     auto accessFd = ::open(accFile.string().c_str(), O_RDWR);
-//     REQUIRE(accessFd != -1);
-//
-//     // Use futimens to update access time (generates IN_ATTRIB event)
-//     struct timespec times[2] = {
-//         {0, UTIME_NOW }, // access time = now
-//         {0, UTIME_OMIT}  // keep modification time unchanged
-//     };
-//     auto result = ::futimens(accessFd, times);
-//     ::close(accessFd);
-//     REQUIRE(result == 0);
-//
-//     // Wait for callback
-//     {
-//         auto lock = std::unique_lock{mtx};
-//         auto got = cv.wait_for(lock, std::chrono::seconds(1), [&] { return notified; });
-//         REQUIRE(got);
-//         REQUIRE(cbId == flowId);
-//         REQUIRE(cbType == mxl::lib::WatcherType::WRITER);
-//     }
-//
-//     // Clean up
-//     REQUIRE(watcher.removeFlow(flowId, mxl::lib::WatcherType::WRITER) == 0);
-// }
-//
-// TEST_CASE("DomainWatcher constructor throws on invalid domain path", "[domainwatcher]")
-// {
-//     // Ensure constructing on a non‐existent or non‐directory path throws
-//     auto const homeDir = std::getenv("HOME");
-//     REQUIRE(homeDir != nullptr);
-//
-//     // Case: path does not exist
-//     auto bad1 = std::filesystem::path{homeDir} / "mxl_nonexistent_domain";
-//     remove_all(bad1);
-//     REQUIRE(!exists(bad1));
-//     REQUIRE_THROWS_AS((mxl::lib::DomainWatcher{bad1, nullptr}), std::filesystem::filesystem_error);
-//
-//     // Case: path exists but is a regular file
-//     auto bad2 = std::filesystem::path{homeDir} / "mxl_not_a_dir";
-//     remove_all(bad2);
-//     {
-//         auto touch = std::ofstream{bad2};
-//         touch << "notadir";
-//     }
-//     REQUIRE(exists(bad2));
-//     REQUIRE(is_regular_file(bad2));
-//     REQUIRE_THROWS_AS((mxl::lib::DomainWatcher{bad2, nullptr}), std::filesystem::filesystem_error);
-//
-//     // Clean up
-//     remove_all(bad2);
-// }
+TEST_CASE("DomainWatcher constructor throws on invalid domain path", "[domainwatcher]")
+{
+    // Ensure constructing on a non‐existent or non‐directory path throws
+    auto const homeDir = std::getenv("HOME");
+    REQUIRE(homeDir != nullptr);
+
+    // Case: path does not exist
+    auto bad1 = std::filesystem::path{homeDir} / "mxl_nonexistent_domain";
+    remove_all(bad1);
+    REQUIRE(!exists(bad1));
+    REQUIRE_THROWS_AS((mxl::lib::DomainWatcher{bad1}), std::filesystem::filesystem_error);
+
+    // Case: path exists but is a regular file
+    auto bad2 = std::filesystem::path{homeDir} / "mxl_not_a_dir";
+    remove_all(bad2);
+    {
+        auto touch = std::ofstream{bad2};
+        touch << "notadir";
+    }
+    REQUIRE(exists(bad2));
+    REQUIRE(is_regular_file(bad2));
+    REQUIRE_THROWS_AS((mxl::lib::DomainWatcher{bad2}), std::filesystem::filesystem_error);
+
+    // Clean up
+    remove_all(bad2);
+}
