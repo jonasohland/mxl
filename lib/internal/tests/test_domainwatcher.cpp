@@ -97,9 +97,11 @@ struct MockWriter : mxl::lib::DiscreteFlowWriter
         _watcher->removeFlow(this, _id);
     }
 
+    [[noreturn]]
     virtual FlowData const& getFlowData() const override
     {
-        throw;
+        // Implementation is not provided
+        std::terminate();
     }
 
     virtual ::mxlFlowInfo getFlowInfo() const override
@@ -130,10 +132,11 @@ struct MockWriter : mxl::lib::DiscreteFlowWriter
     /**
      * Get the grain info for a specific grain index without opening the grain for mutation.
      */
-    [[nodiscard]]
+    [[noreturn]]
     virtual mxlGrainInfo getGrainInfo(std::uint64_t) const override
     {
-        throw;
+        // Implementation is not provided
+        std::terminate();
     };
 
     virtual mxlStatus openGrain(std::uint64_t, mxlGrainInfo*, std::uint8_t**) override
