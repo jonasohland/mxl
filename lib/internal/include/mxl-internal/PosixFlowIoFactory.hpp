@@ -10,7 +10,10 @@ namespace mxl::lib
 {
     struct MXL_EXPORT PosixFlowIoFactory : FlowIoFactory
     {
-        PosixFlowIoFactory(DomainWatcher::ptr);
+        /**
+         * \param[in] watcher The domain watcher that the created flow writers will be registered to.
+         */
+        PosixFlowIoFactory(DomainWatcher::ptr watcher);
 
         /** \see FlowReaderFactory::createDiscreteFlowReader() */
         virtual std::unique_ptr<DiscreteFlowReader> createDiscreteFlowReader(FlowManager const& manager, uuids::uuid const& flowId,

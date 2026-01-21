@@ -10,7 +10,7 @@
 namespace mxl::lib
 {
     PosixFlowIoFactory::PosixFlowIoFactory(DomainWatcher::ptr watcher)
-        : _watcher(std::move(watcher))
+        : _watcher{std::move(watcher)}
     {}
 
     PosixFlowIoFactory::~PosixFlowIoFactory() = default;

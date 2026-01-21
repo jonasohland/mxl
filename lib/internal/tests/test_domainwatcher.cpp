@@ -31,8 +31,9 @@ namespace
 struct MockFlowFiles
 {
     MockFlowFiles(fs::path domain, uuids::uuid const& id)
-        : _domain(std::move(domain))
-        , _id(id)
+        : _domain{std::move(domain)}
+        , _id{id}
+        , _accessFileFd{-1}
     {
         auto flowDir = makeFlowDirectoryName(_domain, uuids::to_string(_id));
         std::filesystem::create_directories(flowDir);
@@ -75,8 +76,7 @@ struct MockFlowFiles
 
     fs::path _domain;
     uuids::uuid _id;
-
-    int _accessFileFd = -1;
+    int _accessFileFd;
 };
 
 struct MockWriter : mxl::lib::DiscreteFlowWriter
@@ -84,43 +84,45 @@ struct MockWriter : mxl::lib::DiscreteFlowWriter
 {
     MockWriter(uuids::uuid id, DomainWatcher::ptr const& watcher)
         : mxl::lib::DiscreteFlowWriter(id)
-        , _id(id)
-        , _watcher(watcher)
+        , _info{}
+        , _id{id}
+        , _notNotified{true}
+        , _watcher{watcher}
     {
         _watcher->addFlow(this, _id);
     }
 
-    ~MockWriter()
+    virtual ~MockWriter() override
     {
         _watcher->removeFlow(this, _id);
     }
 
-    FlowData const& getFlowData() const override
+    virtual FlowData const& getFlowData() const override
     {
         throw;
     }
 
-    ::mxlFlowInfo getFlowInfo() const override
+    virtual ::mxlFlowInfo getFlowInfo() const override
     {
-        return info;
+        return _info;
     }
 
-    ::mxlFlowConfigInfo getFlowConfigInfo() const override
+    virtual ::mxlFlowConfigInfo getFlowConfigInfo() const override
     {
-        return info.config;
+        return _info.config;
     }
 
-    ::mxlFlowRuntimeInfo getFlowRuntimeInfo() const override
+    virtual ::mxlFlowRuntimeInfo getFlowRuntimeInfo() const override
     {
-        return info.runtime;
+        return _info.runtime;
     }
 
-    bool isExclusive() const override
+    virtual bool isExclusive() const override
     {
         return false;
     }
 
-    bool makeExclusive() override
+    virtual bool makeExclusive() override
     {
         return false;
     }
@@ -129,39 +131,40 @@ struct MockWriter : mxl::lib::DiscreteFlowWriter
      * Get the grain info for a specific grain index without opening the grain for mutation.
      */
     [[nodiscard]]
-    mxlGrainInfo getGrainInfo(std::uint64_t) const override
+    virtual mxlGrainInfo getGrainInfo(std::uint64_t) const override
     {
         throw;
     };
 
-    mxlStatus openGrain(std::uint64_t, mxlGrainInfo*, std::uint8_t**) override
+    virtual mxlStatus openGrain(std::uint64_t, mxlGrainInfo*, std::uint8_t**) override
     {
         return MXL_STATUS_OK;
     }
 
-    mxlStatus commit(mxlGrainInfo const&) override
+    virtual mxlStatus commit(mxlGrainInfo const&) override
     {
         return MXL_STATUS_OK;
     }
 
-    mxlStatus cancel() override
+    virtual mxlStatus cancel() override
     {
         return MXL_STATUS_OK;
     }
 
-    void flowRead() override
+    virtual void flowRead() override
     {
         _notNotified.clear();
     }
 
+    [[nodiscard]]
     bool checkAndClearNotified()
     {
         return !_notNotified.test_and_set();
     }
 
-    mxlFlowInfo info;
+    mxlFlowInfo _info;
     uuids::uuid _id;
-    std::atomic_flag _notNotified{true};
+    std::atomic_flag _notNotified;
     DomainWatcher::ptr _watcher;
 };
 
