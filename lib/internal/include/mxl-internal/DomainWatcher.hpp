@@ -34,9 +34,9 @@ namespace mxl::lib
         DiscreteFlowWriter* fw;
 
         [[nodiscard]]
-        bool operator==(DomainWatcherRecord const& other) const noexcept
+        constexpr bool operator==(DomainWatcherRecord const& other) const noexcept
         {
-            return id == other.id && fw == other.fw;
+            return (id == other.id) && (fw == other.fw);
         }
     };
 
@@ -79,8 +79,15 @@ namespace mxl::lib
             _running = false;
         }
 
-        std::size_t count(uuids::uuid) noexcept;
-        std::size_t size() noexcept;
+        /** \brief Returns the number of writers registered for flow id 'id'
+         */
+        [[nodiscard]]
+        std::size_t count(uuids::uuid id) const noexcept;
+
+        /** \brief Returns the total number of writers that are registered in the DomainWatcher
+         */
+        [[nodiscard]]
+        std::size_t size() const noexcept;
 
     private:
         void addRecord(DomainWatcherRecord record);
@@ -104,7 +111,7 @@ namespace mxl::lib
         /// Map of watch descriptors to file records.  Multiple records could use the same watchfd
         std::unordered_multimap<int, DomainWatcherRecord> _watches;
         /// Prodect maps
-        std::mutex _mutex;
+        mutable std::mutex _mutex;
         /// Controls the event processing thread
         std::atomic<bool> _running;
         /// Event processing thread

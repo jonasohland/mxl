@@ -141,10 +141,10 @@ namespace mxl::lib
 #endif
     }
 
-    std::size_t DomainWatcher::count(uuids::uuid id) noexcept
+    std::size_t DomainWatcher::count(uuids::uuid id) const noexcept
     {
         auto lock = std::lock_guard{_mutex};
-        auto it = std::ranges::find_if(_watches, [id](std::pair<int const&, DomainWatcherRecord const&> it) { return it.second.id == id; });
+        auto it = std::ranges::find_if(_watches, [id](auto const& item) { return item.second.id == id; });
         if (it == _watches.end())
         {
             return 0;
@@ -153,7 +153,7 @@ namespace mxl::lib
         return _watches.count(it->first);
     }
 
-    std::size_t DomainWatcher::size() noexcept
+    std::size_t DomainWatcher::size() const noexcept
     {
         auto lock = std::lock_guard{_mutex};
         return _watches.size();
@@ -167,8 +167,8 @@ namespace mxl::lib
             .fw = writer,
         };
         {
-            std::lock_guard<std::mutex> lock(_mutex);
-            int existingWd = -1;
+            auto lock = std::lock_guard{_mutex};
+            auto existingWd = -1;
 
             // Check if this flow is already being watched
             for (auto const& [wd, rec] : _watches)
@@ -188,13 +188,13 @@ namespace mxl::lib
                 int wd = open(record->fileName.c_str(), O_EVTONLY);
 #elif defined __linux__
                 // if not found, add the watch and add it to the maps
-                existingWd = inotify_add_watch(_inotifyFd, record.fileName.c_str(), IN_ACCESS | IN_ATTRIB);
+                existingWd = ::inotify_add_watch(_inotifyFd, record.fileName.c_str(), IN_ACCESS | IN_ATTRIB);
 #endif
                 if (existingWd == -1)
                 {
                     auto const error = errno;
                     MXL_ERROR("Failed to add watch for file '{}': {}", record.fileName, std::strerror(error));
-                    throw std::system_error(error, std::generic_category(), "Failed to add watch for file: " + record.fileName);
+                    throw std::system_error{error, std::generic_category(), "Failed to add watch for file: " + record.fileName};
                 }
                 else
                 {
@@ -214,11 +214,10 @@ namespace mxl::lib
             .fw = writer,
         };
         {
-            auto lock = std::lock_guard<std::mutex>{_mutex};
+            auto lock = std::lock_guard{_mutex};
 
             // Remove the record for this writer
-            auto it = std::ranges::find_if(_watches,
-                [record](std::pair<int const&, DomainWatcherRecord const&> item) { return item.second == record; });
+            auto it = std::ranges::find_if(_watches, [record](auto const& item) { return item.second == record; });
             if (it == _watches.end())
             {
                 return;
@@ -321,7 +320,7 @@ namespace mxl::lib
             }
 
             // We have an inotify event ready
-            ::ssize_t length = ::read(_inotifyFd, buffer, sizeof(buffer));
+            auto length = ::read(_inotifyFd, buffer, sizeof buffer);
             if (length == -1)
             {
                 auto const error = errno;
@@ -337,10 +336,10 @@ namespace mxl::lib
                 continue; // nothing to read (should not happen if nfds > 0)
             }
 
-            auto lock = std::lock_guard<std::mutex>{_mutex};
-            for (char* ptr = buffer; ptr < buffer + length;)
+            auto lock = std::lock_guard{_mutex};
+            for (auto ptr = buffer; ptr < buffer + length;)
             {
-                auto const* event = reinterpret_cast<struct ::inotify_event const*>(ptr);
+                auto event = reinterpret_cast<struct ::inotify_event const*>(ptr);
 
                 auto range = _watches.equal_range(event->wd);
                 for (auto it = range.first; it != range.second; ++it)
