@@ -357,9 +357,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher suppor
     auto work = [&](Worker* w)
     {
         readyCount.fetch_add(1);
-        while (!startSignal.load())
-        {
-        }
+        startSignal.wait(false);
 
         auto dist = std::uniform_int_distribution{std::size_t{0}, w->writers.size() - 1};
 
@@ -395,6 +393,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher suppor
     }
 
     startSignal.store(true);
+    startSignal.notify_all();
     // work work work...
     std::ranges::for_each(workers,
         [](Worker& w)
