@@ -34,7 +34,7 @@ namespace mxl::lib
         DiscreteFlowWriter* fw;
 
         [[nodiscard]]
-        constexpr bool operator==(DomainWatcherRecord const& other) const noexcept
+        bool operator==(DomainWatcherRecord const& other) const noexcept
         {
             return (id == other.id) && (fw == other.fw);
         }
