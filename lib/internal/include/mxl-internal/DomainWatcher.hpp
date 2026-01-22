@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <uuid.h>
 #include <mxl/platform.h>
+#include "mxl-internal/DiscreteFlowData.hpp"
 
 namespace mxl::lib
 {
@@ -25,6 +26,7 @@ namespace mxl::lib
     struct DomainWatcherRecord
     {
         typedef std::shared_ptr<DomainWatcherRecord> ptr;
+        std::shared_ptr<DiscreteFlowData> flowData;
 
         /// flow id
         uuids::uuid id;

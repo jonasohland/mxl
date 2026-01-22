@@ -18,6 +18,8 @@
 #include "mxl-internal/DiscreteFlowWriter.hpp"
 #include "mxl-internal/Logging.hpp"
 #include "mxl-internal/PathUtils.hpp"
+#include "mxl-internal/SharedMemory.hpp"
+#include "mxl-internal/Timing.hpp"
 
 #ifdef __APPLE__
 #   include <sys/event.h>
@@ -162,6 +164,7 @@ namespace mxl::lib
     void DomainWatcher::addFlow(DiscreteFlowWriter* writer, uuids::uuid id)
     {
         auto record = DomainWatcherRecord{
+            .flowData = {},
             .id = id,
             .fileName = makeFlowAccessFilePath(makeFlowDirectoryName(_domain, uuids::to_string(id))),
             .fw = writer,
@@ -176,6 +179,7 @@ namespace mxl::lib
                 if (rec == record)
                 {
                     existingWd = wd;
+                    record.flowData = rec.flowData;
                     break;
                 }
             }
@@ -202,6 +206,9 @@ namespace mxl::lib
                 }
             }
 
+            record.flowData = std::make_shared<DiscreteFlowData>(
+                makeFlowDataFilePath(_domain, uuids::to_string(record.id)).c_str(), AccessMode::READ_WRITE, LockMode::Shared);
+
             _watches.emplace(existingWd, std::move(record));
         }
     }
@@ -209,13 +216,13 @@ namespace mxl::lib
     void DomainWatcher::removeFlow(DiscreteFlowWriter* writer, uuids::uuid id)
     {
         auto record = DomainWatcherRecord{
+            .flowData = {},
             .id = id,
             .fileName = makeFlowAccessFilePath(makeFlowDirectoryName(_domain, uuids::to_string(id))),
             .fw = writer,
         };
         {
             auto lock = std::lock_guard{_mutex};
-
             // Remove the record for this writer
             auto it = std::ranges::find_if(_watches, [record](auto const& item) { return item.second == record; });
             if (it == _watches.end())
@@ -336,31 +343,33 @@ namespace mxl::lib
                 continue; // nothing to read (should not happen if nfds > 0)
             }
 
-            auto lock = std::lock_guard{_mutex};
-            for (auto ptr = buffer; ptr < buffer + length;)
             {
-                auto event = reinterpret_cast<struct ::inotify_event const*>(ptr);
-
-                auto range = _watches.equal_range(event->wd);
-                for (auto it = range.first; it != range.second; ++it)
+                auto lock = std::lock_guard{_mutex};
+                for (auto ptr = buffer; ptr < buffer + length;)
                 {
-                    if ((event->mask & (IN_ACCESS | IN_MODIFY | IN_ATTRIB)) != 0)
+                    auto event = reinterpret_cast<struct ::inotify_event const*>(ptr);
+
+                    auto range = _watches.equal_range(event->wd);
+                    for (auto it = range.first; it != range.second; ++it)
                     {
-                        try
+                        if ((event->mask & (IN_ACCESS | IN_MODIFY | IN_ATTRIB)) != 0)
                         {
-                            it->second.fw->flowRead();
-                        }
-                        catch (std::exception const& e)
-                        {
-                            MXL_ERROR("Exception in DomainWatcher callback: {}", e.what());
-                        }
-                        catch (...)
-                        {
-                            MXL_ERROR("Unknown exception in DomainWatcher callback");
+                            try
+                            {
+                                it->second.flowData->flowInfo()->runtime.lastReadTime = currentTime(Clock::TAI).value;
+                            }
+                            catch (std::exception const& e)
+                            {
+                                MXL_ERROR("Exception in DomainWatcher callback: {}", e.what());
+                            }
+                            catch (...)
+                            {
+                                MXL_ERROR("Unknown exception in DomainWatcher callback");
+                            }
                         }
                     }
+                    ptr += sizeof(struct ::inotify_event) + event->len;
                 }
-                ptr += sizeof(struct ::inotify_event) + event->len;
             }
         }
 #endif
