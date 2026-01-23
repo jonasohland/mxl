@@ -361,7 +361,7 @@ namespace mxl::lib
                 continue;
             }
 
-            auto [it, end] = _watches.equal_range(ptr->wd);
+            auto [it, _] = _watches.equal_range(ptr->wd);
             if (it == _watches.end())
             {
                 continue;
@@ -369,7 +369,7 @@ namespace mxl::lib
 
             try
             {
-                auto& [wd, record] = *it;
+                auto& [_, record] = *it;
                 record.flowData->flowInfo()->runtime.lastReadTime = time.value;
             }
             catch (std::exception const& e)
