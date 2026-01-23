@@ -18,6 +18,7 @@
 #include "mxl-internal/DiscreteFlowWriter.hpp"
 #include "mxl-internal/Logging.hpp"
 #include "mxl-internal/PathUtils.hpp"
+#include "mxl-internal/Timing.hpp"
 
 #ifdef __APPLE__
 #   include <sys/event.h>
@@ -165,6 +166,7 @@ namespace mxl::lib
             .id = id,
             .fileName = makeFlowAccessFilePath(makeFlowDirectoryName(_domain, uuids::to_string(id))),
             .fw = writer,
+            .flowData = {},
         };
         {
             auto lock = std::lock_guard{_mutex};
@@ -176,6 +178,7 @@ namespace mxl::lib
                 if (rec == record)
                 {
                     existingWd = wd;
+                    record.flowData = rec.flowData;
                     break;
                 }
             }
@@ -202,6 +205,8 @@ namespace mxl::lib
                 }
             }
 
+            record.flowData = std::make_shared<DiscreteFlowData>(
+                makeFlowDataFilePath(_domain, uuids::to_string(record.id)).c_str(), AccessMode::READ_WRITE, LockMode::None);
             _watches.emplace(existingWd, std::move(record));
         }
     }
@@ -212,6 +217,7 @@ namespace mxl::lib
             .id = id,
             .fileName = makeFlowAccessFilePath(makeFlowDirectoryName(_domain, uuids::to_string(id))),
             .fw = writer,
+            .flowData = {},
         };
         {
             auto lock = std::lock_guard{_mutex};
@@ -237,9 +243,11 @@ namespace mxl::lib
 #elif defined __linux__
                 if (::inotify_rm_watch(_inotifyFd, wd) == -1)
                 {
-                    fmt::println("remove {}", wd);
                     auto const error = errno;
-                    MXL_ERROR("Failed to remove inotify watch (wd={}) for '{}': {}", wd, record.fileName, std::strerror(error));
+                    if (error != EINVAL || std::filesystem::exists(it->second.fileName))
+                    {
+                        MXL_WARN("Failed to remove inotify watch (wd={}) for '{}': {}", wd, record.fileName, std::strerror(error));
+                    }
                     // Continue with cleanup despite failure
                 }
 #endif
@@ -336,34 +344,46 @@ namespace mxl::lib
                 continue; // nothing to read (should not happen if nfds > 0)
             }
 
-            auto lock = std::lock_guard{_mutex};
-            for (auto ptr = buffer; ptr < buffer + length;)
-            {
-                auto event = reinterpret_cast<struct ::inotify_event const*>(ptr);
-
-                auto range = _watches.equal_range(event->wd);
-                for (auto it = range.first; it != range.second; ++it)
-                {
-                    if ((event->mask & (IN_ACCESS | IN_MODIFY | IN_ATTRIB)) != 0)
-                    {
-                        try
-                        {
-                            it->second.fw->flowRead();
-                        }
-                        catch (std::exception const& e)
-                        {
-                            MXL_ERROR("Exception in DomainWatcher callback: {}", e.what());
-                        }
-                        catch (...)
-                        {
-                            MXL_ERROR("Unknown exception in DomainWatcher callback");
-                        }
-                    }
-                }
-                ptr += sizeof(struct ::inotify_event) + event->len;
-            }
+            processEventBuffer(reinterpret_cast<::inotify_event const*>(buffer), length);
         }
 #endif
     }
+
+#ifdef __linux__
+    void DomainWatcher::processEventBuffer(::inotify_event const* buffer, std::size_t length)
+    {
+        auto lock = std::lock_guard{_mutex};
+        auto time = currentTime(Clock::TAI);
+        for (auto ptr = buffer; ptr < buffer + length; ptr += sizeof(::inotify_event))
+        {
+            if ((ptr->mask & (IN_ACCESS | IN_MODIFY | IN_ATTRIB)) == 0)
+            {
+                continue;
+            }
+
+            auto [it, end] = _watches.equal_range(ptr->wd);
+            if (it == _watches.end())
+            {
+                continue;
+            }
+
+            try
+            {
+                auto& [wd, record] = *it;
+                record.flowData->flowInfo()->runtime.lastReadTime = time.value;
+            }
+            catch (std::exception const& e)
+            {
+                MXL_ERROR("Exception in DomainWatcher callback: {}", e.what());
+            }
+            catch (...)
+            {
+                MXL_ERROR("Unknown exception in DomainWatcher callback");
+            }
+        }
+    }
+#elif defined __APPLE__
+    // TODO
+#endif
 
 } // namespace mxl::lib

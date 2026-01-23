@@ -65,9 +65,6 @@ namespace mxl::lib
         /** \see DiscreteFlowWriter::cancel */
         virtual mxlStatus cancel() override;
 
-        /** \see FlowWriter::flowRead */
-        virtual void flowRead() override;
-
         virtual bool isExclusive() const override;
 
         virtual bool makeExclusive() override;
