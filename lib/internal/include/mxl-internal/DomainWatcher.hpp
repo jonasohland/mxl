@@ -14,7 +14,9 @@
 #include <variant>
 #include <unistd.h>
 #include <uuid.h>
+#include <sys/inotify.h>
 #include <mxl/platform.h>
+#include "mxl-internal/DiscreteFlowData.hpp"
 
 namespace mxl::lib
 {
@@ -32,6 +34,8 @@ namespace mxl::lib
         std::string fileName;
 
         DiscreteFlowWriter* fw;
+
+        std::shared_ptr<DiscreteFlowData> flowData;
 
         [[nodiscard]]
         bool operator==(DomainWatcherRecord const& other) const noexcept
@@ -90,12 +94,16 @@ namespace mxl::lib
         std::size_t size() const noexcept;
 
     private:
-        void addRecord(DomainWatcherRecord record);
-        void removeRecord(DomainWatcherRecord const& record);
-
         /// Event loop that waits for inotify file change events and processes them.
         /// (invokes the callback)
         void processEvents();
+
+#ifdef __linux__
+        void processEventBuffer(struct ::inotify_event const* buffer, std::size_t length);
+#elif defined __APPLE__
+        // TODO
+#endif
+
         /// The monitored domain
         std::filesystem::path _domain;
 

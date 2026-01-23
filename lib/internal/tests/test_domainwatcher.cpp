@@ -14,10 +14,12 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <uuid.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <catch2/catch_test_macros.hpp>
 #include "mxl-internal/DiscreteFlowWriter.hpp"
 #include "mxl-internal/DomainWatcher.hpp"
+#include "mxl-internal/Flow.hpp"
 #include "mxl-internal/PathUtils.hpp"
 #include "mxl/flowinfo.h"
 #include "../../tests/Utils.hpp"
@@ -38,15 +40,28 @@ struct MockFlowFiles
         auto flowDir = makeFlowDirectoryName(_domain, uuids::to_string(_id));
         std::filesystem::create_directories(flowDir);
         auto accessFilePath = makeFlowAccessFilePath(flowDir);
+        auto dataFilePath = makeFlowDataFilePath(flowDir);
 
-        _accessFileFd = ::open(accessFilePath.c_str(), O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+        _accessFileFd = ::open(accessFilePath.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0644);
         if (_accessFileFd < 0)
         {
             auto const error = errno;
             throw std::system_error{error, std::system_category(), "Failed to open access file"};
         }
 
-        std::ofstream of1{makeFlowDataFilePath(flowDir)};
+        _dataFileFd = ::open(dataFilePath.c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0644);
+
+        if (::ftruncate(_accessFileFd, sizeof(Grain)) < 0)
+        {
+            auto const error = errno;
+            throw std::system_error{error, std::system_category(), "Failed truncate access file"};
+        }
+
+        if (::ftruncate(_dataFileFd, sizeof(Flow)) < 0)
+        {
+            auto const error = errno;
+            throw std::system_error{error, std::system_category(), "Failed truncate access file"};
+        }
     }
 
     ~MockFlowFiles()
@@ -54,6 +69,10 @@ struct MockFlowFiles
         if (_accessFileFd > -1)
         {
             (void)::close(_accessFileFd);
+        }
+        if (_dataFileFd > -1)
+        {
+            (void)::close(_dataFileFd);
         }
 
         auto flowDir = makeFlowDirectoryName(_domain, uuids::to_string(_id));
@@ -77,24 +96,45 @@ struct MockFlowFiles
     fs::path _domain;
     uuids::uuid _id;
     int _accessFileFd;
+    int _dataFileFd;
 };
 
 struct MockWriter : mxl::lib::DiscreteFlowWriter
-
 {
-    MockWriter(uuids::uuid id, DomainWatcher::ptr const& watcher)
+    MockWriter(std::filesystem::path const& domain, uuids::uuid id, DomainWatcher::ptr const& watcher)
         : mxl::lib::DiscreteFlowWriter(id)
         , _info{}
         , _id{id}
-        , _notNotified{true}
         , _watcher{watcher}
     {
         _watcher->addFlow(this, _id);
+        _flowDataFd = ::open(makeFlowDataFilePath(domain, uuids::to_string(id)).c_str(), O_RDONLY | O_CLOEXEC, 0);
+        if (_flowDataFd < 0)
+        {
+            auto const error = errno;
+            throw std::system_error{error, std::system_category(), "Failed to open grain data file"};
+        }
+
+        _flowData = reinterpret_cast<Flow*>(::mmap(nullptr, sizeof(Flow), PROT_READ, MAP_SHARED, _flowDataFd, 0));
+        if (_flowData == MAP_FAILED)
+        {
+            auto const error = errno;
+            throw std::system_error{error, std::system_category(), "Failed to map grain data file"};
+        }
     }
 
     virtual ~MockWriter() override
     {
         _watcher->removeFlow(this, _id);
+        if ((_flowData != nullptr) && (_flowData != MAP_FAILED))
+        {
+            (void)::munmap(_flowData, sizeof(Flow));
+        }
+
+        if (_flowDataFd > -1)
+        {
+            (void)::close(_flowDataFd);
+        }
     }
 
     [[noreturn]]
@@ -154,21 +194,20 @@ struct MockWriter : mxl::lib::DiscreteFlowWriter
         return MXL_STATUS_OK;
     }
 
-    virtual void flowRead() override
+    bool checkReadTimeUpdated()
     {
-        _notNotified.clear();
-    }
-
-    [[nodiscard]]
-    bool checkAndClearNotified()
-    {
-        return !_notNotified.test_and_set();
+        auto before = _lastReadTime;
+        _lastReadTime = _flowData->info.runtime.lastReadTime;
+        return before != _lastReadTime;
     }
 
     mxlFlowInfo _info;
     uuids::uuid _id;
-    std::atomic_flag _notNotified;
     DomainWatcher::ptr _watcher;
+
+    std::uint64_t _lastReadTime;
+    int _flowDataFd;
+    Flow* _flowData;
 };
 
 TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Directory Watcher", "[directory watcher]")
@@ -181,11 +220,11 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Directory Watcher", 
     auto mockFiles = MockFlowFiles{domain, flowId1};
     auto mockFiles2 = MockFlowFiles{domain, flowId2};
 
-    auto mockWriter1 = std::make_unique<MockWriter>(flowId1, watcher);
-    auto mockWriter2 = std::make_unique<MockWriter>(flowId1, watcher);
+    auto mockWriter1 = std::make_unique<MockWriter>(domain, flowId1, watcher);
+    auto mockWriter2 = std::make_unique<MockWriter>(domain, flowId1, watcher);
     REQUIRE(watcher->count(flowId1) == 2);
     REQUIRE(watcher->size() == 2);
-    auto mockWriter3 = std::make_unique<MockWriter>(flowId2, watcher);
+    auto mockWriter3 = std::make_unique<MockWriter>(domain, flowId2, watcher);
     mockWriter1.reset();
     REQUIRE(watcher->count(flowId1) == 1);
     REQUIRE(watcher->count(flowId2) == 1);
@@ -207,8 +246,8 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher trigge
     auto mockFlow = MockFlowFiles{domain, flowId};
 
     {
-        auto writer1 = MockWriter{flowId, watcher};
-        auto writer2 = MockWriter{flowId, watcher};
+        auto writer1 = MockWriter{domain, flowId, watcher};
+        auto writer2 = MockWriter{domain, flowId, watcher};
 
         // Give the watcher thread a moment to register the inotify watch
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -217,17 +256,17 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher trigge
         mockFlow.touch();
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        REQUIRE(writer1.checkAndClearNotified());
-        REQUIRE(writer2.checkAndClearNotified());
-        REQUIRE(!writer1.checkAndClearNotified());
-        REQUIRE(!writer2.checkAndClearNotified());
+        REQUIRE(writer1.checkReadTimeUpdated());
+        REQUIRE(writer2.checkReadTimeUpdated());
+        REQUIRE(!writer1.checkReadTimeUpdated());
+        REQUIRE(!writer2.checkReadTimeUpdated());
 
         // Modify the main data file and expect a Writer event
         mockFlow.touch();
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        REQUIRE(writer1.checkAndClearNotified());
-        REQUIRE(writer2.checkAndClearNotified());
+        REQUIRE(writer1.checkReadTimeUpdated());
+        REQUIRE(writer2.checkReadTimeUpdated());
     }
 
     REQUIRE(watcher->size() == 0);
@@ -243,8 +282,8 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher thread
     auto mockFlow = MockFlowFiles{domain, flowId};
 
     {
-        auto mockWriter1 = MockWriter{flowId, watcher};
-        auto mockWriter2 = MockWriter{flowId, watcher};
+        auto mockWriter1 = MockWriter{domain, flowId, watcher};
+        auto mockWriter2 = MockWriter{domain, flowId, watcher};
         REQUIRE(watcher->size() == 2);
         REQUIRE(watcher->count(flowId) == 2);
 
@@ -254,8 +293,8 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher thread
 
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
-        REQUIRE(mockWriter1.checkAndClearNotified());
-        REQUIRE(mockWriter2.checkAndClearNotified());
+        REQUIRE(mockWriter1.checkReadTimeUpdated());
+        REQUIRE(mockWriter2.checkReadTimeUpdated());
 
         watcher->stop();
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
@@ -263,8 +302,8 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher thread
         mockFlow.touch();
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
-        REQUIRE(!mockWriter1.checkAndClearNotified());
-        REQUIRE(!mockWriter2.checkAndClearNotified());
+        REQUIRE(!mockWriter1.checkReadTimeUpdated());
+        REQUIRE(!mockWriter2.checkReadTimeUpdated());
     }
 }
 
@@ -277,7 +316,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher error 
     uuids::uuid dummyId = *uuids::uuid::from_string("01234567-89ab-cdef-0123-456789abcdef");
     auto test = [&]()
     {
-        auto mockWriter = MockWriter{dummyId, watcher};
+        auto mockWriter = MockWriter{domain, dummyId, watcher};
     };
 
     // The implementation throws std::system_error when inotify_add_watch fails
@@ -316,7 +355,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher cleans
         // Add a watch to force inotify initialization if not already done in constructor
         auto const flowId = *uuids::uuid::from_string("12345678-1234-5678-1234-567812345678");
         auto flowFiles = MockFlowFiles{domain, flowId};
-        auto writer = MockWriter{flowId, watcher};
+        auto writer = MockWriter{domain, flowId, watcher};
 
         auto const fdsWhileActive = countOpenFDs();
         REQUIRE(fdsWhileActive > fdsBefore);
@@ -371,7 +410,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher suppor
             }
             else
             {
-                slot.emplace(flowId, watcher);
+                slot.emplace(domain, flowId, watcher);
             }
 
             if (index > (w->writers.size() / 2))
@@ -405,7 +444,7 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "DomainWatcher suppor
     REQUIRE(watcher->size() == 0);
     REQUIRE(watcher->count(flowId) == 0);
     {
-        auto mockWriter = MockWriter{flowId, watcher};
+        auto mockWriter = MockWriter{domain, flowId, watcher};
         REQUIRE(watcher->size() == 1);
         REQUIRE(watcher->count(flowId) == 1);
     }

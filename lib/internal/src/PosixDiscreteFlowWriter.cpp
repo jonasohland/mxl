@@ -91,14 +91,6 @@ namespace mxl::lib
         return MXL_STATUS_OK;
     }
 
-    void PosixDiscreteFlowWriter::flowRead()
-    {
-        if (_flowData)
-        {
-            _flowData->flowInfo()->runtime.lastReadTime = currentTime(mxl::lib::Clock::TAI).value;
-        }
-    }
-
     bool PosixDiscreteFlowWriter::isExclusive() const
     {
         if (!_flowData)
