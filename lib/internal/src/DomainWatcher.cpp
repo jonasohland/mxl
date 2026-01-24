@@ -344,24 +344,24 @@ namespace mxl::lib
                 continue; // nothing to read (should not happen if nfds > 0)
             }
 
-            processEventBuffer(reinterpret_cast<::inotify_event const*>(buffer), length);
+            processEventBuffer(reinterpret_cast<::inotify_event const*>(buffer), length / sizeof(::inotify_event));
         }
 #endif
     }
 
 #ifdef __linux__
-    void DomainWatcher::processEventBuffer(::inotify_event const* buffer, std::size_t length)
+    void DomainWatcher::processEventBuffer(::inotify_event const* buffer, std::size_t count)
     {
         auto lock = std::lock_guard{_mutex};
         auto time = currentTime(Clock::TAI);
-        for (auto ptr = buffer; ptr < buffer + length; ptr += sizeof(::inotify_event))
+        for (auto p = buffer; p != buffer + count; ++p)
         {
-            if ((ptr->mask & (IN_ACCESS | IN_MODIFY | IN_ATTRIB)) == 0)
+            if ((p->mask & (IN_ACCESS | IN_MODIFY | IN_ATTRIB)) == 0)
             {
                 continue;
             }
 
-            auto [it, _] = _watches.equal_range(ptr->wd);
+            auto [it, _] = _watches.equal_range(p->wd);
             if (it == _watches.end())
             {
                 continue;

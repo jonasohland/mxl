@@ -99,7 +99,7 @@ namespace mxl::lib
         void processEvents();
 
 #ifdef __linux__
-        void processEventBuffer(struct ::inotify_event const* buffer, std::size_t length);
+        void processEventBuffer(struct ::inotify_event const* buffer, std::size_t count);
 #elif defined __APPLE__
         // TODO
 #endif
