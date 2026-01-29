@@ -61,7 +61,7 @@ namespace mxl::lib
 #if defined __linux__
             if (::renameat2(AT_FDCWD, source.c_str(), AT_FDCWD, dest.c_str(), RENAME_NOREPLACE) < 0)
 #elif defined __APPLE__
-            if (::rename(source.c_str(), dest.c_str()) < 0)
+            if (::renamex_np(source.c_str(), dest.c_str(), RENAME_EXCL) < 0)
 #endif
             {
                 auto const error = errno;
