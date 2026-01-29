@@ -1,0 +1,28 @@
+name: Small Improvement
+description: Suggest an small improvement to the current feature set, that is NOT derived from an MXL Requirement
+labels:
+  - Small Improvement
+assignees: []
+title: "[Small Improvement] <short description>"
+
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Provide a clear, concise description of the proposed small improvement improvement.
+      placeholder: "What feature will be improved and in what way?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional Context
+      description: Add any other context, background information, or images.
+      placeholder: "Include relevant background, links, screenshots, or diagrams."
+    validations:
+      required: false
+
+# SPDX-FileCopyrightText: 2025 Contributors to the Media eXchange Layer project.
+# SPDX-License-Identifier: Apache-2.0
