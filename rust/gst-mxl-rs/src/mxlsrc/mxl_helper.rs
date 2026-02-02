@@ -140,45 +140,32 @@ pub(crate) fn generate_channel_mask_from_channels(channels: u32) -> gst::Bitmask
 
 fn init_mxl_reader(settings: &MutexGuard<'_, Settings>) -> Result<FlowReader, gst::ErrorMessage> {
     let mxl_instance = init_mxl_instance(settings)?;
-    let reader = if settings.video_flow.is_some() {
-        mxl_instance
-            .create_flow_reader(
-                settings
-                    .video_flow
-                    .as_ref()
-                    .ok_or(gst::error_msg!(
-                        gst::CoreError::Failed,
-                        ["Failed to create MXL reader: Video flow id is None"]
-                    ))?
-                    .as_str(),
-            )
-            .map_err(|e| {
-                gst::error_msg!(
-                    gst::CoreError::Failed,
-                    ["Failed to create MXL reader: {}", e]
-                )
-            })?
+    let flow_id = if settings.video_flow.is_some() {
+        settings.video_flow.as_ref()
     } else {
-        mxl_instance
-            .create_flow_reader(
-                settings
-                    .audio_flow
-                    .as_ref()
-                    .ok_or(gst::error_msg!(
-                        gst::CoreError::Failed,
-                        ["Failed to create MXL reader: Audio flow id is None"]
-                    ))?
-                    .as_str(),
-            )
-            .map_err(|e| {
-                gst::error_msg!(
+        settings.audio_flow.as_ref()
+    }
+    .ok_or_else(|| gst::error_msg!(gst::CoreError::Failed, ["Missing flow id in settings"]))?;
+    let mut warned = false;
+    loop {
+        match mxl_instance.create_flow_reader(flow_id) {
+            Ok(reader) => break Ok(reader),
+            Err(mxl::Error::FlowNotFound) => {
+                if !warned {
+                    eprintln!("Waiting for flow to be created...");
+                    warned = true;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+                continue;
+            }
+            Err(err) => {
+                break Err(gst::error_msg!(
                     gst::CoreError::Failed,
-                    ["Failed to create MXL reader: {}", e]
-                )
-            })?
-    };
-
-    Ok(reader)
+                    ["Failed to create flow reader: {}", err]
+                ));
+            }
+        }
+    }
 }
 
 pub(crate) fn init(mxlsrc: &MxlSrc) -> Result<(), gst::ErrorMessage> {
@@ -194,24 +181,7 @@ pub(crate) fn init(mxlsrc: &MxlSrc) -> Result<(), gst::ErrorMessage> {
         )
     })?;
 
-    let reader;
-    let mut warned = false;
-    loop {
-        match init_mxl_reader(&settings) {
-            Ok(r) => {
-                reader = r;
-                break;
-            }
-            Err(_) => {
-                if !warned {
-                    eprintln!("Waiting for flow to be created...");
-                    warned = true;
-                }
-                //Sleep to avoid busy looping
-                std::thread::sleep(Duration::from_millis(10));
-            }
-        }
-    }
+    let reader = init_mxl_reader(&settings)?;
     let binding = reader.get_info();
     let reader_info = binding.as_ref();
     let instance = init_mxl_instance(&settings).map_err(|e| {
