@@ -188,7 +188,7 @@ namespace mxl::lib
                 MXL_DEBUG("Record for {} not found, creating one.", uuids::to_string(record.id));
 
 #ifdef __APPLE__
-                existingWd = ::open(record->fileName.c_str(), O_EVTONLY);
+                existingWd = ::open(record.fileName.c_str(), O_EVTONLY);
 #elif defined __linux__
                 // if not found, add the watch and add it to the maps
                 existingWd = ::inotify_add_watch(_inotifyFd, record.fileName.c_str(), IN_ACCESS | IN_ATTRIB);
@@ -238,7 +238,7 @@ namespace mxl::lib
 #ifdef __APPLE__
                 if (::close(wd) == -1)
                 {
-                    MXL_ERROR("Error closing file descriptor {} for '{}'", wd, rec->fileName);
+                    MXL_ERROR("Error closing file descriptor {} for '{}'", wd, record.fileName);
                 }
 #elif defined __linux__
                 if (::inotify_rm_watch(_inotifyFd, wd) == -1)
@@ -258,36 +258,15 @@ namespace mxl::lib
     {
 #ifdef __APPLE__
 
-        /* Set up a list of events to monitor. */
-        constexpr unsigned int vnodeEvents = NOTE_DELETE | NOTE_WRITE | NOTE_ATTRIB;
-        std::vector<struct kevent> eventsToMonitor, eventData;
-        std::vector<DomainWatcherRecord::ptr> eventsToMonitorRecords;
-
         while (_running)
         {
-            size_t watchCount = 0;
-            {
-                std::lock_guard<std::mutex> lock(_mutex);
-                watchCount = _watches.size();
-                eventsToMonitor.reserve(watchCount);
-                eventsToMonitor.resize(watchCount);
-                eventsToMonitorRecords.reserve(watchCount);
-                size_t index = 0;
-                for (auto const& [wd, rec] : _watches)
-                {
-                    // keep the record alive.  this ensures that it is not released whilst waiting for an event.
-                    eventsToMonitorRecords.push_back(rec);
-                    EV_SET(&eventsToMonitor[index], wd, EVFILT_VNODE, EV_ADD | EV_CLEAR, vnodeEvents, 0, rec.get());
-                    index++;
-                }
-            }
-
             timespec timeout;
             timeout.tv_sec = 0;          // 0 seconds
             timeout.tv_nsec = 250000000; // 250 milliseconds
 
-            eventData.resize(watchCount);
-            int eventCount = kevent(_kq, eventsToMonitor.data(), watchCount, eventData.data(), watchCount, &timeout);
+            setWatch();
+
+            int eventCount = kevent(_kq, _eventsToMonitor.data(), _eventsToMonitor.size(), _eventData.data(), _eventsToMonitor.size(), &timeout);
             if (eventCount < 0)
             {
                 auto const error = errno;
@@ -296,11 +275,7 @@ namespace mxl::lib
             }
             else if (eventCount)
             {
-                for (int eventIndex = 0; eventIndex < eventCount; eventIndex++)
-                {
-                    DomainWatcherRecord* rec = (DomainWatcherRecord*)eventData[eventIndex].udata;
-                    it->second.fw->flowRead();
-                }
+                processPendingEvents(eventCount);
             }
         }
 
@@ -348,7 +323,47 @@ namespace mxl::lib
 #endif
     }
 
-#ifdef __linux__
+#ifdef __APPLE__
+
+    void DomainWatcher::setWatch()
+    {
+        auto lock = std::lock_guard{_mutex};
+
+        /* Set up a list of events to monitor. */
+        constexpr unsigned int vnodeEvents = NOTE_DELETE | NOTE_WRITE | NOTE_ATTRIB;
+
+        _eventsToMonitor.resize(_watches.size());
+        _eventData.resize(_watches.size());
+
+        size_t index = 0;
+
+        for (auto const& [wd, rec] : _watches)
+        {
+            EV_SET(
+                &_eventsToMonitor[index], wd, EVFILT_VNODE, EV_ADD | EV_CLEAR, vnodeEvents, 0, std::bit_cast<void*>(static_cast<std::uintptr_t>(wd)));
+            index++;
+        }
+    }
+
+    void DomainWatcher::processPendingEvents(int numEvents)
+    {
+        auto lock = std::lock_guard{_mutex};
+        auto time = currentTime(Clock::TAI);
+        for (int eventIndex = 0; eventIndex < numEvents; eventIndex++)
+        {
+            auto wd = static_cast<int>(std::bit_cast<std::uintptr_t>(_eventData[eventIndex].udata));
+            auto [it, _] = _watches.equal_range(wd);
+            if (it == _watches.end())
+            {
+                continue;
+            }
+
+            auto& [unused, rec] = *it;
+            rec.flowData->flowInfo()->runtime.lastReadTime = time.value;
+        }
+    }
+
+#elif defined __linux__
     void DomainWatcher::processEventBuffer(::inotify_event const* buffer, std::size_t count)
     {
         auto lock = std::lock_guard{_mutex};
