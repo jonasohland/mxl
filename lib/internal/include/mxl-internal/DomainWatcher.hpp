@@ -14,9 +14,14 @@
 #include <variant>
 #include <unistd.h>
 #include <uuid.h>
-#include <sys/inotify.h>
 #include <mxl/platform.h>
 #include "mxl-internal/DiscreteFlowData.hpp"
+
+#if defined __linux__
+#   include <sys/inotify.h>
+#elif defined __APPLE__
+#   include <sys/event.h>
+#endif
 
 namespace mxl::lib
 {
@@ -108,7 +113,8 @@ namespace mxl::lib
 #ifdef __linux__
         void processEventBuffer(struct ::inotify_event const* buffer, std::size_t count);
 #elif defined __APPLE__
-        // TODO
+        void setWatch();
+        void processPendingEvents(int numEvents);
 #endif
 
         /// The monitored domain
@@ -116,6 +122,8 @@ namespace mxl::lib
 
 #ifdef __APPLE__
         int _kq;
+        std::vector<struct ::kevent> _eventsToMonitor;
+        std::vector<struct ::kevent> _eventData;
 #elif defined __linux__
         /// The inotify file descriptor
         int _inotifyFd;
