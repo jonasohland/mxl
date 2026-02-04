@@ -21,7 +21,7 @@
 MXL: 
 
 - is implemented in C++, exposed via a C API with Rust bindings available
-- supports for V210 video, Float32 and ANC data
+- supports for V210 video, Float32 audio and ANC data
 - implements zero-copy media sharing or low-copy media movement
 - is asynchronous by design
 - is a thin library with minimal external dependencies
@@ -51,11 +51,11 @@ Rapid advances in computing power and network infrastructure are transforming th
 
 To address these challenges, the [EBU Dynamic Media Facility (DMF)](https://tech.ebu.ch/groups/dmf) initiative proposes a standardised architecture inspired by the cloud-hyperscaler model. In this architecture, discrete “media functions”, the modular building blocks responsible for ingesting, processing, and delivering content, are deployed onto a common container-based platform. These functions can be provisioned and scaled on-demand, and strategically placed wherever compute, storage, and bandwidth are most readily available, whether on-premises, at the network edge, or in public or private clouds.
 
-At the heart of the [DMF architecture](https://tech.ebu.ch/publications/white-paper-2024-09-03) lies the Media eXchange Layer (MXL), a high-performance data plane designed to simplify and accelerate communication between these distributed media functions. The MXL enables entirely new production paradigms, including asynchronous “faster-than-live” workflows, allowing teams to produce content more flexibly and quickly than traditional linear models permit. Moreover, its extensible design supports evolving transport mechanisms and new media formats as they emerge, ensuring that the architecture is well equipped to evolve alongside technological progress.
+At the heart of the [DMF architecture](https://tech.ebu.ch/publications/white-paper-2024-09-03) lies the Media echange layer, a high-performance data plane designed to simplify and accelerate communication between these distributed media functions. This enables entirely new production paradigms, including asynchronous “faster-than-live” workflows, allowing teams to produce content more flexibly and quickly than traditional linear models permit. Moreover, its extensible design supports evolving transport mechanisms and new media formats as they emerge, ensuring that the architecture is well equipped to evolve alongside technological progress. MXL is an open-source implementation of that layer.
 
 ![docs/Media eXchange Layer.png](https://github.com/dmf-mxl/mxl/blob/53e889c888b2daceb4bf550943f3a194f559f182/docs/Media%20eXchange%20Layer.png "MXL Layer Diagram")
 
-In order to encourage broad industry adoption, the European Broadcasting Union (EBU), the North American Broadcasters Association (NABA), and the Linux Foundation are pursuing an “implement-first” strategy. This practical, hands-on approach involves close collaboration with broadcasters and technology suppliers to produce an open-source software development kit that promotes interoperability and showcases real-world use cases for the MXL. The first alpha version of this SDK was released in June 2025. Ultimately, the DMF initiative aspires to establish a new baseline for open, interoperable software-based live production, a foundation that is robust, future-proof, and capable of sustaining innovation across the entire media ecosystem.
+In order to encourage broad industry adoption, the European Broadcasting Union (EBU) and the North American Broadcasters Association (NABA) are pursuing an “implement-first” strategy. This practical, hands-on approach involves close collaboration with broadcasters and technology suppliers to produce an open-source software development kit that promotes interoperability and showcases real-world use cases for the MXL. The first alpha version of this SDK was released in June 2025. Ultimately, the DMF initiative aspires to establish a new baseline for open, interoperable software-based live production, a foundation that is robust, future-proof, and capable of sustaining innovation across the entire media ecosystem.
 
 
 # Learning More
