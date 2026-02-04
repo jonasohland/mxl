@@ -47,7 +47,13 @@ mxlStatus mxlIsFlowActive(mxlInstance instance, char const* flowId, bool* isActi
                         int fd = open(flowDataFile.c_str(), O_RDONLY | O_CLOEXEC);
                         if (fd < 0)
                         {
-                            MXL_ERROR("Failed to open flow data file {} : {}", flowDataFile.string(), std::strerror(errno));
+                            auto const error = errno;
+                            if (error == ENOENT)
+                            {
+                                return MXL_ERR_FLOW_NOT_FOUND;
+                            }
+
+                            MXL_ERROR("Failed to open flow data file {} : {}", flowDataFile.string(), std::strerror(error));
                             return MXL_ERR_FLOW_NOT_FOUND;
                         }
 
@@ -106,8 +112,13 @@ mxlStatus mxlGetFlowDef(mxlInstance instance, char const* flowId, char* buffer, 
     }
     catch (std::filesystem::filesystem_error const& e)
     {
+        if (e.code().value() == ENOENT)
+        {
+            return MXL_ERR_FLOW_NOT_FOUND;
+        }
+
         MXL_ERROR("Failed to get flow definition : {}", e.what());
-        return MXL_ERR_FLOW_NOT_FOUND;
+        return MXL_ERR_UNKNOWN;
     }
     catch (std::exception const& e)
     {
@@ -139,6 +150,16 @@ mxlStatus mxlCreateFlowReader(mxlInstance instance, char const* flowId, char con
         }
 
         return MXL_ERR_INVALID_ARG;
+    }
+    catch (std::filesystem::filesystem_error const& e)
+    {
+        if (e.code().value() == ENOENT)
+        {
+            return MXL_ERR_FLOW_NOT_FOUND;
+        }
+
+        MXL_ERROR("Failed to create flow reader: {}", e.what());
+        return MXL_ERR_UNKNOWN;
     }
     catch (...)
     {
