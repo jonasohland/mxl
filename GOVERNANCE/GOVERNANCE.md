@@ -3,7 +3,7 @@
 
 # MXL Project Governance
 
-MXL is a Linux Foundation project.
+MXL has been established as Media eXchange Layer a Series of LF Projects, LLC.
 
 There are four primary project roles:
 
