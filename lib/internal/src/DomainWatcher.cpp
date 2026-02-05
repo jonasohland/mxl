@@ -335,7 +335,7 @@ namespace mxl::lib
         _eventsToMonitor.resize(_watches.size());
         _eventData.resize(_watches.size());
 
-        size_t index = 0;
+        auto index = std::size_t{0};
 
         for (auto const& [wd, rec] : _watches)
         {
