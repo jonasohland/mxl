@@ -12,7 +12,7 @@
 
 # What is MXL?
 
-- MXL is an open-source SDK designed for high-performance and container-friendly shared media transport across on‑premise or cloud environments.
+- MXL is an open-source SDK designed for high-performance and container-friendly shared media exchange across on‑premise or cloud environments.
 - It provides an open and non-proprietary exchange layer, helping to promote interoperability by avoiding the need for conversion between vendors. Such a layer is required by the [EBU Dynamic Media Facility Reference Architecture](https://tech.ebu.ch/dmf/ra).
 - This repository contains an open-source SDK that specifies MXL through implementation, including how video, audio and data payloads are represented in shared memory, and the timing of those payloads.
 
@@ -51,7 +51,7 @@ Rapid advances in computing power and network infrastructure are transforming th
 
 To address these challenges, the [EBU Dynamic Media Facility (DMF)](https://tech.ebu.ch/groups/dmf) initiative proposes a standardised architecture inspired by the cloud-hyperscaler model. In this architecture, discrete “media functions”, the modular building blocks responsible for ingesting, processing, and delivering content, are deployed onto a common container-based platform. These functions can be provisioned and scaled on-demand, and strategically placed wherever compute, storage, and bandwidth are most readily available, whether on-premises, at the network edge, or in public or private clouds.
 
-At the heart of the [DMF architecture](https://tech.ebu.ch/publications/white-paper-2024-09-03) lies the Media echange layer, a high-performance data plane designed to simplify and accelerate communication between these distributed media functions. This enables entirely new production paradigms, including asynchronous “faster-than-live” workflows, allowing teams to produce content more flexibly and quickly than traditional linear models permit. Moreover, its extensible design supports evolving transport mechanisms and new media formats as they emerge, ensuring that the architecture is well equipped to evolve alongside technological progress. MXL is an open-source implementation of that layer.
+At the heart of the [DMF architecture](https://tech.ebu.ch/publications/white-paper-2024-09-03) lies the Media exchange layer, a high-performance data plane designed to simplify and accelerate communication between these distributed media functions. This enables entirely new production paradigms, including asynchronous “faster-than-live” workflows, allowing teams to produce content more flexibly and quickly than traditional linear models permit. Moreover, its extensible design supports evolving exchange mechanisms and new media formats as they emerge, ensuring that the architecture is well equipped to evolve alongside technological progress. MXL is an open-source implementation of that layer.
 
 ![docs/Media eXchange Layer.png](https://github.com/dmf-mxl/mxl/blob/53e889c888b2daceb4bf550943f3a194f559f182/docs/Media%20eXchange%20Layer.png "MXL Layer Diagram")
 
