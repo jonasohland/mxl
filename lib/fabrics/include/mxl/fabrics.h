@@ -1,6 +1,14 @@
 // SPDX-FileCopyrightText: 2025 Contributors to the Media eXchange Layer project.
 // SPDX-License-Identifier: Apache-2.0
 
+/**
+ * DISCLAIMER
+ *
+ * The contents of this header should be considered a preview and unstable. They are
+ * included in this release only for informational and procedural reasons and subject to change.
+ * A stable version of this header is expected to be released in a later version of this library.
+ */
+
 #pragma once
 
 #include <cstddef>
