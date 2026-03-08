@@ -45,10 +45,6 @@ namespace mxl::lib::fabrics::ofi
         auto endpoint = Endpoint::create(domain);
 
         auto cqAttr = CompletionQueue::Attributes::defaults();
-        if (provider == Provider::EFA)
-        {
-            cqAttr.waitObject = FI_WAIT_NONE;
-        }
         auto cq = CompletionQueue::open(domain, cqAttr);
         endpoint.bind(cq, FI_RECV | FI_TRANSMIT);
 
