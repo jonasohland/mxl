@@ -98,7 +98,11 @@ namespace mxl::lib
             {
 #ifdef __linux__
                 auto value = ::eventfd_t{1};
-                ::write(_eventFd, &value, sizeof(::eventfd_t));
+                if (::write(_eventFd, &value, sizeof(::eventfd_t)) < 0)
+                {
+                    auto const error = errno;
+                    MXL_ERROR("Failed to signal DomainWatcher stop request: {}", ::strerror(error));
+                }
 #endif
 
                 _watchThread.join();

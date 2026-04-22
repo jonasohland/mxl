@@ -84,13 +84,22 @@ namespace mxl::lib
         if (_eventFd < 0)
         {
             auto const error = errno;
+            ::close(_inotifyFd);
+            ::close(_epollFd);
             throw std::system_error{error, std::generic_category(), "failed to create evenfd"};
         }
 
         auto efdEvent = ::epoll_event{};
         efdEvent.events = EPOLLIN;
         efdEvent.data.fd = _eventFd;
-        ::epoll_ctl(_epollFd, EPOLL_CTL_ADD, _eventFd, &efdEvent);
+        if (::epoll_ctl(_epollFd, EPOLL_CTL_ADD, _eventFd, &efdEvent) == -1)
+        {
+            auto const error = errno;
+            ::close(_inotifyFd);
+            ::close(_epollFd);
+            ::close(_eventFd);
+            throw std::system_error(error, std::generic_category(), "epoll_ctl ADD eventfd failed");
+        }
 #endif
 
         // Start event processing thread
@@ -106,6 +115,7 @@ namespace mxl::lib
 #elif defined __linux__
             ::close(_inotifyFd);
             ::close(_epollFd);
+            ::close(_eventFd);
 #endif
             throw;
         }
@@ -117,6 +127,7 @@ namespace mxl::lib
 #elif defined __linux__
             ::close(_inotifyFd);
             ::close(_epollFd);
+            ::close(_eventFd);
 #endif
             throw;
         }
