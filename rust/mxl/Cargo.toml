@@ -20,6 +20,13 @@ serde.workspace = true
 [dev-dependencies]
 clap.workspace = true
 tracing-subscriber.workspace = true
+ctrlc = "3"
 
 [features]
 mxl-not-built = ["mxl-sys/mxl-not-built"]
+mxl-fabrics-ofi = ["mxl-sys/mxl-fabrics-ofi"]
+
+[[example]]
+name = "fabrics-demo"
+required-features = ["mxl-fabrics-ofi"]
+

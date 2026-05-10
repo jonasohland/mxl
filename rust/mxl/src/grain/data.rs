@@ -10,6 +10,10 @@ pub struct GrainData<'a> {
     pub total_size: usize,
 
     pub flags: u32,
+
+    /// The number of slices in the full grain. This is does not change depending on whether the
+    /// grain is partial or complete.
+    pub total_slices: u16,
 }
 
 impl<'a> GrainData<'a> {
