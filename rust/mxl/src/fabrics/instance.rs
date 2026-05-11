@@ -6,7 +6,7 @@ use crate::{
     api::MxlFabricsAPiHandle,
     error::{Error, Result},
     fabrics::{
-        Initiator,
+        self, Initiator,
         initiator::create_initiator,
         provider::Provider,
         region::Regions,
@@ -83,7 +83,7 @@ impl FabricsInstance {
     }
 
     /// Create a fabrics initiator instance.
-    pub fn create_initiator(&self) -> Result<Initiator> {
+    pub fn create_initiator(&self) -> Result<Initiator<fabrics::initiator::Initializing>> {
         create_initiator(&self.ctx)
     }
 

@@ -25,7 +25,8 @@ mod target_info;
 
 pub use config::EndpointAddress;
 pub use initiator::{
-    Config as InitiatorConfig, GrainInitiator, Initiator, InitiatorTransfer, SampleInitiator,
+    Config as InitiatorConfig, Either as InitiatorEither, Grain as InitiatorGrain, Initiator,
+    Samples as InitiatorSamples, Specializing as InitiatorSpecializing,
 };
 pub use instance::FabricsInstance;
 pub use provider::Provider;

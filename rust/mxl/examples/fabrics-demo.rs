@@ -12,9 +12,9 @@ use mxl::{
     MxlFabricsApi, MxlInstance, SamplesReader, SamplesWriter,
     config::{get_mxl_fabrics_ofi_so_path, get_mxl_so_path},
     fabrics::{
-        EndpointAddress, FabricsInstance, GrainInitiator, GrainTarget, Initiator, InitiatorConfig,
-        InitiatorTransfer, SampleInitiator, SampleTarget, Target, TargetConfig, TargetInfo,
-        TargetRead,
+        EndpointAddress, FabricsInstance, GrainTarget, Initiator, InitiatorConfig, InitiatorEither,
+        InitiatorGrain, InitiatorSamples, InitiatorSpecializing, SampleTarget, Target,
+        TargetConfig, TargetInfo, TargetRead,
     },
 };
 
@@ -171,7 +171,7 @@ struct InitiatorEndpoint<'a> {
     instance: &'a MxlInstance,
     fabrics_instance: FabricsInstance,
     flow_reader: FlowReader,
-    initiator: Initiator,
+    initiator: Initiator<InitiatorSpecializing>,
 }
 
 impl<'a> InitiatorEndpoint<'a> {
@@ -199,7 +199,7 @@ impl<'a> InitiatorEndpoint<'a> {
             false,
         );
 
-        initiator.setup(&initiator_config)?;
+        let initiator = initiator.setup(&initiator_config)?;
 
         Ok(Self {
             instance,
@@ -210,49 +210,54 @@ impl<'a> InitiatorEndpoint<'a> {
     }
 
     pub fn run(self, target_info_str: &str, running: Arc<AtomicBool>) -> Result<(), mxl::Error> {
+        let flow_info = self.flow_reader.get_info()?;
         let target_info = self
             .fabrics_instance
             .target_info_from_str(target_info_str)?;
-        self.initiator.add_target(&target_info)?;
 
-        // Wait to be connected
-        loop {
-            if !running.load(atomic::Ordering::SeqCst) {
-                return Ok(());
-            }
+        match self.initiator.specialize(&flow_info.config)? {
+            InitiatorEither::Grain(initiator) => {
+                initiator.add_target(&target_info)?;
+                // Wait to be connected
+                loop {
+                    if !running.load(atomic::Ordering::SeqCst) {
+                        return Ok(());
+                    }
 
-            if self
-                .initiator
-                .make_progress(Duration::from_millis(250))
-                .is_ok()
-            {
-                break;
-            }
-        }
-
-        let flow_info = self.flow_reader.get_info()?;
-
-        let initiator = self.initiator.specialize(&flow_info.config)?;
-        match initiator {
-            InitiatorTransfer::Grain(grain_initiator) => {
+                    if initiator.make_progress(Duration::from_millis(250)).is_ok() {
+                        break;
+                    }
+                }
                 Self::run_discrete(
                     self.instance,
-                    grain_initiator,
+                    initiator,
                     self.flow_reader.to_grain_reader()?,
                     &flow_info,
                     running,
                 )?;
             }
-            InitiatorTransfer::Sample(sample_initiator) => {
+            InitiatorEither::Samples(initiator) => {
+                initiator.add_target(&target_info)?;
+                // Wait to be connected
+                loop {
+                    if !running.load(atomic::Ordering::SeqCst) {
+                        return Ok(());
+                    }
+
+                    if initiator.make_progress(Duration::from_millis(250)).is_ok() {
+                        break;
+                    }
+                }
                 Self::run_continuous(
                     self.instance,
-                    sample_initiator,
+                    initiator,
                     self.flow_reader.to_samples_reader()?,
                     &flow_info,
                     running,
                 )?;
             }
         }
+
         println!("Stopping as requested.");
 
         Ok(())
@@ -260,7 +265,7 @@ impl<'a> InitiatorEndpoint<'a> {
 
     fn run_discrete(
         instance: &MxlInstance,
-        initiator: GrainInitiator,
+        initiator: Initiator<InitiatorGrain>,
         reader: GrainReader,
         flow_info: &FlowInfo,
         running: Arc<AtomicBool>,
@@ -319,7 +324,7 @@ impl<'a> InitiatorEndpoint<'a> {
 
     fn run_continuous(
         instance: &MxlInstance,
-        initiator: SampleInitiator,
+        initiator: Initiator<InitiatorSamples>,
         reader: SamplesReader,
         flow_info: &FlowInfo,
         running: Arc<AtomicBool>,
