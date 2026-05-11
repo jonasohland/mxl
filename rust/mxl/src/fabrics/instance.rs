@@ -6,11 +6,10 @@ use crate::{
     api::MxlFabricsAPiHandle,
     error::{Error, Result},
     fabrics::{
-        self, Initiator,
-        initiator::create_initiator,
+        initiator::{self, Initiator, create_initiator},
         provider::Provider,
         region::Regions,
-        target::{Target, create_target},
+        target::{self, Target, create_target},
         target_info::TargetInfo,
     },
     instance::InstanceContext,
@@ -78,12 +77,12 @@ impl FabricsInstance {
     }
 
     /// Create a fabrics target. The target is the receiver of write operations from an initiator.
-    pub fn create_target(&self) -> Result<Target> {
+    pub fn create_target(&self) -> Result<Target<target::states::Initializing>> {
         create_target(&self.ctx)
     }
 
     /// Create a fabrics initiator instance.
-    pub fn create_initiator(&self) -> Result<Initiator<fabrics::initiator::Initializing>> {
+    pub fn create_initiator(&self) -> Result<Initiator<initiator::states::Initializing>> {
         create_initiator(&self.ctx)
     }
 

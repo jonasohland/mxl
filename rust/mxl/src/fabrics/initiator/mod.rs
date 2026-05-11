@@ -12,6 +12,35 @@ pub use config::Config;
 
 use std::{marker::PhantomData, rc::Rc};
 
+use states::*;
+
+pub mod states {
+    /// Used to create a new initiator
+    pub struct New {}
+
+    /// Waiting for the initiator to be initialized with the setup function
+    pub struct Initializing {}
+
+    /// The setup function has been called, but the initiator has not yet been specialized into a
+    /// grain or samples initiator
+    pub struct Specializing {}
+
+    /// The initiator has been specialized into a grain initiator. It can only transfer grains to
+    /// targets.
+    pub struct Grain {}
+
+    /// The initiator has been specialized into a samples initiator. It can only transfer samples to
+    pub struct Samples {}
+
+    impl InitiatorState for New {}
+    impl InitiatorState for Initializing {}
+    impl InitiatorState for Specializing {}
+    impl InitiatorState for Grain {}
+    impl InitiatorState for Samples {}
+
+    pub trait InitiatorState {}
+}
+
 /// Wrapper class that holds a reference count to the Fabrics Instance and the actual initiator instance.
 struct InitiatorInstance {
     ctx: Rc<FabricsInstanceContext>,
@@ -29,22 +58,9 @@ impl Drop for InitiatorInstance {
     }
 }
 
-// Initiator states
-pub struct New {}
-pub struct Initializing {}
-pub struct Specializing {}
-pub struct Grain {}
-pub struct Samples {}
-impl InitiatorState for New {}
-impl InitiatorState for Initializing {}
-impl InitiatorState for Specializing {}
-impl InitiatorState for Grain {}
-impl InitiatorState for Samples {}
-pub trait InitiatorState {}
-
 pub struct Initiator<S: InitiatorState> {
     instance: InitiatorInstance,
-    marker: std::marker::PhantomData<S>,
+    _marker: std::marker::PhantomData<S>,
 }
 pub enum Either<G, S> {
     Grain(G),
@@ -63,7 +79,7 @@ impl Initiator<New> {
         };
         Initiator {
             instance,
-            marker: std::marker::PhantomData,
+            _marker: std::marker::PhantomData,
         }
     }
 }
@@ -79,7 +95,7 @@ impl Initiator<Initializing> {
         })?;
         Ok(Initiator {
             instance: self.instance,
-            marker: PhantomData,
+            _marker: PhantomData,
         })
     }
 }
@@ -93,17 +109,18 @@ impl Initiator<Specializing> {
         Ok(if flow_config.is_discrete_flow() {
             Either::Grain(Initiator {
                 instance: self.instance,
-                marker: PhantomData,
+                _marker: PhantomData,
             })
         } else {
             Either::Samples(Initiator {
                 instance: self.instance,
-                marker: PhantomData,
+                _marker: PhantomData,
             })
         })
     }
 }
 
+/// Create a new initiator
 #[doc(hidden)]
 pub(crate) fn create_initiator(
     ctx: &Rc<FabricsInstanceContext>,

@@ -3,7 +3,7 @@ use std::time::Duration;
 use crate::{
     Error,
     error::Result,
-    fabrics::{TargetInfo, target::Target},
+    fabrics::target::{Target, states::Sample},
 };
 
 pub struct SampleReadResult {
@@ -11,26 +11,14 @@ pub struct SampleReadResult {
     pub count: usize,
 }
 
-pub struct SampleTarget {
-    inner: Target,
-}
-
-impl SampleTarget {
-    pub(crate) fn new(target: Target) -> Self {
-        Self { inner: target }
-    }
-
-    pub fn setup(&self, config: &super::Config) -> Result<TargetInfo> {
-        self.inner.setup(config)
-    }
-
+impl Target<Sample> {
     ///Blocking accessor for a new grain.
     pub fn read(&self, timeout: Duration) -> Result<SampleReadResult> {
         let mut head_index = 0;
         let mut count = 0;
         Error::from_status(unsafe {
-            self.inner.ctx.api().fabrics_target_read_samples(
-                self.inner.inner,
+            self.instance.ctx.api().fabrics_target_read_samples(
+                self.instance.inner,
                 timeout.as_millis() as u16,
                 &mut head_index,
                 &mut count,
@@ -43,11 +31,11 @@ impl SampleTarget {
         let mut head_index = 0;
         let mut count = 0;
         Error::from_status(unsafe {
-            self.inner
+            self.instance
                 .ctx
                 .api()
                 .fabrics_target_read_samples_non_blocking(
-                    self.inner.inner,
+                    self.instance.inner,
                     &mut head_index,
                     &mut count,
                 )

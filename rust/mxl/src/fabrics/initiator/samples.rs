@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{
     Error, Result,
-    fabrics::{Initiator, TargetInfo, initiator::Samples},
+    fabrics::{TargetInfo, initiator::Initiator, initiator::Samples},
 };
 
 impl Initiator<Samples> {

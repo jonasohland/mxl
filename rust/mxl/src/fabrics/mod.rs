@@ -16,22 +16,19 @@
 //! let initiator = fabrics_instance.create_initiator().unwrap();
 //! ````
 mod config;
-mod initiator;
+pub mod initiator;
 mod instance;
 mod provider;
 mod region;
-mod target;
+pub mod target;
 mod target_info;
 
 pub use config::EndpointAddress;
-pub use initiator::{
-    Config as InitiatorConfig, Either as InitiatorEither, Grain as InitiatorGrain, Initiator,
-    Samples as InitiatorSamples, Specializing as InitiatorSpecializing,
-};
+// pub use initiator::{Config as InitiatorConfig, Either as InitiatorEither, Initiator};
 pub use instance::FabricsInstance;
 pub use provider::Provider;
 pub use region::Regions;
-pub use target::{Config as TargetConfig, GrainTarget, SampleTarget, Target, TargetRead};
+// pub use target::{Config as TargetConfig, Target};
 pub use target_info::TargetInfo;
 
 pub(crate) use instance::create_instance;

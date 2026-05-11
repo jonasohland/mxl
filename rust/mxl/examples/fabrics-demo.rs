@@ -12,9 +12,9 @@ use mxl::{
     MxlFabricsApi, MxlInstance, SamplesReader, SamplesWriter,
     config::{get_mxl_fabrics_ofi_so_path, get_mxl_so_path},
     fabrics::{
-        EndpointAddress, FabricsInstance, GrainTarget, Initiator, InitiatorConfig, InitiatorEither,
-        InitiatorGrain, InitiatorSamples, InitiatorSpecializing, SampleTarget, Target,
-        TargetConfig, TargetInfo, TargetRead,
+        EndpointAddress, FabricsInstance, TargetInfo,
+        initiator::{self, Initiator},
+        target::{self, Target},
     },
 };
 
@@ -46,7 +46,7 @@ struct TargetEndpoint<'a> {
     _instance: &'a MxlInstance,
     flow_config: FlowConfigInfo,
     flow_writer: FlowWriter,
-    target: Target,
+    target: Target<target::states::Specializing>,
 }
 
 impl<'a> TargetEndpoint<'a> {
@@ -65,7 +65,7 @@ impl<'a> TargetEndpoint<'a> {
         let regions = fabrics_instance.regions_from_writer(&writer)?;
         let provider = fabrics_instance.provider_from_str(&cli.provider)?;
 
-        let target_config = TargetConfig::new(
+        let target_config = target::Config::new(
             EndpointAddress {
                 node: Some(&cli.node),
                 service: Some(&cli.service),
@@ -76,7 +76,7 @@ impl<'a> TargetEndpoint<'a> {
         );
 
         let target = fabrics_instance.create_target()?;
-        let target_info = target.setup(&target_config)?;
+        let (target, target_info) = target.setup(&target_config)?;
 
         Ok((
             Self {
@@ -91,10 +91,10 @@ impl<'a> TargetEndpoint<'a> {
 
     pub fn run(self, running: Arc<AtomicBool>) -> Result<(), mxl::Error> {
         match self.target.specialize(&self.flow_config) {
-            TargetRead::Grain(target) => {
+            target::Either::Grain(target) => {
                 Self::run_discrete(target, self.flow_writer.to_grain_writer()?, running)?;
             }
-            TargetRead::Sample(target) => {
+            target::Either::Sample(target) => {
                 Self::run_continuous(target, self.flow_writer.to_samples_writer()?, running)?;
             }
         }
@@ -102,7 +102,7 @@ impl<'a> TargetEndpoint<'a> {
     }
 
     fn run_discrete(
-        target: GrainTarget,
+        target: Target<target::states::Grain>,
         writer: GrainWriter,
         running: Arc<AtomicBool>,
     ) -> Result<(), mxl::Error> {
@@ -135,7 +135,7 @@ impl<'a> TargetEndpoint<'a> {
     }
 
     fn run_continuous(
-        target: SampleTarget,
+        target: Target<target::states::Sample>,
         writer: SamplesWriter,
         running: Arc<AtomicBool>,
     ) -> Result<(), mxl::Error> {
@@ -171,7 +171,7 @@ struct InitiatorEndpoint<'a> {
     instance: &'a MxlInstance,
     fabrics_instance: FabricsInstance,
     flow_reader: FlowReader,
-    initiator: Initiator<InitiatorSpecializing>,
+    initiator: Initiator<initiator::states::Specializing>,
 }
 
 impl<'a> InitiatorEndpoint<'a> {
@@ -189,7 +189,7 @@ impl<'a> InitiatorEndpoint<'a> {
         let regions = fabrics_instance.regions_from_reader(&flow_reader)?;
         let provider = fabrics_instance.provider_from_str(&cli.provider)?;
 
-        let initiator_config = InitiatorConfig::new(
+        let initiator_config = initiator::Config::new(
             EndpointAddress {
                 node: Some(&cli.node),
                 service: Some(&cli.service),
@@ -216,7 +216,7 @@ impl<'a> InitiatorEndpoint<'a> {
             .target_info_from_str(target_info_str)?;
 
         match self.initiator.specialize(&flow_info.config)? {
-            InitiatorEither::Grain(initiator) => {
+            initiator::Either::Grain(initiator) => {
                 initiator.add_target(&target_info)?;
                 // Wait to be connected
                 loop {
@@ -236,7 +236,7 @@ impl<'a> InitiatorEndpoint<'a> {
                     running,
                 )?;
             }
-            InitiatorEither::Samples(initiator) => {
+            initiator::Either::Samples(initiator) => {
                 initiator.add_target(&target_info)?;
                 // Wait to be connected
                 loop {
@@ -265,7 +265,7 @@ impl<'a> InitiatorEndpoint<'a> {
 
     fn run_discrete(
         instance: &MxlInstance,
-        initiator: Initiator<InitiatorGrain>,
+        initiator: Initiator<initiator::states::Grain>,
         reader: GrainReader,
         flow_info: &FlowInfo,
         running: Arc<AtomicBool>,
@@ -324,7 +324,7 @@ impl<'a> InitiatorEndpoint<'a> {
 
     fn run_continuous(
         instance: &MxlInstance,
-        initiator: Initiator<InitiatorSamples>,
+        initiator: Initiator<initiator::states::Samples>,
         reader: SamplesReader,
         flow_info: &FlowInfo,
         running: Arc<AtomicBool>,
