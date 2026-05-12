@@ -62,9 +62,10 @@ pub struct Initiator<S: InitiatorState> {
     instance: InitiatorInstance,
     _marker: std::marker::PhantomData<S>,
 }
-pub enum Either<G, S> {
-    Grain(G),
-    Samples(S),
+
+pub enum Either {
+    Grain(Initiator<Grain>),
+    Samples(Initiator<Samples>),
 }
 
 impl Initiator<New> {
@@ -102,11 +103,8 @@ impl Initiator<Initializing> {
 
 impl Initiator<Specializing> {
     /// Specialize the initator into a concrete grain or samples initator
-    pub fn specialize(
-        self,
-        flow_config: &FlowConfigInfo,
-    ) -> Result<Either<Initiator<Grain>, Initiator<Samples>>> {
-        Ok(if flow_config.is_discrete_flow() {
+    pub fn specialize(self, flow_config: &FlowConfigInfo) -> Either {
+        if flow_config.is_discrete_flow() {
             Either::Grain(Initiator {
                 instance: self.instance,
                 _marker: PhantomData,
@@ -116,7 +114,7 @@ impl Initiator<Specializing> {
                 instance: self.instance,
                 _marker: PhantomData,
             })
-        })
+        }
     }
 }
 

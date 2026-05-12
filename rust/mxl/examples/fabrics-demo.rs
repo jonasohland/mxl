@@ -1,3 +1,5 @@
+mod common;
+
 use std::{
     sync::{
         Arc,
@@ -6,7 +8,10 @@ use std::{
     time::Duration,
 };
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
+
+use base64::{Engine as _, prelude::BASE64_STANDARD};
+
 use mxl::{
     Error, FlowConfigInfo, FlowInfo, FlowReader, FlowWriter, GrainReader, GrainWriter,
     MxlFabricsApi, MxlInstance, SamplesReader, SamplesWriter,
@@ -19,27 +24,62 @@ use mxl::{
 };
 
 #[derive(Debug, Parser)]
+#[command(
+    version = clap::crate_version!(),
+    author = clap::crate_authors!(),
+    subcommand_required = true,
+    arg_required_else_help = true
+)]
 pub struct Cli {
-    #[arg(short, long)]
+    #[arg(short, long, help = "The MXL domain directory")]
     pub domain: String,
 
-    #[arg(short, long)]
-    pub flow_id: String,
-
-    #[arg(short, long, default_value = "tcp")]
+    #[arg(
+        short,
+        long,
+        default_value = "tcp",
+        help = "The fabrics provider. One of (tcp, verbs or efa)."
+    )]
     pub provider: String,
 
-    #[arg(short, long)]
+    #[arg(
+        short,
+        long,
+        help = "This corresponds to the interface identifier of the fabrics endpoint, it can also be a logical address. This can be seen as the bind address when using sockets."
+    )]
     pub node: String,
 
-    #[arg(short, long)]
+    #[arg(
+        short,
+        long,
+        help = "This corresponds to a service identifier for the fabrics endpoint. This can be seen as the bind port when using sockets."
+    )]
     pub service: String,
 
-    #[arg(short = 'i', long)]
-    pub as_initiator: bool,
+    #[command(subcommand)]
+    pub command: Command,
+}
 
-    #[arg(short, long)]
-    pub target_info: Option<String>,
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    /// Run as a receiver (fabrics target + flow writer).
+    Target {
+        #[arg(
+            long,
+            help = "The JSON file which contains the NMOS Flow configuration."
+        )]
+        flow_file: String,
+    },
+    /// Run as an initiator (flow reader + fabrics initiator).
+    Initiator {
+        #[arg(long, help = "The flow ID to read from.")]
+        flow_id: String,
+        #[arg(
+            long,
+            help = "The target information to send to. Start the target first and paste the printed target info here."
+        )]
+        target_info: String,
+    },
 }
 
 struct TargetEndpoint<'a> {
@@ -53,10 +93,10 @@ impl<'a> TargetEndpoint<'a> {
     pub fn new(
         instance: &'a MxlInstance,
         fabrics_api: &Arc<MxlFabricsApi>,
+        flow_file: &str,
         cli: &Cli,
     ) -> Result<(Self, TargetInfo), mxl::Error> {
-        let flow_config_str =
-            std::fs::read_to_string(&cli.flow_id).expect("Failed to read flow file");
+        let flow_config_str = std::fs::read_to_string(flow_file).expect("Failed to read flow file");
 
         let (writer, flow_config, _) = instance.create_flow_writer(&flow_config_str, None)?;
 
@@ -123,7 +163,7 @@ impl<'a> TargetEndpoint<'a> {
                     continue;
                 }
                 Err(mxl::Error::Interrupted) => {
-                    println!("Interrupted, exiting.");
+                    tracing::info!("Interrupted, exiting.");
                     break;
                 }
                 Err(e) => {
@@ -155,7 +195,7 @@ impl<'a> TargetEndpoint<'a> {
                     continue;
                 }
                 Err(mxl::Error::Interrupted) => {
-                    println!("Interrupted, exiting.");
+                    tracing::info!("Interrupted, exiting.");
                     break;
                 }
                 Err(e) => {
@@ -178,9 +218,10 @@ impl<'a> InitiatorEndpoint<'a> {
     pub fn new(
         instance: &'a MxlInstance,
         fabrics_api: &Arc<MxlFabricsApi>,
+        flow_id: &str,
         cli: &Cli,
     ) -> Result<Self, mxl::Error> {
-        let flow_reader = instance.create_flow_reader(&cli.flow_id)?;
+        let flow_reader = instance.create_flow_reader(flow_id)?;
 
         let fabrics_instance = instance.create_fabrics_instance(fabrics_api)?;
 
@@ -211,11 +252,18 @@ impl<'a> InitiatorEndpoint<'a> {
 
     pub fn run(self, target_info_str: &str, running: Arc<AtomicBool>) -> Result<(), mxl::Error> {
         let flow_info = self.flow_reader.get_info()?;
+
+        let target_info_str =
+            String::from_utf8(BASE64_STANDARD.decode(target_info_str).map_err(|e| {
+                Error::Other(format!("Failed to decode target_info from base64: {e}"))
+            })?)
+            .map_err(|e| Error::Other(format!("Decoded target_info is not valid UTF-8: {e}")))?;
+
         let target_info = self
             .fabrics_instance
-            .target_info_from_str(target_info_str)?;
+            .target_info_from_str(&target_info_str)?;
 
-        match self.initiator.specialize(&flow_info.config)? {
+        match self.initiator.specialize(&flow_info.config) {
             initiator::Either::Grain(initiator) => {
                 initiator.add_target(&target_info)?;
                 // Wait to be connected
@@ -258,7 +306,7 @@ impl<'a> InitiatorEndpoint<'a> {
             }
         }
 
-        println!("Stopping as requested.");
+        tracing::info!("Stopping as requested.");
 
         Ok(())
     }
@@ -315,7 +363,7 @@ impl<'a> InitiatorEndpoint<'a> {
                     // We are too early, retry the same grain
                 }
                 Err(e) => {
-                    println!("Error reading from flow: {}.", e);
+                    tracing::error!("Error reading from flow: {}.", e);
                 }
             }
         }
@@ -375,7 +423,7 @@ impl<'a> InitiatorEndpoint<'a> {
                     // We are too early, retry the same grain
                 }
                 Err(e) => {
-                    println!("Error reading from flow: {}.", e);
+                    tracing::error!("Error reading from flow: {}.", e);
                 }
             }
         }
@@ -384,6 +432,8 @@ impl<'a> InitiatorEndpoint<'a> {
 }
 
 fn main() -> Result<(), mxl::Error> {
+    common::setup_logging();
+
     let cli = Cli::parse();
 
     let running = Arc::new(AtomicBool::new(true));
@@ -397,19 +447,25 @@ fn main() -> Result<(), mxl::Error> {
 
     let fabrics_api = mxl::load_fabrics_api(get_mxl_fabrics_ofi_so_path())?;
 
-    let instance = mxl::MxlInstance::new(api, "/dev/shm", "")?;
+    let instance = mxl::MxlInstance::new(api, &cli.domain, "")?;
 
-    if cli.as_initiator {
-        let initiator = InitiatorEndpoint::new(&instance, &fabrics_api, &cli)?;
-        initiator.run(
-            &cli.target_info
-                .expect("When running as initiator target-info is mandatory"),
-            running,
-        )?;
-    } else {
-        let (target, target_info) = TargetEndpoint::new(&instance, &fabrics_api, &cli)?;
-        println!("Target Info: {}", target_info.to_string()?);
-        target.run(running)?;
+    match &cli.command {
+        Command::Initiator {
+            flow_id,
+            target_info,
+        } => {
+            let initiator = InitiatorEndpoint::new(&instance, &fabrics_api, flow_id, &cli)?;
+            initiator.run(target_info, running)?;
+        }
+        Command::Target { flow_file } => {
+            let (target, target_info) =
+                TargetEndpoint::new(&instance, &fabrics_api, flow_file, &cli)?;
+            tracing::info!(
+                "Target Info: {}",
+                BASE64_STANDARD.encode(target_info.to_string()?)
+            );
+            target.run(running)?;
+        }
     }
 
     Ok(())

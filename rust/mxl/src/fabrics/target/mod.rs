@@ -62,9 +62,9 @@ pub struct Target<S: TargetState> {
     instance: TargetInstance,
     _marker: PhantomData<S>,
 }
-pub enum Either<G, S> {
-    Grain(G),
-    Sample(S),
+pub enum Either {
+    Grain(Target<Grain>),
+    Sample(Target<Sample>),
 }
 
 impl Target<New> {
@@ -108,7 +108,7 @@ impl Target<Initializing> {
 
 impl Target<Specializing> {
     /// Specialize the target into a concrete grain or samples target
-    pub fn specialize(self, flow_config: &FlowConfigInfo) -> Either<Target<Grain>, Target<Sample>> {
+    pub fn specialize(self, flow_config: &FlowConfigInfo) -> Either {
         if flow_config.is_discrete_flow() {
             Either::Grain(Target {
                 instance: self.instance,
