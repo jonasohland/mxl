@@ -228,18 +228,19 @@ namespace mxl::lib::fabrics::ofi
     // makeProgressBlocking
     bool RDMInitiator::makeProgressBlocking(std::chrono::steady_clock::duration timeout)
     {
-        auto now = std::chrono::steady_clock::now();
+        auto const deadline = std::chrono::steady_clock::now() + timeout;
         activateIdleEndpoints();
-        auto elapsed = std::chrono::steady_clock::now() - now;
 
-        auto remaining = timeout - elapsed;
-        if (remaining.count() >= 0)
+        while (hasPendingWork())
         {
+            auto remaining = deadline - std::chrono::steady_clock::now();
+            if (remaining.count() <= 0)
+            {
+                pollCQ();
+                break;
+            }
+
             blockOnCQ(remaining);
-        }
-        else
-        {
-            pollCQ();
         }
 
         return hasPendingWork();
