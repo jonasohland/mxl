@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <thread>
 #include <utility>
 #include <variant>
 #include <mxl-internal/Logging.hpp>
@@ -238,6 +239,11 @@ namespace mxl::lib::fabrics::ofi
             {
                 pollCQ();
                 break;
+            }
+
+            if (remaining > std::chrono::milliseconds(5))
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
             }
 
             blockOnCQ(remaining);
