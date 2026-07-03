@@ -30,7 +30,7 @@ namespace mxl::lib::fabrics::ofi
                     throw Exception::invalidArgument("invalid node address");
                 }
                 return FabricAddress::Native{
-                    ::sockaddr_in6{.sin6_family = AF_INET6, .sin6_port = port, .sin6_flowinfo = 0, .sin6_addr = addr, .sin6_scope_id = 0}
+                    ::sockaddr_in6{.sin6_family = AF_INET6, .sin6_port = ::htons(port), .sin6_flowinfo = 0, .sin6_addr = addr, .sin6_scope_id = 0}
                 };
             }
             else
@@ -41,7 +41,7 @@ namespace mxl::lib::fabrics::ofi
                     throw Exception::invalidArgument("invalid node address");
                 }
                 return FabricAddress::Native{
-                    ::sockaddr_in{.sin_family = AF_INET, .sin_port = port, .sin_addr = addr, .sin_zero = {}}
+                    ::sockaddr_in{.sin_family = AF_INET, .sin_port = ::htons(port), .sin_addr = addr, .sin_zero = {}}
                 };
             }
         }
@@ -139,12 +139,12 @@ namespace mxl::lib::fabrics::ofi
 
         std::optional<std::string> serviceString(::sockaddr_in const& sin)
         {
-            return sin.sin_port == 0 ? std::nullopt : std::make_optional(std::to_string(sin.sin_port));
+            return sin.sin_port == 0 ? std::nullopt : std::make_optional(std::to_string(::ntohs(sin.sin_port)));
         }
 
         std::optional<std::string> serviceString(::sockaddr_in6 const& sin)
         {
-            return sin.sin6_port == 0 ? std::nullopt : std::make_optional(std::to_string(sin.sin6_port));
+            return sin.sin6_port == 0 ? std::nullopt : std::make_optional(std::to_string(::ntohs(sin.sin6_port)));
         }
 
         std::optional<std::string> serviceString(OfiSockaddrIb)
