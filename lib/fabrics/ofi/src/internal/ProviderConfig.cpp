@@ -21,13 +21,13 @@ namespace mxl::lib::fabrics::ofi
             auto result = std::uint64_t{0};
             if (capabilities->interfaceCaps & MXL_FABRICS_IFACE_CAP_REMOTE_WRITE)
             {
-                result |= isTarget ? FI_REMOTE_WRITE : FI_WRITE;
+                result |= (isTarget ? FI_REMOTE_WRITE : FI_WRITE) | FI_RMA;
             }
             if (capabilities->interfaceCaps & MXL_FABRICS_IFACE_CAP_SEND_RECEIVE)
             {
                 result |= FI_SEND | FI_RECV;
             }
-            return result | FI_RMA;
+            return result;
         }
 
         std::uint64_t libfabricRequiredCaps(std::optional<ProviderCapabilities> const& capabilities)
