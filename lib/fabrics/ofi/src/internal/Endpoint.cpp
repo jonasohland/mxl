@@ -99,18 +99,20 @@ namespace mxl::lib::fabrics::ofi
         , _eq(std::move(eq))
         , _av(std::move(av))
     {
-        MXL_INFO("Endpoint {} created", Endpoint::idFromFID(raw));
+        MXL_DEBUG("Endpoint {} created", Endpoint::idFromFID(raw));
     }
 
     void Endpoint::close()
     {
         if (_raw)
         {
+#if SPDLOG_ACTIVE_LEVEL <= SPDLOG_LEVEL_DEBUG
             auto id = this->id();
+#endif
 
             fiCall(::fi_close, "Failed to close endpoint", &_raw->fid);
 
-            MXL_INFO("Endoint {} closed", id);
+            MXL_DEBUG("Endoint {} closed", id);
 
             _raw = nullptr;
         }
@@ -175,7 +177,7 @@ namespace mxl::lib::fabrics::ofi
         fiCall(::fi_accept, "Failed to accept connection", _raw, &dummy, sizeof(dummy));
     }
 
-    void Endpoint::connect(FabricAddress const& addr)
+    void Endpoint::connect(RawFabricAddress const& addr)
     {
         fiCall(::fi_connect, "Failed to connect endpoint", _raw, addr.raw(), nullptr, 0);
     }
@@ -185,9 +187,9 @@ namespace mxl::lib::fabrics::ofi
         fiCall(::fi_shutdown, "Failed to shutdown endpoint", _raw, 0);
     }
 
-    FabricAddress Endpoint::localAddress() const
+    RawFabricAddress Endpoint::localAddress() const
     {
-        return FabricAddress::fromFid(&_raw->fid);
+        return RawFabricAddress::fromFid(&_raw->fid, _info.view());
     }
 
     std::shared_ptr<CompletionQueue> Endpoint::completionQueue() const
