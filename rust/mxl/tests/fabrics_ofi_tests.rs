@@ -13,8 +13,8 @@ use mxl::{
     SamplesReader, SamplesWriter,
     fabrics::{
         EndpointAddress, InterfaceConfig, Provider,
-        initiator::{self, Initiator},
-        target::{self, Target},
+        initiator::{self, Initiator, InitiatorFlavor},
+        target::{self, Target, TargetFlavor},
     },
 };
 
@@ -22,15 +22,12 @@ const POLL_TIMEOUT: Duration = Duration::from_secs(5);
 const BLOCKING_WAIT: Duration = Duration::from_millis(20);
 const AUDIO_SAMPLE_COUNT: usize = 42;
 
-fn tcp_endpoint() -> EndpointAddress<'static> {
-    EndpointAddress {
-        node: Some("127.0.0.1"),
-        service: Some("0"),
-    }
+fn tcp_endpoint() -> Result<EndpointAddress, Error> {
+    EndpointAddress::new(Some("127.0.0.1"), Some("0"))
 }
 
-fn tcp_interface(provider: &Provider) -> InterfaceConfig<'static> {
-    InterfaceConfig::builder(tcp_endpoint())
+fn tcp_interface(provider: &Provider) -> Result<InterfaceConfig, Error> {
+    InterfaceConfig::builder(tcp_endpoint()?)
         .provider(provider.prov_type().clone())
         .build()
 }
@@ -75,7 +72,7 @@ fn wait_for_grain_connection(
 }
 
 fn wait_for_samples_connection(
-    target: &Target<target::states::Sample>,
+    target: &Target<target::states::Samples>,
     initiator: &Initiator<initiator::states::Samples>,
 ) {
     poll_until_success(
@@ -128,7 +125,7 @@ fn wait_for_grain_transfer_start(
 }
 
 fn wait_for_samples_transfer_start(
-    target: &Target<target::states::Sample>,
+    target: &Target<target::states::Samples>,
     initiator: &Initiator<initiator::states::Samples>,
     head_index: u64,
     count: usize,
@@ -189,7 +186,7 @@ fn wait_for_grain_transfer_completion(
 }
 
 fn wait_for_samples_transfer_completion(
-    target: &Target<target::states::Sample>,
+    target: &Target<target::states::Samples>,
     initiator: &Initiator<initiator::states::Samples>,
     expected_head_index: u64,
     expected_count: usize,
@@ -356,12 +353,12 @@ fn target_info_roundtrip() {
     {
         let fabrics_api = load_fabrics_test_api();
         let fabrics_instance = mxl_instance.create_fabrics_instance(&fabrics_api).unwrap();
-        let (flow_writer, _flow_reader, _flow_config) = create_video_flow(&mxl_instance);
+        let (flow_writer, _flow_reader, flow_config) = create_video_flow(&mxl_instance);
 
         let provider = fabrics_instance.provider_from_str("tcp").unwrap();
         let target = fabrics_instance.create_target().unwrap();
-        let config = target::Config::new(tcp_interface(&provider), &flow_writer);
-        let (_target, target_info) = target.setup(&config).unwrap();
+        let config = target::Config::new(tcp_interface(&provider).unwrap(), &flow_writer);
+        let (_target, target_info) = target.setup(&config, &flow_config).unwrap();
 
         let serialized = target_info.to_string().unwrap();
         let deserialized = fabrics_instance.target_info_from_str(&serialized).unwrap();
@@ -382,7 +379,7 @@ fn tcp_grain_transfer_delivers_payload_to_target_flow() {
 
         let (source_flow_writer, source_flow_reader, source_flow_config) =
             create_video_flow(&mxl_instance);
-        let (target_flow_writer, target_flow_reader, _target_flow_config) =
+        let (target_flow_writer, target_flow_reader, target_flow_config) =
             create_video_flow_with_unique_id(&mxl_instance);
 
         let source_grain_writer: GrainWriter = source_flow_writer.to_grain_writer().unwrap();
@@ -392,14 +389,16 @@ fn tcp_grain_transfer_delivers_payload_to_target_flow() {
         let (target, target_info) = {
             let target_provider = fabrics_instance.provider_from_str("tcp").unwrap();
             let target = fabrics_instance.create_target().unwrap();
-            let target_config =
-                target::Config::new(tcp_interface(&target_provider), &target_flow_writer);
-            target.setup(&target_config).unwrap()
+            let target_config = target::Config::new(
+                tcp_interface(&target_provider).unwrap(),
+                &target_flow_writer,
+            );
+            target.setup(&target_config, &target_flow_config).unwrap()
         };
         let target_grain_writer: GrainWriter = target_flow_writer.to_grain_writer().unwrap();
-        let target = match target.specialize(&source_flow_config) {
-            target::Either::Grain(target) => target,
-            target::Either::Sample(_) => panic!("expected grain target for video flow"),
+        let target = match target {
+            TargetFlavor::Grain(target) => target,
+            TargetFlavor::Sample(_) => panic!("expected grain target for video flow"),
         };
 
         let initiator_flow_reader = mxl_instance
@@ -408,13 +407,15 @@ fn tcp_grain_transfer_delivers_payload_to_target_flow() {
         let initiator = {
             let initiator_provider = fabrics_instance.provider_from_str("tcp").unwrap();
             let initiator = fabrics_instance.create_initiator().unwrap();
-            let initiator_config =
-                initiator::Config::new(tcp_interface(&initiator_provider), &initiator_flow_reader);
+            let initiator_config = initiator::Config::new(
+                tcp_interface(&initiator_provider).unwrap(),
+                &initiator_flow_reader,
+            );
             initiator.setup(&initiator_config).unwrap()
         };
-        let initiator = match initiator.specialize(&source_flow_config) {
-            initiator::Either::Grain(initiator) => initiator,
-            initiator::Either::Samples(_) => panic!("expected grain initiator for video flow"),
+        let initiator = match initiator {
+            InitiatorFlavor::Grain(initiator) => initiator,
+            InitiatorFlavor::Samples(_) => panic!("expected grain initiator for video flow"),
         };
 
         initiator.add_target(&target_info).unwrap();
@@ -458,7 +459,7 @@ fn tcp_samples_transfer_delivers_payload_to_target_flow() {
 
         let (source_flow_writer, source_flow_reader, source_flow_config) =
             create_audio_flow(&mxl_instance);
-        let (target_flow_writer, target_flow_reader, _target_flow_config) =
+        let (target_flow_writer, target_flow_reader, target_flow_config) =
             create_audio_flow_with_unique_id(&mxl_instance);
 
         let source_samples_writer: SamplesWriter = source_flow_writer.to_samples_writer().unwrap();
@@ -468,14 +469,16 @@ fn tcp_samples_transfer_delivers_payload_to_target_flow() {
         let (target, target_info) = {
             let target_provider = fabrics_instance.provider_from_str("tcp").unwrap();
             let target = fabrics_instance.create_target().unwrap();
-            let target_config =
-                target::Config::new(tcp_interface(&target_provider), &target_flow_writer);
-            target.setup(&target_config).unwrap()
+            let target_config = target::Config::new(
+                tcp_interface(&target_provider).unwrap(),
+                &target_flow_writer,
+            );
+            target.setup(&target_config, &target_flow_config).unwrap()
         };
         let target_samples_writer: SamplesWriter = target_flow_writer.to_samples_writer().unwrap();
-        let target = match target.specialize(&source_flow_config) {
-            target::Either::Sample(target) => target,
-            target::Either::Grain(_) => panic!("expected samples target for audio flow"),
+        let target = match target {
+            TargetFlavor::Sample(target) => target,
+            TargetFlavor::Grain(_) => panic!("expected samples target for audio flow"),
         };
 
         let initiator_flow_reader = mxl_instance
@@ -484,13 +487,15 @@ fn tcp_samples_transfer_delivers_payload_to_target_flow() {
         let initiator = {
             let initiator_provider = fabrics_instance.provider_from_str("tcp").unwrap();
             let initiator = fabrics_instance.create_initiator().unwrap();
-            let initiator_config =
-                initiator::Config::new(tcp_interface(&initiator_provider), &initiator_flow_reader);
+            let initiator_config = initiator::Config::new(
+                tcp_interface(&initiator_provider).unwrap(),
+                &initiator_flow_reader,
+            );
             initiator.setup(&initiator_config).unwrap()
         };
-        let initiator = match initiator.specialize(&source_flow_config) {
-            initiator::Either::Samples(initiator) => initiator,
-            initiator::Either::Grain(_) => panic!("expected samples initiator for audio flow"),
+        let initiator = match initiator {
+            InitiatorFlavor::Samples(initiator) => initiator,
+            InitiatorFlavor::Grain(_) => panic!("expected samples initiator for audio flow"),
         };
 
         initiator.add_target(&target_info).unwrap();

@@ -16,13 +16,13 @@ use clap::{Parser, Subcommand};
 use base64::{Engine as _, prelude::BASE64_STANDARD};
 
 use mxl::{
-    Error, FlowConfigInfo, FlowInfo, FlowReader, FlowWriter, GrainReader, GrainWriter, MxlInstance,
-    SamplesReader, SamplesWriter,
+    Error, FlowInfo, FlowReader, FlowWriter, GrainReader, GrainWriter, MxlInstance, SamplesReader,
+    SamplesWriter,
     config::{get_mxl_fabrics_ofi_so_path, get_mxl_so_path},
     fabrics::{
         Capabilities, EndpointAddress, FabricsInstance, InterfaceConfig, ProviderType, TargetInfo,
-        initiator::{self, Initiator},
-        target::{self, Target},
+        initiator::{self, Initiator, InitiatorFlavor},
+        target::{self, Target, TargetFlavor},
     },
 };
 
@@ -92,9 +92,8 @@ pub enum Command {
 
 struct TargetEndpoint<'a> {
     _instance: &'a MxlInstance,
-    flow_config: FlowConfigInfo,
     flow_writer: FlowWriter,
-    target: Target<target::states::Specializing>,
+    target: TargetFlavor,
 }
 
 impl<'a> TargetEndpoint<'a> {
@@ -111,12 +110,11 @@ impl<'a> TargetEndpoint<'a> {
         let target_config = target::Config::new(interface, &flow_writer);
 
         let target = fabrics_instance.create_target()?;
-        let (target, target_info) = target.setup(&target_config)?;
+        let (target, target_info) = target.setup(&target_config, &flow_config)?;
 
         Ok((
             Self {
                 _instance: instance,
-                flow_config,
                 flow_writer,
                 target,
             },
@@ -125,11 +123,11 @@ impl<'a> TargetEndpoint<'a> {
     }
 
     pub fn run(self, running: Arc<AtomicBool>) -> Result<(), mxl::Error> {
-        match self.target.specialize(&self.flow_config) {
-            target::Either::Grain(target) => {
+        match self.target {
+            TargetFlavor::Grain(target) => {
                 Self::run_discrete(target, self.flow_writer.to_grain_writer()?, running)?;
             }
-            target::Either::Sample(target) => {
+            TargetFlavor::Sample(target) => {
                 Self::run_continuous(target, self.flow_writer.to_samples_writer()?, running)?;
             }
         }
@@ -170,7 +168,7 @@ impl<'a> TargetEndpoint<'a> {
     }
 
     fn run_continuous(
-        target: Target<target::states::Sample>,
+        target: Target<target::states::Samples>,
         writer: SamplesWriter,
         running: Arc<AtomicBool>,
     ) -> Result<(), mxl::Error> {
@@ -206,7 +204,7 @@ struct InitiatorEndpoint<'a> {
     instance: &'a MxlInstance,
     fabrics_instance: FabricsInstance,
     flow_reader: FlowReader,
-    initiator: Initiator<initiator::states::Specializing>,
+    initiator: InitiatorFlavor,
 }
 
 impl<'a> InitiatorEndpoint<'a> {
@@ -232,18 +230,25 @@ impl<'a> InitiatorEndpoint<'a> {
     pub fn run(self, target_info_str: &str, running: Arc<AtomicBool>) -> Result<(), mxl::Error> {
         let flow_info = self.flow_reader.get_info()?;
 
-        let target_info_str =
+        let target_info_str = if let Some(file_path) = target_info_str.strip_prefix('@') {
+            std::fs::read_to_string(file_path).map_err(|e| {
+                Error::Other(format!(
+                    "Failed to read target info file '{file_path}': {e}"
+                ))
+            })?
+        } else {
             String::from_utf8(BASE64_STANDARD.decode(target_info_str).map_err(|e| {
                 Error::Other(format!("Failed to decode target_info from base64: {e}"))
             })?)
-            .map_err(|e| Error::Other(format!("Decoded target_info is not valid UTF-8: {e}")))?;
+            .map_err(|e| Error::Other(format!("Decoded target_info is not valid UTF-8: {e}")))?
+        };
 
         let target_info = self
             .fabrics_instance
             .target_info_from_str(&target_info_str)?;
 
-        match self.initiator.specialize(&flow_info.config) {
-            initiator::Either::Grain(initiator) => {
+        match self.initiator {
+            InitiatorFlavor::Grain(initiator) => {
                 initiator.add_target(&target_info)?;
                 // Wait to be connected
                 loop {
@@ -263,7 +268,7 @@ impl<'a> InitiatorEndpoint<'a> {
                     running,
                 )?;
             }
-            initiator::Either::Samples(initiator) => {
+            InitiatorFlavor::Samples(initiator) => {
                 initiator.add_target(&target_info)?;
                 // Wait to be connected
                 loop {
@@ -356,7 +361,7 @@ impl<'a> InitiatorEndpoint<'a> {
         flow_info: &FlowInfo,
         running: Arc<AtomicBool>,
     ) -> Result<(), mxl::Error> {
-        let rate = flow_info.config.common().grain_rate()?;
+        let rate = flow_info.config.common().sample_rate()?;
         let count = flow_info.config.common().max_sync_batch_size_hint() as usize;
         let mut index = instance.get_current_index(&rate);
         while running.load(atomic::Ordering::SeqCst) {
@@ -392,7 +397,8 @@ impl<'a> InitiatorEndpoint<'a> {
                             }
                         }
                     }
-                    index += 1;
+
+                    index += count as u64;
                 }
                 Err(Error::OutOfRangeTooLate) => {
                     // We are too late, move to the next grain
@@ -456,18 +462,15 @@ fn main() -> Result<(), mxl::Error> {
 
     let fabrics_instance = instance.create_fabrics_instance(&fabrics_api)?;
 
-    let endpoint_address = EndpointAddress {
-        node: cli.node.as_deref(),
-        service: cli.service.as_deref(),
-    };
+    let interface_query_address = EndpointAddress::new(cli.node.as_deref(), None)?;
 
     let provider =
         fabrics_instance.provider_from_str(&cli.provider.unwrap_or("any".to_string()))?;
 
-    let interface_config = mxl::fabrics::InterfaceConfig::builder(endpoint_address)
+    let interface_config = mxl::fabrics::InterfaceConfig::builder(interface_query_address)
         .provider(provider.prov_type().clone())
         .caps(Capabilities::default())
-        .build();
+        .build()?;
 
     let interfaces = fabrics_instance
         .get_interfaces(Some(interface_config))
@@ -477,11 +480,11 @@ fn main() -> Result<(), mxl::Error> {
         .iter()
         .max_by_key(|k| ProviderPrio(k.provider.clone()))
         .ok_or(Error::Other("No suitable interface found".to_string()))?;
-    interface.set_endpoint_address(EndpointAddress {
-        node: cli.node.as_deref(),
-        service: cli.service.as_deref(),
-    });
-
+    let selected_node = match cli.node.as_deref() {
+        Some(node) => Some(node),
+        None => interface.endpoint_address.node()?,
+    };
+    interface.set_endpoint_address(EndpointAddress::new(selected_node, cli.service.as_deref())?);
     tracing::info!(
         provider = ?interface.provider,
         node = ?interface.endpoint_address.node,
@@ -505,16 +508,22 @@ fn main() -> Result<(), mxl::Error> {
             let (target, target_info) =
                 TargetEndpoint::new(&instance, &fabrics_instance, interface, flow_file)?;
 
-            if let Some(target_info_file) = target_info_path
-                && target_info_file.starts_with('@')
-            {
-                let file = if target_info_file.starts_with("@") {
-                    target_info_file
-                        .strip_prefix('@')
-                        .expect("impossible to fail.") //SAFETY: we already checked that the string starts with '@';
-                } else {
-                    target_info_file.as_str()
-                };
+            if let Some(target_info_file) = target_info_path {
+                let file = target_info_file
+                    .strip_prefix('@')
+                    .unwrap_or(target_info_file);
+                let path = std::path::Path::new(file);
+                if let Some(parent) = path.parent()
+                    && !parent.as_os_str().is_empty()
+                {
+                    std::fs::create_dir_all(parent).map_err(|e| {
+                        mxl::Error::Other(format!(
+                            "fail to create parent directory '{}': {}",
+                            parent.display(),
+                            e
+                        ))
+                    })?;
+                }
                 std::fs::write(file, target_info.to_string()?.as_bytes())
                     .map_err(|e| mxl::Error::Other(format!("fail to write to file: {}", e)))?;
             }

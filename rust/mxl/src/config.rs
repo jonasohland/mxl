@@ -30,7 +30,7 @@ pub fn get_mxl_fabrics_ofi_so_path() -> std::path::PathBuf {
 #[cfg(feature = "mxl-not-built")]
 pub fn get_mxl_fabrics_ofi_so_path() -> std::path::PathBuf {
     std::path::PathBuf::from_str(MXL_BUILD_DIR)
-        .expect("build error: 'MXL_FABRICS_SO_PATH' is invalid")
+        .expect("build error: 'MXL_BUILD_DIR' is invalid")
         .join("lib")
         .join("fabrics")
         .join("ofi")

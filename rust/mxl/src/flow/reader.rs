@@ -71,7 +71,7 @@ impl FlowReader {
         Self { context, reader }
     }
 
-    #[allow(dead_code)]
+    #[cfg(feature = "mxl-fabrics-ofi")]
     pub(crate) fn inner(&self) -> mxl_sys::FlowReader {
         self.reader
     }

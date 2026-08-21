@@ -19,10 +19,10 @@ pub fn load_api(path_to_so_file: impl AsRef<Path>) -> Result<MxlApiHandle> {
 #[cfg(feature = "mxl-fabrics-ofi")]
 pub type MxlFabricsApi = mxl_sys::fabrics::libmxlfabrics;
 #[cfg(feature = "mxl-fabrics-ofi")]
-pub type MxlFabricsAPiHandle = Arc<MxlFabricsApi>;
+pub type MxlFabricsApiHandle = Arc<MxlFabricsApi>;
 
 #[cfg(feature = "mxl-fabrics-ofi")]
-pub fn load_fabrics_api(path_to_so_file: impl AsRef<Path>) -> Result<MxlFabricsAPiHandle> {
+pub fn load_fabrics_api(path_to_so_file: impl AsRef<Path>) -> Result<MxlFabricsApiHandle> {
     Ok(Arc::new(unsafe {
         mxl_sys::fabrics::libmxlfabrics::new(path_to_so_file.as_ref().as_os_str())?
     }))

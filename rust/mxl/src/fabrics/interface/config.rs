@@ -3,10 +3,7 @@
 
 use crate::{
     Error,
-    fabrics::{
-        EndpointAddress, capabilities::Capabilities, endpoint_address::OwnedEndpointAddress,
-        provider::ProviderType,
-    },
+    fabrics::{EndpointAddress, capabilities::Capabilities, provider::ProviderType},
 };
 
 use std::ffi::CString;
@@ -14,12 +11,12 @@ use std::ffi::CString;
 pub struct InterfaceConfigBuilder<'a> {
     provider: Option<ProviderType>,
     caps: Option<Capabilities>,
-    endpoint_address: EndpointAddress<'a>,
+    endpoint_address: EndpointAddress,
     attr: Option<&'a str>,
 }
 
 impl<'a> InterfaceConfigBuilder<'a> {
-    pub(crate) fn new(endpoint_address: EndpointAddress<'a>) -> Self {
+    pub(crate) fn new(endpoint_address: EndpointAddress) -> Self {
         Self {
             provider: None,
             caps: None,
@@ -46,90 +43,55 @@ impl<'a> InterfaceConfigBuilder<'a> {
     }
 
     /// Builds the `InterfaceConfig`
-    pub fn build(self) -> InterfaceConfig<'a> {
-        InterfaceConfig {
+    pub fn build(self) -> Result<InterfaceConfig, crate::Error> {
+        Ok(InterfaceConfig {
             provider: self.provider.unwrap_or(ProviderType::Any),
             caps: self.caps.unwrap_or_default(),
             endpoint_address: self.endpoint_address,
-            attr: self.attr,
-        }
+            attr: self.attr.map(CString::new).transpose()?,
+        })
     }
 }
 
 /// A configuration for a network interface, including the provider type, capabilities, endpoint address, and optional attributes.
 #[derive(Debug)]
-pub struct InterfaceConfig<'a> {
+pub struct InterfaceConfig {
     pub provider: ProviderType,
     pub caps: Capabilities,
-    pub endpoint_address: EndpointAddress<'a>,
-    pub attr: Option<&'a str>,
+    pub endpoint_address: EndpointAddress,
+    pub attr: Option<CString>,
 }
-impl<'a> InterfaceConfig<'a> {
-    pub fn builder(endpoint_address: EndpointAddress<'a>) -> InterfaceConfigBuilder<'a> {
+impl<'a> InterfaceConfig {
+    pub fn builder(endpoint_address: EndpointAddress) -> InterfaceConfigBuilder<'a> {
         InterfaceConfigBuilder::new(endpoint_address)
     }
-    pub fn set_endpoint_address(&mut self, endpoint_address: EndpointAddress<'a>) {
+    pub fn set_endpoint_address(&mut self, endpoint_address: EndpointAddress) {
         self.endpoint_address = endpoint_address;
     }
 }
-impl TryFrom<&InterfaceConfig<'_>> for OwnedInterfaceConfig {
+impl TryFrom<&InterfaceConfig> for mxl_sys::fabrics::FabricsInterfaceConfig {
     type Error = Error;
-    fn try_from(value: &InterfaceConfig<'_>) -> Result<Self, Self::Error> {
-        OwnedInterfaceConfig::new(value)
-    }
-}
-
-/// A wrapper around `mxl_sys::fabrics::FabricsInterfaceConfig` that owns the memory for the endpoint address and attribute strings.
-pub(crate) struct OwnedInterfaceConfig {
-    inner: mxl_sys::fabrics::FabricsInterfaceConfig,
-    _address: OwnedEndpointAddress,
-    _attr: Option<CString>,
-}
-
-impl OwnedInterfaceConfig {
-    pub(crate) fn new(value: &InterfaceConfig<'_>) -> Result<Self, Error> {
-        let address = OwnedEndpointAddress::new(&value.endpoint_address)?;
-        let attr = value.attr.map(CString::new).transpose()?;
-
-        Ok(Self {
-            inner: mxl_sys::fabrics::FabricsInterfaceConfig {
-                version: mxl_sys::fabrics::MXL_FABRICS_API_VERSION as i32,
-                provider: (&value.provider).into(),
-                caps: (&value.caps).into(),
-                address: address.as_ffi(),
-                attr: attr
-                    .as_ref()
-                    .map_or(std::ptr::null_mut(), |value| value.as_ptr() as *mut i8),
-            },
-            _address: address,
-            _attr: attr,
+    fn try_from(value: &InterfaceConfig) -> Result<Self, Self::Error> {
+        Ok(mxl_sys::fabrics::FabricsInterfaceConfig {
+            version: mxl_sys::fabrics::MXL_FABRICS_API_VERSION as i32,
+            provider: (&value.provider).into(),
+            caps: (&value.caps).into(),
+            address: (&value.endpoint_address).into(),
+            attr: value
+                .attr
+                .as_ref()
+                .map_or(std::ptr::null_mut(), |v| v.as_ptr()),
         })
     }
-
-    pub(crate) fn as_ffi(&self) -> &mxl_sys::fabrics::FabricsInterfaceConfig {
-        &self.inner
-    }
 }
-impl<'a> TryFrom<mxl_sys::fabrics::FabricsInterfaceConfig> for InterfaceConfig<'a> {
+impl TryFrom<mxl_sys::fabrics::FabricsInterfaceConfig> for InterfaceConfig {
     type Error = crate::Error;
     fn try_from(value: mxl_sys::fabrics::FabricsInterfaceConfig) -> Result<Self, Self::Error> {
-        let provider = (value.provider as mxl_sys::fabrics::FabricsProvider).into();
+        let provider = (value.provider as mxl_sys::fabrics::FabricsProvider).try_into()?;
         let caps = value.caps.into();
-        let endpoint_address = EndpointAddress {
-            node: (!value.address.node.is_null())
-                .then(|| unsafe { std::ffi::CStr::from_ptr(value.address.node) }.to_str())
-                .transpose()
-                .map_err(|e| Error::Other(e.to_string()))?,
-            service: (!value.address.service.is_null())
-                .then(|| unsafe { std::ffi::CStr::from_ptr(value.address.service) }.to_str())
-                .transpose()
-                .map_err(|e| Error::Other(e.to_string()))?,
-        };
-
-        let attr = (!value.attr.is_null())
-            .then(|| unsafe { std::ffi::CStr::from_ptr(value.attr) }.to_str())
-            .transpose()
-            .map_err(|e| Error::Other(e.to_string()))?;
+        let endpoint_address = EndpointAddress::from(&value.address);
+        let attr =
+            (!value.attr.is_null()).then(|| unsafe { CString::from_raw(value.attr as *mut i8) });
 
         Ok(Self {
             provider,

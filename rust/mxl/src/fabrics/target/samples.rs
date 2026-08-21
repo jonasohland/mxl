@@ -6,7 +6,7 @@ use std::time::Duration;
 use crate::{
     Error,
     error::Result,
-    fabrics::target::{Target, states::Sample},
+    fabrics::target::{Target, states::Samples},
 };
 
 pub struct SampleReadResult {
@@ -14,8 +14,8 @@ pub struct SampleReadResult {
     pub count: usize,
 }
 
-impl Target<Sample> {
-    ///Blocking accessor for a new grain.
+impl Target<Samples> {
+    ///Blocking accessor for new samples.
     pub fn read(&self, timeout: Duration) -> Result<SampleReadResult> {
         let mut head_index = 0;
         let mut count = 0;
@@ -29,7 +29,7 @@ impl Target<Sample> {
         })?;
         Ok(SampleReadResult { head_index, count })
     }
-    /// Non-blocking accessor for a new grain.
+    /// Non-blocking accessor for new samples.
     pub fn read_non_blocking(&self) -> Result<SampleReadResult> {
         let mut head_index = 0;
         let mut count = 0;

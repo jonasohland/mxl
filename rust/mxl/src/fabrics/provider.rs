@@ -34,15 +34,16 @@ pub enum ProviderType {
     Shm,
 }
 
-impl From<mxl_sys::fabrics::FabricsProvider> for ProviderType {
-    fn from(value: mxl_sys::fabrics::FabricsProvider) -> Self {
+impl TryFrom<mxl_sys::fabrics::FabricsProvider> for ProviderType {
+    type Error = Error;
+    fn try_from(value: mxl_sys::fabrics::FabricsProvider) -> Result<Self> {
         match value {
-            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_ANY => ProviderType::Any,
-            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_TCP => ProviderType::Tcp,
-            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_VERBS => ProviderType::Verbs,
-            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_EFA => ProviderType::Efa,
-            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_SHM => ProviderType::Shm,
-            _ => panic!("Unknown FabricsProvider value"),
+            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_ANY => Ok(ProviderType::Any),
+            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_TCP => Ok(ProviderType::Tcp),
+            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_VERBS => Ok(ProviderType::Verbs),
+            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_EFA => Ok(ProviderType::Efa),
+            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_SHM => Ok(ProviderType::Shm),
+            _ => Err(Error::Other("Unknown FabricsProvider value".into())),
         }
     }
 }
@@ -66,11 +67,11 @@ impl From<&Provider> for mxl_sys::fabrics::FabricsProvider {
 }
 
 impl Provider {
-    fn new(ctx: Arc<FabricsInstanceContext>, inner: FabricsProvider) -> Self {
-        Self {
-            inner: inner.into(),
+    fn new(ctx: Arc<FabricsInstanceContext>, inner: FabricsProvider) -> Result<Self> {
+        Ok(Self {
+            inner: inner.try_into()?,
             ctx,
-        }
+        })
     }
 
     pub fn prov_type(&self) -> &ProviderType {
@@ -88,7 +89,7 @@ impl Provider {
                 .fabrics_provider_from_string(CString::new(s)?.as_ptr(), &mut inner)
         })?;
 
-        Ok(Self::new(ctx, inner))
+        Self::new(ctx, inner)
     }
 
     /// Convert a fabrics provider enum value to a string.

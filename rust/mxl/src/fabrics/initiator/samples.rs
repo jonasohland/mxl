@@ -10,7 +10,7 @@ use crate::{
 
 impl Initiator<Samples> {
     /// Add a target to the initiator. This will allow the initiator to send data to the target in subsequent calls to
-    /// mxlFabricsInitiatorTransferGrain(). This function is always non-blocking. If additional connection setup is required
+    /// mxlFabricsInitiatorTransferSamples(). This function is always non-blocking. If additional connection setup is required
     /// by the underlying implementation, it will only happen during a call to make_progress*().
     pub fn add_target(&self, target: &TargetInfo) -> Result<()> {
         Error::from_status(unsafe {
@@ -22,7 +22,7 @@ impl Initiator<Samples> {
     }
 
     /// Remove a target from the initiator. This function is always non-blocking. If any additional communication for a graceful shutdown is
-    /// required it will happend during a call to make_progress*(). It is guaranteed that no new grain transfer operations will
+    /// required it will happend during a call to make_progress*(). It is guaranteed that no new sample transfer operations will
     /// be queued for this target during calls to transfer() after the target was removed, but it is only guaranteed that
     /// the connection shutdown has completed after make_progress*() no longer returns Error::NotReady.
     pub fn remove_target(&self, target: &TargetInfo) -> Result<()> {

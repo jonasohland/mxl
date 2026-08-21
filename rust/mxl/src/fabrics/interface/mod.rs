@@ -3,12 +3,11 @@
 //
 use std::sync::Arc;
 
+use mxl_sys::fabrics::FabricsInterfaceConfig;
+
 use crate::{
     Error,
-    fabrics::{
-        instance::FabricsInstanceContext,
-        interface::config::{InterfaceConfig, OwnedInterfaceConfig},
-    },
+    fabrics::{instance::FabricsInstanceContext, interface::config::InterfaceConfig},
 };
 
 pub mod config;
@@ -17,19 +16,19 @@ pub struct Interfaces {
     ctx: Arc<FabricsInstanceContext>,
     inner: *mut mxl_sys::fabrics::FabricsInterfaceList,
 }
-
 impl Interfaces {
     pub(crate) fn get(
         ctx: Arc<FabricsInstanceContext>,
         query: Option<InterfaceConfig>,
     ) -> Result<Self, crate::Error> {
-        let query_storage = match query {
-            Some(q) => Some(OwnedInterfaceConfig::new(&q)?),
-            None => None,
-        };
-        let query_ptr = query_storage
+        let query_raw = query
             .as_ref()
-            .map_or(std::ptr::null(), |q| q.as_ffi() as *const _);
+            .map(FabricsInterfaceConfig::try_from)
+            .transpose()?;
+
+        let query_ptr = query_raw
+            .as_ref()
+            .map_or(std::ptr::null(), |q| q as *const _);
 
         let mut out_list = std::ptr::null_mut();
 
@@ -50,7 +49,6 @@ impl Interfaces {
         }
     }
 }
-
 impl Drop for Interfaces {
     fn drop(&mut self) {
         if !self.inner.is_null() {
@@ -67,9 +65,8 @@ pub struct InterfaceIter<'a> {
     it: *mut mxl_sys::fabrics::FabricsInterfaceList,
     _marker: std::marker::PhantomData<&'a ()>,
 }
-
 impl<'a> Iterator for InterfaceIter<'a> {
-    type Item = InterfaceConfig<'a>;
+    type Item = InterfaceConfig;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.it.is_null() {
@@ -77,7 +74,12 @@ impl<'a> Iterator for InterfaceIter<'a> {
         }
 
         let iface = unsafe { &*self.it };
-        let out = iface.interface.try_into().ok();
+
+        let out = iface
+            .interface
+            .try_into()
+            .inspect_err(|e| tracing::error!(error=%e, "Failed to convert interface config."))
+            .ok();
 
         self.it = iface.next;
 

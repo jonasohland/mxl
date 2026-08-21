@@ -54,7 +54,7 @@ impl Initiator<Grain> {
                 .api()
                 .fabrics_initiator_make_progress_blocking(
                     self.instance.inner,
-                    timeout.as_millis() as u16,
+                    u16::try_from(timeout.as_millis()).map_err(|_| Error::InvalidArg)?,
                 )
         })
     }

@@ -6,12 +6,12 @@ mod grain;
 mod samples;
 
 use crate::{
-    FlowConfigInfo,
     error::{Error, Result},
-    fabrics::{initiator::config::OwnedInitiatorConfig, instance::FabricsInstanceContext},
+    fabrics::instance::FabricsInstanceContext,
 };
 
 pub use config::Config;
+use mxl_sys::fabrics::FabricsInitiatorConfig;
 
 use std::{marker::PhantomData, sync::Arc};
 
@@ -24,10 +24,6 @@ pub mod states {
     /// Waiting for the initiator to be initialized with the setup function
     pub struct Initializing {}
 
-    /// The setup function has been called, but the initiator has not yet been specialized into a
-    /// grain or samples initiator
-    pub struct Specializing {}
-
     /// The initiator has been specialized into a grain initiator. It can only transfer grains to
     /// targets.
     pub struct Grain {}
@@ -37,7 +33,6 @@ pub mod states {
 
     impl InitiatorState for New {}
     impl InitiatorState for Initializing {}
-    impl InitiatorState for Specializing {}
     impl InitiatorState for Grain {}
     impl InitiatorState for Samples {}
 
@@ -70,7 +65,7 @@ pub struct Initiator<S: InitiatorState> {
 //SAFETY: An initiator is safe to be sent across threads, but it's not thread-safe to use its API functions.
 unsafe impl<S: InitiatorState> Send for Initiator<S> {}
 
-pub enum Either {
+pub enum InitiatorFlavor {
     Grain(Initiator<Grain>),
     Samples(Initiator<Samples>),
 }
@@ -94,35 +89,28 @@ impl Initiator<New> {
 
 impl Initiator<Initializing> {
     ///  Configure the initiator.
-    pub fn setup(self, config: &Config) -> Result<Initiator<Specializing>> {
-        let config = OwnedInitiatorConfig::new(config)?;
+    pub fn setup(self, config: &Config) -> Result<InitiatorFlavor> {
+        let initiator_config = FabricsInitiatorConfig::try_from(config)?;
         Error::from_status(unsafe {
             self.instance.ctx.api().fabrics_initiator_setup(
                 self.instance.inner,
-                config.as_ffi(),
+                // Pointer does not need to outlive the call, so we can safely pass a pointer to the stack variable.
+                &initiator_config as *const _,
                 std::ptr::null(), // Unused for now
             )
         })?;
-        Ok(Initiator {
-            instance: self.instance,
-            _marker: PhantomData,
-        })
-    }
-}
 
-impl Initiator<Specializing> {
-    /// Specialize the initator into a concrete grain or samples initator
-    pub fn specialize(self, flow_config: &FlowConfigInfo) -> Either {
-        if flow_config.is_discrete_flow() {
-            Either::Grain(Initiator {
+        let flow_info = config.flow_reader.get_info()?;
+        if flow_info.config.is_discrete_flow() {
+            Ok(InitiatorFlavor::Grain(Initiator {
                 instance: self.instance,
                 _marker: PhantomData,
-            })
+            }))
         } else {
-            Either::Samples(Initiator {
+            Ok(InitiatorFlavor::Samples(Initiator {
                 instance: self.instance,
                 _marker: PhantomData,
-            })
+            }))
         }
     }
 }

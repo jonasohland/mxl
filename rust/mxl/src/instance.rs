@@ -4,7 +4,7 @@
 use std::{ffi::CString, sync::Arc};
 
 #[cfg(feature = "mxl-fabrics-ofi")]
-use crate::api::MxlFabricsAPiHandle;
+use crate::api::MxlFabricsApiHandle;
 use crate::{Error, FlowConfigInfo, FlowReader, FlowWriter, Result, api::MxlApiHandle};
 
 /// This struct stores the context that is shared by all objects.
@@ -246,7 +246,7 @@ impl MxlInstance {
     #[cfg(feature = "mxl-fabrics-ofi")]
     pub fn create_fabrics_instance(
         &self,
-        fabrics_api: &MxlFabricsAPiHandle,
+        fabrics_api: &MxlFabricsApiHandle,
     ) -> Result<crate::fabrics::FabricsInstance> {
         use crate::fabrics;
 

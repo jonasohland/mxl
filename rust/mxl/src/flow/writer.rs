@@ -34,7 +34,7 @@ impl FlowWriter {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(feature = "mxl-fabrics-ofi")]
     pub(crate) fn inner(&self) -> mxl_sys::FlowWriter {
         self.writer
     }

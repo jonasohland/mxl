@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::{
-    api::MxlFabricsAPiHandle,
+    api::MxlFabricsApiHandle,
     error::{Error, Result},
     fabrics::{
         InterfaceConfig,
@@ -19,7 +19,7 @@ use crate::{
 
 pub(crate) fn create_instance(
     ctx: Arc<InstanceContext>,
-    fabrics_api: &MxlFabricsAPiHandle,
+    fabrics_api: &MxlFabricsApiHandle,
 ) -> Result<FabricsInstance> {
     let mut inst = std::ptr::null_mut();
     Error::from_status(unsafe {
@@ -49,13 +49,13 @@ pub(crate) fn create_instance(
 
 pub(crate) struct FabricsInstanceContext {
     _parent_ctx: Arc<InstanceContext>,
-    api: MxlFabricsAPiHandle,
+    api: MxlFabricsApiHandle,
     pub(crate) inner: mxl_sys::fabrics::FabricsInstance,
 }
 unsafe impl Send for FabricsInstanceContext {}
 
 impl FabricsInstanceContext {
-    pub(crate) fn api(&self) -> &MxlFabricsAPiHandle {
+    pub(crate) fn api(&self) -> &MxlFabricsApiHandle {
         &self.api
     }
 }

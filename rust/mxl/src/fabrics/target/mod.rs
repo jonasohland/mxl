@@ -10,13 +10,11 @@ use std::{marker::PhantomData, sync::Arc};
 use crate::{
     FlowConfigInfo,
     error::{Error, Result},
-    fabrics::{
-        instance::FabricsInstanceContext, target::config::OwnedTargetConfig,
-        target_info::TargetInfo,
-    },
+    fabrics::{instance::FabricsInstanceContext, target_info::TargetInfo},
 };
 pub use config::Config;
 
+use mxl_sys::fabrics::FabricsTargetConfig;
 use states::*;
 
 pub mod states {
@@ -26,21 +24,16 @@ pub mod states {
     /// Waiting for the target to be initialized with the setup function
     pub struct Initializing {}
 
-    /// The setup function has been called, but the target has not yet been specialized into a
-    /// grain or samples target
-    pub struct Specializing {}
-
     /// The target has been specialized into a grain target. It can only receive grains
     pub struct Grain {}
 
     /// The target has been specialized into a samples target. It can only receive samples
-    pub struct Sample {}
+    pub struct Samples {}
 
     impl TargetState for New {}
     impl TargetState for Initializing {}
-    impl TargetState for Specializing {}
     impl TargetState for Grain {}
-    impl TargetState for Sample {}
+    impl TargetState for Samples {}
 
     pub trait TargetState {}
 }
@@ -72,9 +65,9 @@ pub struct Target<S: TargetState> {
 //SAFETY: A target is safe to be sent across threads, but it's not thread-safe to use its API functions.
 unsafe impl<S: TargetState> Send for Target<S> {}
 
-pub enum Either {
+pub enum TargetFlavor {
     Grain(Target<Grain>),
-    Sample(Target<Sample>),
+    Sample(Target<Samples>),
 }
 
 impl Target<New> {
@@ -94,13 +87,18 @@ impl Target<Initializing> {
     /// Configure the target. After the target has been configured, it is ready to receive transfers from an initiator.
     /// If additional connection setup is required by the underlying implementation it might not happen during the call to
     /// setup(), but be deferred until the first call to mxlFabricsTargetTryNewGrain().
-    pub fn setup(self, config: &Config) -> Result<(Target<Specializing>, TargetInfo)> {
+    pub fn setup(
+        self,
+        config: &Config,
+        flow_config_info: &FlowConfigInfo,
+    ) -> Result<(TargetFlavor, TargetInfo)> {
         let mut info = mxl_sys::fabrics::FabricsTargetInfo::default();
-        let config = OwnedTargetConfig::new(config)?;
+        let target_config = FabricsTargetConfig::try_from(config)?;
         Error::from_status(unsafe {
             self.instance.ctx.api().fabrics_target_setup(
                 self.instance.inner,
-                config.as_ffi(),
+                // Pointer does not need to outlive the call, so we can safely pass a pointer to the stack variable.
+                &target_config as *const _,
                 std::ptr::null(),
                 &mut info,
             )
@@ -108,29 +106,22 @@ impl Target<Initializing> {
 
         let ctx = self.instance.ctx.clone();
 
-        Ok((
-            Target {
-                instance: self.instance,
-                _marker: PhantomData,
-            },
-            TargetInfo::new(ctx, info),
-        ))
-    }
-}
-
-impl Target<Specializing> {
-    /// Specialize the target into a concrete grain or samples target
-    pub fn specialize(self, flow_config: &FlowConfigInfo) -> Either {
-        if flow_config.is_discrete_flow() {
-            Either::Grain(Target {
-                instance: self.instance,
-                _marker: PhantomData,
-            })
+        if flow_config_info.is_discrete_flow() {
+            Ok((
+                TargetFlavor::Grain(Target {
+                    instance: self.instance,
+                    _marker: PhantomData,
+                }),
+                TargetInfo::new(ctx, info),
+            ))
         } else {
-            Either::Sample(Target {
-                instance: self.instance,
-                _marker: PhantomData,
-            })
+            Ok((
+                TargetFlavor::Sample(Target {
+                    instance: self.instance,
+                    _marker: PhantomData,
+                }),
+                TargetInfo::new(ctx, info),
+            ))
         }
     }
 }
