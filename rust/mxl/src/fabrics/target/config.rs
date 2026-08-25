@@ -25,11 +25,12 @@ impl<'a> TryFrom<&Config<'a>> for mxl_sys::fabrics::FabricsTargetConfig {
     type Error = crate::Error;
 
     fn try_from(value: &Config) -> Result<Self, Self::Error> {
+        let writer = value.flow_writer.inner();
         Ok(Self {
             version: value.version,
             interface: mxl_sys::fabrics::FabricsInterfaceConfig::try_from(&value.interface)?,
             // SAFETY: Both types are equivalent opaque writer handles from different bindgen modules.
-            writer: value.flow_writer.inner().cast(),
+            writer: writer.cast(),
         })
     }
 }

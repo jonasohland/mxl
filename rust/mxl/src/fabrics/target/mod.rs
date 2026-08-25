@@ -5,7 +5,10 @@ mod config;
 mod grain;
 mod samples;
 
-use std::{marker::PhantomData, sync::Arc};
+use std::{
+    marker::PhantomData,
+    sync::{Arc, Weak},
+};
 
 use crate::{
     FlowConfigInfo,
@@ -61,6 +64,7 @@ impl Drop for TargetInstance {
 pub struct Target<S: TargetState> {
     instance: TargetInstance,
     _marker: PhantomData<S>,
+    flow_alive: Weak<()>,
 }
 //SAFETY: A target is safe to be sent across threads, but it's not thread-safe to use its API functions.
 unsafe impl<S: TargetState> Send for Target<S> {}
@@ -68,6 +72,18 @@ unsafe impl<S: TargetState> Send for Target<S> {}
 pub enum TargetFlavor {
     Grain(Target<Grain>),
     Sample(Target<Samples>),
+}
+impl<S> Target<S>
+where
+    S: TargetState,
+{
+    /// Returns an error if the flow was dropped
+    fn flow_alive_check(&self) -> Result<()> {
+        if self.flow_alive.strong_count() == 0 {
+            return Err(Error::Other("FlowWriter has been dropped.".to_string()));
+        }
+        Ok(())
+    }
 }
 
 impl Target<New> {
@@ -79,6 +95,7 @@ impl Target<New> {
         Target {
             instance,
             _marker: PhantomData,
+            flow_alive: Weak::new(),
         }
     }
 }
@@ -111,6 +128,7 @@ impl Target<Initializing> {
                 TargetFlavor::Grain(Target {
                     instance: self.instance,
                     _marker: PhantomData,
+                    flow_alive: config.flow_writer.flow_alive(),
                 }),
                 TargetInfo::new(ctx, info),
             ))
@@ -119,6 +137,7 @@ impl Target<Initializing> {
                 TargetFlavor::Sample(Target {
                     instance: self.instance,
                     _marker: PhantomData,
+                    flow_alive: config.flow_writer.flow_alive(),
                 }),
                 TargetInfo::new(ctx, info),
             ))

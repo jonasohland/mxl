@@ -13,7 +13,10 @@ use crate::{
 pub use config::Config;
 use mxl_sys::fabrics::FabricsInitiatorConfig;
 
-use std::{marker::PhantomData, sync::Arc};
+use std::{
+    marker::PhantomData,
+    sync::{Arc, Weak},
+};
 
 use states::*;
 
@@ -61,6 +64,7 @@ impl Drop for InitiatorInstance {
 pub struct Initiator<S: InitiatorState> {
     instance: InitiatorInstance,
     _marker: std::marker::PhantomData<S>,
+    flow_alive: Weak<()>,
 }
 //SAFETY: An initiator is safe to be sent across threads, but it's not thread-safe to use its API functions.
 unsafe impl<S: InitiatorState> Send for Initiator<S> {}
@@ -68,6 +72,21 @@ unsafe impl<S: InitiatorState> Send for Initiator<S> {}
 pub enum InitiatorFlavor {
     Grain(Initiator<Grain>),
     Samples(Initiator<Samples>),
+}
+
+impl<S> Initiator<S>
+where
+    S: InitiatorState,
+{
+    /// Returns a marker that indicates whether the underlying flow is still alive.
+    pub fn flow_alive_check(&self) -> Result<()> {
+        if self.flow_alive.strong_count() == 0 {
+            return Err(Error::Other(
+                "The underlying flow has been closed.".to_string(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl Initiator<New> {
@@ -83,6 +102,7 @@ impl Initiator<New> {
         Initiator {
             instance,
             _marker: std::marker::PhantomData,
+            flow_alive: Weak::new(),
         }
     }
 }
@@ -105,11 +125,13 @@ impl Initiator<Initializing> {
             Ok(InitiatorFlavor::Grain(Initiator {
                 instance: self.instance,
                 _marker: PhantomData,
+                flow_alive: config.flow_reader.flow_alive(),
             }))
         } else {
             Ok(InitiatorFlavor::Samples(Initiator {
                 instance: self.instance,
                 _marker: PhantomData,
+                flow_alive: config.flow_reader.flow_alive(),
             }))
         }
     }

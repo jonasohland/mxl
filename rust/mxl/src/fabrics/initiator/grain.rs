@@ -13,6 +13,8 @@ impl Initiator<Grain> {
     /// mxlFabricsInitiatorTransferGrain(). This function is always non-blocking. If additional connection setup is required
     /// by the underlying implementation, it will only happen during a call to make_progress*().
     pub fn add_target(&self, target: &TargetInfo) -> Result<()> {
+        self.flow_alive_check()?;
+
         Error::from_status(unsafe {
             self.instance
                 .ctx
@@ -26,6 +28,8 @@ impl Initiator<Grain> {
     /// be queued for this target during calls to transfer() after the target was removed, but it is only guaranteed that
     /// the connection shutdown has completed after make_progress*() no longer returns Error::NotReady.
     pub fn remove_target(&self, target: &TargetInfo) -> Result<()> {
+        // No need to check if the initiator is still alive since we are not directly interacting
+        // with flow buffers.
         Error::from_status(unsafe {
             self.instance
                 .ctx
@@ -37,6 +41,8 @@ impl Initiator<Grain> {
     /// This function must be called regularly for the initiator to make progress on queued transfer operations, connection establishment
     /// operations and connection shutdown operations.
     pub fn make_progress_non_blocking(&self) -> Result<()> {
+        self.flow_alive_check()?;
+
         Error::from_status(unsafe {
             self.instance
                 .ctx
@@ -48,6 +54,8 @@ impl Initiator<Grain> {
     /// This function must be called regularly for the initiator to make progress on queued transfer operations, connection establishment
     /// operations and connection shutdown operations.
     pub fn make_progress(&self, timeout: Duration) -> Result<()> {
+        self.flow_alive_check()?;
+
         Error::from_status(unsafe {
             self.instance
                 .ctx
@@ -62,6 +70,8 @@ impl Initiator<Grain> {
     /// Enqueue a transfer operation to all added targets. This function is always non-blocking. The transfer operation might be started right
     /// away, but is only guaranteed to have completed after mxlFabricsInitiatorMakeProgress*() no longer returns Error::NotReady.
     pub fn transfer(&self, grain_index: u64, start_slice: u16, end_slice: u16) -> Result<()> {
+        self.flow_alive_check()?;
+
         Error::from_status(unsafe {
             self.instance.ctx.api().fabrics_initiator_transfer_grain(
                 self.instance.inner,

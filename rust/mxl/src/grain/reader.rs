@@ -15,6 +15,7 @@ use crate::{
 pub struct GrainReader {
     context: Arc<InstanceContext>,
     reader: mxl_sys::FlowReader,
+    _alive: Arc<()>,
 }
 
 /// The MXL readers and writers are not thread-safe, so we do not implement `Sync` for them, but
@@ -22,8 +23,16 @@ pub struct GrainReader {
 unsafe impl Send for GrainReader {}
 
 impl GrainReader {
-    pub(crate) fn new(context: Arc<InstanceContext>, reader: mxl_sys::FlowReader) -> Self {
-        Self { context, reader }
+    pub(crate) fn new(
+        context: Arc<InstanceContext>,
+        reader: mxl_sys::FlowReader,
+        alive: Arc<()>,
+    ) -> Self {
+        Self {
+            context,
+            reader,
+            _alive: alive,
+        }
     }
 
     pub fn destroy(mut self) -> Result<()> {
