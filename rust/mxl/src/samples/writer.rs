@@ -9,6 +9,7 @@ use crate::{Error, Result, SamplesWriteAccess, instance::InstanceContext};
 pub struct SamplesWriter {
     context: Arc<InstanceContext>,
     writer: mxl_sys::FlowWriter,
+    _alive: Arc<()>,
 }
 
 /// The MXL readers and writers are not thread-safe, so we do not implement `Sync` for them, but
@@ -16,8 +17,16 @@ pub struct SamplesWriter {
 unsafe impl Send for SamplesWriter {}
 
 impl SamplesWriter {
-    pub(crate) fn new(context: Arc<InstanceContext>, writer: mxl_sys::FlowWriter) -> Self {
-        Self { context, writer }
+    pub(crate) fn new(
+        context: Arc<InstanceContext>,
+        writer: mxl_sys::FlowWriter,
+        alive: Arc<()>,
+    ) -> Self {
+        Self {
+            context,
+            writer,
+            _alive: alive,
+        }
     }
 
     pub fn destroy(mut self) -> Result<()> {

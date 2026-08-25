@@ -1,13 +1,15 @@
 // SPDX-FileCopyrightText: 2025 2025 Contributors to the Media eXchange Layer project.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::sync::Arc;
-
 use crate::{
     DataFormat, Error, GrainWriter, Result, SamplesWriter,
     flow::is_discrete_data_format,
     instance::{InstanceContext, create_flow_reader},
 };
+
+use std::sync::Arc;
+#[cfg(feature = "mxl-fabrics-ofi")]
+use std::sync::Weak;
 
 /// Generic MXL Flow Writer, which can be further used to build either the "discrete" (grain-based
 /// data like video frames or meta) or "continuous" (audio samples) flow writers in MXL terminology.
@@ -15,6 +17,7 @@ pub struct FlowWriter {
     context: Arc<InstanceContext>,
     writer: mxl_sys::FlowWriter,
     id: uuid::Uuid,
+    alive: Arc<()>,
 }
 
 /// The MXL readers and writers are not thread-safe, so we do not implement `Sync` for them, but
@@ -31,12 +34,19 @@ impl FlowWriter {
             context,
             writer,
             id,
+            alive: Arc::new(()),
         }
     }
 
     #[cfg(feature = "mxl-fabrics-ofi")]
     pub(crate) fn inner(&self) -> mxl_sys::FlowWriter {
         self.writer
+    }
+
+    #[cfg(feature = "mxl-fabrics-ofi")]
+    /// Returns a marker that indicates whether the underlying flow is still alive.
+    pub(crate) fn flow_alive(&self) -> Weak<()> {
+        Arc::downgrade(&self.alive)
     }
 
     pub fn to_grain_writer(mut self) -> Result<GrainWriter> {
@@ -47,7 +57,7 @@ impl FlowWriter {
                 DataFormat::from(flow_type)
             )));
         }
-        let result = GrainWriter::new(self.context.clone(), self.writer);
+        let result = GrainWriter::new(self.context.clone(), self.writer, self.alive.clone());
         self.writer = std::ptr::null_mut();
         Ok(result)
     }
@@ -60,7 +70,7 @@ impl FlowWriter {
                 DataFormat::from(flow_type)
             )));
         }
-        let result = SamplesWriter::new(self.context.clone(), self.writer);
+        let result = SamplesWriter::new(self.context.clone(), self.writer, self.alive.clone());
         self.writer = std::ptr::null_mut();
         Ok(result)
     }

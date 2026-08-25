@@ -17,6 +17,8 @@ pub struct GrainReadResult {
 impl Target<Grain> {
     /// Blocking accessor for a new grain.
     pub fn read(&self, timeout: Duration) -> Result<GrainReadResult> {
+        self.flow_alive_check()?;
+
         let mut grain_index = 0;
         Error::from_status(unsafe {
             self.instance.ctx.api().fabrics_target_read_grain(
@@ -30,6 +32,8 @@ impl Target<Grain> {
 
     /// Non-blocking accessor for a new grain.
     pub fn read_non_blocking(&self) -> Result<GrainReadResult> {
+        self.flow_alive_check()?;
+
         let mut grain_index = 0;
         Error::from_status(unsafe {
             self.instance

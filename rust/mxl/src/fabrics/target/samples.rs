@@ -17,6 +17,8 @@ pub struct SampleReadResult {
 impl Target<Samples> {
     ///Blocking accessor for new samples.
     pub fn read(&self, timeout: Duration) -> Result<SampleReadResult> {
+        self.flow_alive_check()?;
+
         let mut head_index = 0;
         let mut count = 0;
         Error::from_status(unsafe {
@@ -31,6 +33,8 @@ impl Target<Samples> {
     }
     /// Non-blocking accessor for new samples.
     pub fn read_non_blocking(&self) -> Result<SampleReadResult> {
+        self.flow_alive_check()?;
+
         let mut head_index = 0;
         let mut count = 0;
         Error::from_status(unsafe {

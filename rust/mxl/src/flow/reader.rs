@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use std::sync::Arc;
+#[cfg(feature = "mxl-fabrics-ofi")]
+use std::sync::Weak;
 
 use crate::{
     DataFormat, Error, FlowConfigInfo, FlowRuntimeInfo, GrainReader, Result, SamplesReader,
@@ -12,6 +14,7 @@ use crate::{
 pub struct FlowReader {
     context: Arc<InstanceContext>,
     reader: mxl_sys::FlowReader,
+    alive: Arc<()>, // Marker to indcate that the underlying flow is alive.
 }
 
 /// The MXL readers and writers are not thread-safe, so we do not implement `Sync` for them, but
@@ -68,12 +71,22 @@ pub(crate) fn get_runtime_info(
 
 impl FlowReader {
     pub(crate) fn new(context: Arc<InstanceContext>, reader: mxl_sys::FlowReader) -> Self {
-        Self { context, reader }
+        Self {
+            context,
+            reader,
+            alive: Arc::new(()),
+        }
     }
 
     #[cfg(feature = "mxl-fabrics-ofi")]
     pub(crate) fn inner(&self) -> mxl_sys::FlowReader {
         self.reader
+    }
+
+    #[cfg(feature = "mxl-fabrics-ofi")]
+    /// Returns a marker that indicates whether the underlying flow is still alive.
+    pub(crate) fn flow_alive(&self) -> Weak<()> {
+        Arc::downgrade(&self.alive)
     }
 
     pub fn get_info(&self) -> Result<FlowInfo> {
@@ -88,7 +101,7 @@ impl FlowReader {
                 DataFormat::from(flow_type)
             )));
         }
-        let result = GrainReader::new(self.context.clone(), self.reader);
+        let result = GrainReader::new(self.context.clone(), self.reader, self.alive.clone());
         self.reader = std::ptr::null_mut();
         Ok(result)
     }
@@ -101,7 +114,7 @@ impl FlowReader {
                 DataFormat::from(flow_type)
             )));
         }
-        let result = SamplesReader::new(self.context.clone(), self.reader);
+        let result = SamplesReader::new(self.context.clone(), self.reader, self.alive.clone());
         self.reader = std::ptr::null_mut();
         Ok(result)
     }
