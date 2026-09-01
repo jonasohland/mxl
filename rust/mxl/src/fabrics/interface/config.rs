@@ -6,6 +6,7 @@ use crate::{
     fabrics::{EndpointAddress, capabilities::Capabilities, provider::ProviderType},
 };
 
+use mxl_sys::types::{FabricsInterfaceConfig, FabricsProvider, MXL_FABRICS_API_VERSION};
 use std::ffi::CString;
 
 pub struct InterfaceConfigBuilder<'a> {
@@ -69,11 +70,11 @@ impl<'a> InterfaceConfig {
         self.endpoint_address = endpoint_address;
     }
 }
-impl TryFrom<&InterfaceConfig> for mxl_sys::fabrics::FabricsInterfaceConfig {
+impl TryFrom<&InterfaceConfig> for FabricsInterfaceConfig {
     type Error = Error;
     fn try_from(value: &InterfaceConfig) -> Result<Self, Self::Error> {
-        Ok(mxl_sys::fabrics::FabricsInterfaceConfig {
-            version: mxl_sys::fabrics::MXL_FABRICS_API_VERSION as i32,
+        Ok(FabricsInterfaceConfig {
+            version: MXL_FABRICS_API_VERSION as i32,
             provider: (&value.provider).into(),
             caps: (&value.caps).into(),
             address: (&value.endpoint_address).into(),
@@ -84,10 +85,10 @@ impl TryFrom<&InterfaceConfig> for mxl_sys::fabrics::FabricsInterfaceConfig {
         })
     }
 }
-impl TryFrom<mxl_sys::fabrics::FabricsInterfaceConfig> for InterfaceConfig {
+impl TryFrom<FabricsInterfaceConfig> for InterfaceConfig {
     type Error = crate::Error;
-    fn try_from(value: mxl_sys::fabrics::FabricsInterfaceConfig) -> Result<Self, Self::Error> {
-        let provider = (value.provider as mxl_sys::fabrics::FabricsProvider).try_into()?;
+    fn try_from(value: FabricsInterfaceConfig) -> Result<Self, Self::Error> {
+        let provider = (value.provider as FabricsProvider).try_into()?;
         let caps = value.caps.into();
         let endpoint_address = EndpointAddress::from(&value.address);
         let attr =

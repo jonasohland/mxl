@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub use config::Config;
-use mxl_sys::fabrics::FabricsInitiatorConfig;
+use mxl_sys::types::{FabricsInitiator, FabricsInitiatorConfig};
 
 use std::{marker::PhantomData, sync::Arc};
 
@@ -42,7 +42,7 @@ pub mod states {
 /// Wrapper class that holds a reference count to the Fabrics Instance and the actual initiator instance.
 struct InitiatorInstance {
     ctx: Arc<FabricsInstanceContext>,
-    inner: mxl_sys::fabrics::FabricsInitiator,
+    inner: FabricsInitiator,
 }
 unsafe impl Send for InitiatorInstance {}
 
@@ -74,7 +74,7 @@ impl Initiator<New> {
     /// Create a new initiator
     pub(crate) fn new(
         ctx: Arc<FabricsInstanceContext>,
-        initiator: mxl_sys::fabrics::FabricsInitiator,
+        initiator: FabricsInitiator,
     ) -> Initiator<Initializing> {
         let instance = InitiatorInstance {
             ctx,
@@ -120,7 +120,7 @@ impl Initiator<Initializing> {
 pub(crate) fn create_initiator(
     ctx: Arc<FabricsInstanceContext>,
 ) -> Result<Initiator<Initializing>> {
-    let mut initiator = mxl_sys::fabrics::FabricsInitiator::default();
+    let mut initiator = FabricsInitiator::default();
     unsafe {
         Error::from_status(
             ctx.api()

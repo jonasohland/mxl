@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Contributors to the Media eXchange Layer project.
 // SPDX-License-Identifier: Apache-2.0
 
+use mxl_sys::types::FabricsInstance as FabricsInstanceHandle;
 use std::sync::Arc;
 
 use crate::{
@@ -24,8 +25,7 @@ pub(crate) fn create_instance(
     let mut inst = std::ptr::null_mut();
     Error::from_status(unsafe {
         fabrics_api.fabrics_create_instance(
-            //SAFETY: Both types are equivalent opaque handles from different bindgen modules.
-            ctx.instance.cast(),
+            ctx.instance,
             std::ptr::null(), // Unused for now
             &mut inst,
         )
@@ -50,7 +50,7 @@ pub(crate) fn create_instance(
 pub(crate) struct FabricsInstanceContext {
     _parent_ctx: Arc<InstanceContext>,
     api: MxlFabricsApiHandle,
-    pub(crate) inner: mxl_sys::fabrics::FabricsInstance,
+    pub(crate) inner: FabricsInstanceHandle,
 }
 unsafe impl Send for FabricsInstanceContext {}
 

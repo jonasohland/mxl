@@ -1,7 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Contributors to the Media eXchange Layer project.
 // SPDX-License-Identifier: Apache-2.0
 
-use mxl_sys::fabrics::FabricsProvider;
+use mxl_sys::types::{
+    FabricsProvider, MXL_FABRICS_PROVIDER_ANY, MXL_FABRICS_PROVIDER_EFA, MXL_FABRICS_PROVIDER_SHM,
+    MXL_FABRICS_PROVIDER_TCP, MXL_FABRICS_PROVIDER_VERBS,
+};
 
 use crate::error::{Error, Result};
 use std::{ffi::CString, sync::Arc};
@@ -34,33 +37,33 @@ pub enum ProviderType {
     Shm,
 }
 
-impl TryFrom<mxl_sys::fabrics::FabricsProvider> for ProviderType {
+impl TryFrom<FabricsProvider> for ProviderType {
     type Error = Error;
-    fn try_from(value: mxl_sys::fabrics::FabricsProvider) -> Result<Self> {
+    fn try_from(value: FabricsProvider) -> Result<Self> {
         match value {
-            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_ANY => Ok(ProviderType::Any),
-            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_TCP => Ok(ProviderType::Tcp),
-            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_VERBS => Ok(ProviderType::Verbs),
-            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_EFA => Ok(ProviderType::Efa),
-            mxl_sys::fabrics::MXL_FABRICS_PROVIDER_SHM => Ok(ProviderType::Shm),
+            MXL_FABRICS_PROVIDER_ANY => Ok(ProviderType::Any),
+            MXL_FABRICS_PROVIDER_TCP => Ok(ProviderType::Tcp),
+            MXL_FABRICS_PROVIDER_VERBS => Ok(ProviderType::Verbs),
+            MXL_FABRICS_PROVIDER_EFA => Ok(ProviderType::Efa),
+            MXL_FABRICS_PROVIDER_SHM => Ok(ProviderType::Shm),
             _ => Err(Error::Other("Unknown FabricsProvider value".into())),
         }
     }
 }
 
-impl From<&ProviderType> for mxl_sys::fabrics::FabricsProvider {
+impl From<&ProviderType> for FabricsProvider {
     fn from(value: &ProviderType) -> Self {
         match value {
-            ProviderType::Any => mxl_sys::fabrics::MXL_FABRICS_PROVIDER_ANY,
-            ProviderType::Tcp => mxl_sys::fabrics::MXL_FABRICS_PROVIDER_TCP,
-            ProviderType::Verbs => mxl_sys::fabrics::MXL_FABRICS_PROVIDER_VERBS,
-            ProviderType::Efa => mxl_sys::fabrics::MXL_FABRICS_PROVIDER_EFA,
-            ProviderType::Shm => mxl_sys::fabrics::MXL_FABRICS_PROVIDER_SHM,
+            ProviderType::Any => MXL_FABRICS_PROVIDER_ANY,
+            ProviderType::Tcp => MXL_FABRICS_PROVIDER_TCP,
+            ProviderType::Verbs => MXL_FABRICS_PROVIDER_VERBS,
+            ProviderType::Efa => MXL_FABRICS_PROVIDER_EFA,
+            ProviderType::Shm => MXL_FABRICS_PROVIDER_SHM,
         }
     }
 }
 
-impl From<&Provider> for mxl_sys::fabrics::FabricsProvider {
+impl From<&Provider> for FabricsProvider {
     fn from(value: &Provider) -> Self {
         (&value.inner).into()
     }

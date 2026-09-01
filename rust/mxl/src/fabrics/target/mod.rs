@@ -14,7 +14,7 @@ use crate::{
 };
 pub use config::Config;
 
-use mxl_sys::fabrics::FabricsTargetConfig;
+use mxl_sys::types::{FabricsTarget, FabricsTargetConfig, FabricsTargetInfo};
 use states::*;
 
 pub mod states {
@@ -42,7 +42,7 @@ pub mod states {
 /// instance.
 pub struct TargetInstance {
     ctx: Arc<FabricsInstanceContext>,
-    inner: mxl_sys::fabrics::FabricsTarget,
+    inner: FabricsTarget,
 }
 unsafe impl Send for TargetInstance {}
 
@@ -73,7 +73,7 @@ pub enum TargetFlavor {
 impl Target<New> {
     pub(crate) fn new(
         ctx: Arc<FabricsInstanceContext>,
-        target: mxl_sys::fabrics::FabricsTarget,
+        target: FabricsTarget,
     ) -> Target<Initializing> {
         let instance = TargetInstance { ctx, inner: target };
         Target {
@@ -92,7 +92,7 @@ impl Target<Initializing> {
         config: &Config,
         flow_config_info: &FlowConfigInfo,
     ) -> Result<(TargetFlavor, TargetInfo)> {
-        let mut info = mxl_sys::fabrics::FabricsTargetInfo::default();
+        let mut info = FabricsTargetInfo::default();
         let target_config = FabricsTargetConfig::try_from(config)?;
         Error::from_status(unsafe {
             self.instance.ctx.api().fabrics_target_setup(
@@ -129,7 +129,7 @@ impl Target<Initializing> {
 /// Create a new target.
 #[doc(hidden)]
 pub(crate) fn create_target(ctx: Arc<FabricsInstanceContext>) -> Result<Target<Initializing>> {
-    let mut target = mxl_sys::fabrics::FabricsTarget::default();
+    let mut target = FabricsTarget::default();
     unsafe {
         Error::from_status(ctx.api().fabrics_create_target(ctx.inner, &mut target))?;
     }
