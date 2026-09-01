@@ -3,7 +3,7 @@
 //
 use std::sync::Arc;
 
-use mxl_sys::fabrics::FabricsInterfaceConfig;
+use mxl_sys::types::{FabricsInterfaceConfig, FabricsInterfaceList};
 
 use crate::{
     Error,
@@ -14,7 +14,7 @@ pub mod config;
 
 pub struct Interfaces {
     ctx: Arc<FabricsInstanceContext>,
-    inner: *mut mxl_sys::fabrics::FabricsInterfaceList,
+    inner: *mut FabricsInterfaceList,
 }
 impl Interfaces {
     pub(crate) fn get(
@@ -53,16 +53,16 @@ impl Drop for Interfaces {
     fn drop(&mut self) {
         if !self.inner.is_null() {
             unsafe {
-                self.ctx.api().fabrics_free_interface_list(
-                    self.inner as *mut mxl_sys::fabrics::FabricsInterfaceList,
-                );
+                self.ctx
+                    .api()
+                    .fabrics_free_interface_list(self.inner as *mut FabricsInterfaceList);
             }
         }
     }
 }
 
 pub struct InterfaceIter<'a> {
-    it: *mut mxl_sys::fabrics::FabricsInterfaceList,
+    it: *mut FabricsInterfaceList,
     _marker: std::marker::PhantomData<&'a ()>,
 }
 impl<'a> Iterator for InterfaceIter<'a> {

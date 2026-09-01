@@ -3,7 +3,7 @@
 
 use std::ffi::{CStr, CString};
 
-use mxl_sys::fabrics::FabricsEndpointAddress;
+use mxl_sys::types::FabricsEndpointAddress;
 
 use crate::Error;
 

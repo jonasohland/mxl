@@ -4,6 +4,7 @@
 use crate::FlowWriter;
 
 use crate::fabrics::InterfaceConfig;
+use mxl_sys::types::{FabricsInterfaceConfig, FabricsTargetConfig, MXL_FABRICS_API_VERSION};
 
 /// Configuration object required to set up a target.
 pub struct Config<'a> {
@@ -15,21 +16,20 @@ pub struct Config<'a> {
 impl<'a> Config<'a> {
     pub fn new(interface: InterfaceConfig, flow_writer: &'a FlowWriter) -> Self {
         Self {
-            version: mxl_sys::fabrics::MXL_FABRICS_API_VERSION as i32,
+            version: MXL_FABRICS_API_VERSION as i32,
             interface,
             flow_writer,
         }
     }
 }
-impl<'a> TryFrom<&Config<'a>> for mxl_sys::fabrics::FabricsTargetConfig {
+impl<'a> TryFrom<&Config<'a>> for FabricsTargetConfig {
     type Error = crate::Error;
 
     fn try_from(value: &Config) -> Result<Self, Self::Error> {
         Ok(Self {
             version: value.version,
-            interface: mxl_sys::fabrics::FabricsInterfaceConfig::try_from(&value.interface)?,
-            // SAFETY: Both types are equivalent opaque writer handles from different bindgen modules.
-            writer: value.flow_writer.inner().cast(),
+            interface: FabricsInterfaceConfig::try_from(&value.interface)?,
+            writer: value.flow_writer.inner(),
         })
     }
 }

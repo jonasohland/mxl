@@ -1,6 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Contributors to the Media eXchange Layer project.
 // SPDX-License-Identifier: Apache-2.0
 
+use mxl_sys::types::{
+    FabricsInterfaceCaps, MXL_FABRICS_API_VERSION, MXL_FABRICS_IFACE_CAP_BLOCKING_OPERATIONS,
+    MXL_FABRICS_IFACE_CAP_REMOTE_WRITE, MXL_FABRICS_IFACE_CAP_SEND_RECEIVE,
+};
+
 /// Capabilities of the fabric interface
 #[derive(Debug)]
 pub struct Capabilities {
@@ -45,44 +50,41 @@ impl Default for Capabilities {
         }
     }
 }
-impl From<&Capabilities> for mxl_sys::fabrics::FabricsInterfaceCaps {
+impl From<&Capabilities> for FabricsInterfaceCaps {
     fn from(value: &Capabilities) -> Self {
         let flags = (if value.blocking_operations {
-            mxl_sys::fabrics::MXL_FABRICS_IFACE_CAP_BLOCKING_OPERATIONS as u64
+            MXL_FABRICS_IFACE_CAP_BLOCKING_OPERATIONS as u64
         } else {
             0
         }) | (if value.remote_write {
-            mxl_sys::fabrics::MXL_FABRICS_IFACE_CAP_REMOTE_WRITE as u64
+            MXL_FABRICS_IFACE_CAP_REMOTE_WRITE as u64
         } else {
             0
         }) | (if value.send_recv {
-            mxl_sys::fabrics::MXL_FABRICS_IFACE_CAP_SEND_RECEIVE as u64
+            MXL_FABRICS_IFACE_CAP_SEND_RECEIVE as u64
         } else {
             0
         });
 
         Self {
-            version: mxl_sys::fabrics::MXL_FABRICS_API_VERSION as i32,
+            version: MXL_FABRICS_API_VERSION as i32,
             flags,
             maxMessageSize: value.max_message_size,
         }
     }
 }
-impl From<Capabilities> for mxl_sys::fabrics::FabricsInterfaceCaps {
+impl From<Capabilities> for FabricsInterfaceCaps {
     fn from(value: Capabilities) -> Self {
         (&value).into()
     }
 }
-impl From<mxl_sys::fabrics::FabricsInterfaceCaps> for Capabilities {
-    fn from(value: mxl_sys::fabrics::FabricsInterfaceCaps) -> Self {
+impl From<FabricsInterfaceCaps> for Capabilities {
+    fn from(value: FabricsInterfaceCaps) -> Self {
         let flags = value.flags;
         Self {
-            blocking_operations: (flags
-                & mxl_sys::fabrics::MXL_FABRICS_IFACE_CAP_BLOCKING_OPERATIONS as u64)
-                != 0,
-            remote_write: (flags & mxl_sys::fabrics::MXL_FABRICS_IFACE_CAP_REMOTE_WRITE as u64)
-                != 0,
-            send_recv: (flags & mxl_sys::fabrics::MXL_FABRICS_IFACE_CAP_SEND_RECEIVE as u64) != 0,
+            blocking_operations: (flags & MXL_FABRICS_IFACE_CAP_BLOCKING_OPERATIONS as u64) != 0,
+            remote_write: (flags & MXL_FABRICS_IFACE_CAP_REMOTE_WRITE as u64) != 0,
+            send_recv: (flags & MXL_FABRICS_IFACE_CAP_SEND_RECEIVE as u64) != 0,
             max_message_size: value.maxMessageSize,
         }
     }

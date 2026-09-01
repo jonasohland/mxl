@@ -4,7 +4,7 @@
 use std::{ffi::CString, sync::Arc};
 
 use crate::error::{Error, Result};
-use mxl_sys::fabrics::FabricsTargetInfo;
+use mxl_sys::types::FabricsTargetInfo;
 
 use crate::fabrics::instance::FabricsInstanceContext;
 
