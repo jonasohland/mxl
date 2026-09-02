@@ -7,7 +7,7 @@ use crate::{
 };
 
 use mxl_sys::types::{FabricsInterfaceConfig, FabricsProvider, MXL_FABRICS_API_VERSION};
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 
 pub struct InterfaceConfigBuilder<'a> {
     provider: Option<ProviderType>,
@@ -91,8 +91,7 @@ impl TryFrom<FabricsInterfaceConfig> for InterfaceConfig {
         let provider = (value.provider as FabricsProvider).try_into()?;
         let caps = value.caps.into();
         let endpoint_address = EndpointAddress::from(&value.address);
-        let attr =
-            (!value.attr.is_null()).then(|| unsafe { CString::from_raw(value.attr as *mut i8) });
+        let attr = (!value.attr.is_null()).then(|| unsafe { CStr::from_ptr(value.attr).into() });
 
         Ok(Self {
             provider,
