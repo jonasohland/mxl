@@ -91,7 +91,8 @@ impl TryFrom<FabricsInterfaceConfig> for InterfaceConfig {
         let provider = (value.provider as FabricsProvider).try_into()?;
         let caps = value.caps.into();
         let endpoint_address = EndpointAddress::from(&value.address);
-        let attr = (!value.attr.is_null()).then(|| unsafe { CStr::from_ptr(value.attr).into() });
+        let attr =
+            (!value.attr.is_null()).then(|| unsafe { CStr::from_ptr(value.attr).to_owned() });
 
         Ok(Self {
             provider,

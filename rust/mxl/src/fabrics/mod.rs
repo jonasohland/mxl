@@ -8,7 +8,7 @@
 //! # Details
 //! - To get a FabricsInstance, you must create it from MXL instance and a loaded Fabrics API.
 //! ```
-//! let mxl_api = mxl::load_api(mxl::config::get_mxl_so_path()) .unwrap();
+//! let mxl_api = mxl::load_api(mxl::config::get_mxl_so_path()).unwrap();
 //! let instance = mxl::MxlInstance::new(mxl_api, "/dev/shm","").unwrap();
 //!
 //! let mxl_fabrics_api = mxl::load_fabrics_api(mxl::config::get_mxl_fabrics_ofi_so_path());
@@ -17,7 +17,7 @@
 //! // You can now create Targets and Initiators from the fabrics_instance
 //! let target = fabrics_instance.create_target().unwrap();
 //! let initiator = fabrics_instance.create_initiator().unwrap();
-//! ````
+//! ```
 mod capabilities;
 mod endpoint_address;
 pub mod initiator;

@@ -67,7 +67,7 @@ unsafe impl<S: TargetState> Send for Target<S> {}
 
 pub enum TargetFlavor {
     Grain(Target<Grain>),
-    Sample(Target<Samples>),
+    Samples(Target<Samples>),
 }
 
 impl Target<New> {
@@ -116,7 +116,7 @@ impl Target<Initializing> {
             ))
         } else {
             Ok((
-                TargetFlavor::Sample(Target {
+                TargetFlavor::Samples(Target {
                     instance: self.instance,
                     _marker: PhantomData,
                 }),

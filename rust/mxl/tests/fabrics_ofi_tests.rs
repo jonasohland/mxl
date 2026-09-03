@@ -398,7 +398,7 @@ fn tcp_grain_transfer_delivers_payload_to_target_flow() {
         let target_grain_writer: GrainWriter = target_flow_writer.to_grain_writer().unwrap();
         let target = match target {
             TargetFlavor::Grain(target) => target,
-            TargetFlavor::Sample(_) => panic!("expected grain target for video flow"),
+            TargetFlavor::Samples(_) => panic!("expected grain target for video flow"),
         };
 
         let initiator_flow_reader = mxl_instance
@@ -477,7 +477,7 @@ fn tcp_samples_transfer_delivers_payload_to_target_flow() {
         };
         let target_samples_writer: SamplesWriter = target_flow_writer.to_samples_writer().unwrap();
         let target = match target {
-            TargetFlavor::Sample(target) => target,
+            TargetFlavor::Samples(target) => target,
             TargetFlavor::Grain(_) => panic!("expected samples target for audio flow"),
         };
 

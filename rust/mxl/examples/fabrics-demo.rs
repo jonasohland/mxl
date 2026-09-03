@@ -127,7 +127,7 @@ impl<'a> TargetEndpoint<'a> {
             TargetFlavor::Grain(target) => {
                 Self::run_discrete(target, self.flow_writer.to_grain_writer()?, running)?;
             }
-            TargetFlavor::Sample(target) => {
+            TargetFlavor::Samples(target) => {
                 Self::run_continuous(target, self.flow_writer.to_samples_writer()?, running)?;
             }
         }

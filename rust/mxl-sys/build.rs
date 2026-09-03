@@ -151,7 +151,7 @@ fn main() {
             .blocklist_var(".*")
             .raw_line("use crate::types::*;")
             .dynamic_library_name("libmxlfabrics")
-            .dynamic_link_require_all(false)
+            .dynamic_link_require_all(true)
             .parse_callbacks(Box::new(CB))
             .generate()
             .unwrap();

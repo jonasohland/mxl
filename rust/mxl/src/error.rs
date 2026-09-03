@@ -23,6 +23,12 @@ pub enum Error {
     InvalidArg,
     #[error("Conflict")]
     Conflict,
+    #[error("Permission Denied")]
+    PermissionDenied,
+    /// A flow is invalid from a reader point of view if its data file has been replaced
+    /// (for example, if a writer restarted and recreated the flow)
+    #[error("Flow invalid")]
+    FlowInvalid,
 
     // Fabrics errors
     #[error("String length exceeds buffer size")]
@@ -68,6 +74,8 @@ impl Error {
             mxl_sys::MXL_ERR_TIMEOUT => Err(Error::Timeout),
             mxl_sys::MXL_ERR_INVALID_ARG => Err(Error::InvalidArg),
             mxl_sys::MXL_ERR_CONFLICT => Err(Error::Conflict),
+            mxl_sys::MXL_ERR_PERMISSION_DENIED => Err(Error::PermissionDenied),
+            mxl_sys::MXL_ERR_FLOW_INVALID => Err(Error::FlowInvalid),
 
             // fabrics errors
             mxl_sys::MXL_ERR_STRLEN => Err(Error::Strlen),

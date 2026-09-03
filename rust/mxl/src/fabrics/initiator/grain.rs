@@ -22,7 +22,7 @@ impl Initiator<Grain> {
     }
 
     /// Remove a target from the initiator. This function is always non-blocking. If any additional communication for a graceful shutdown is
-    /// required it will happend during a call to make_progress*(). It is guaranteed that no new grain transfer operations will
+    /// required it will happen during a call to make_progress*(). It is guaranteed that no new grain transfer operations will
     /// be queued for this target during calls to transfer() after the target was removed, but it is only guaranteed that
     /// the connection shutdown has completed after make_progress*() no longer returns Error::NotReady.
     pub fn remove_target(&self, target: &TargetInfo) -> Result<()> {
