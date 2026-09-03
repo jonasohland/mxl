@@ -157,7 +157,7 @@ impl<'a> TargetEndpoint<'a> {
                 }
                 Err(mxl::Error::Interrupted) => {
                     tracing::info!("Interrupted, exiting.");
-                    break;
+                    return Ok(());
                 }
                 Err(e) => {
                     return Err(e);
@@ -189,7 +189,7 @@ impl<'a> TargetEndpoint<'a> {
                 }
                 Err(mxl::Error::Interrupted) => {
                     tracing::info!("Interrupted, exiting.");
-                    break;
+                    return Ok(());
                 }
                 Err(e) => {
                     return Err(e);
@@ -251,15 +251,11 @@ impl<'a> InitiatorEndpoint<'a> {
             InitiatorFlavor::Grain(initiator) => {
                 initiator.add_target(&target_info)?;
                 // Wait to be connected
-                loop {
-                    if !running.load(atomic::Ordering::SeqCst) {
-                        return Ok(());
-                    }
-
-                    if initiator.make_progress(Duration::from_millis(250)).is_ok() {
-                        break;
-                    }
+                if !Self::wait_for_completion(&initiator, Duration::from_millis(250), &running)? {
+                    // Interrupted while waiting for connection, exit gracefully
+                    return Ok(());
                 }
+
                 Self::run_discrete(
                     self.instance,
                     initiator,
@@ -271,15 +267,11 @@ impl<'a> InitiatorEndpoint<'a> {
             InitiatorFlavor::Samples(initiator) => {
                 initiator.add_target(&target_info)?;
                 // Wait to be connected
-                loop {
-                    if !running.load(atomic::Ordering::SeqCst) {
-                        return Ok(());
-                    }
-
-                    if initiator.make_progress(Duration::from_millis(250)).is_ok() {
-                        break;
-                    }
+                if !Self::wait_for_completion(&initiator, Duration::from_millis(250), &running)? {
+                    // Interrupted while waiting for connection, exit gracefully
+                    return Ok(());
                 }
+
                 Self::run_continuous(
                     self.instance,
                     initiator,
@@ -319,24 +311,12 @@ impl<'a> InitiatorEndpoint<'a> {
                     };
 
                     // Transfer was posted, now wait for completion
-                    loop {
-                        match initiator.make_progress(Duration::from_millis(10)) {
-                            Ok(_) => {
-                                // we're done exiting the loop
-                                break;
-                            }
-                            Err(Error::Interrupted) => {
-                                return Ok(());
-                            }
-                            Err(Error::NotReady) => {
-                                // Retry
-                                continue;
-                            }
-                            Err(e) => {
-                                return Err(e);
-                            }
-                        }
+                    if !Self::wait_for_completion(&initiator, Duration::from_millis(10), &running)?
+                    {
+                        // Interrupted while waiting for completion, exit gracefully
+                        return Ok(());
                     }
+
                     index += 1;
                 }
                 Err(Error::OutOfRangeTooLate) => {
@@ -379,23 +359,10 @@ impl<'a> InitiatorEndpoint<'a> {
                     };
 
                     // Transfer was posted, now wait for completion
-                    loop {
-                        match initiator.make_progress(Duration::from_millis(10)) {
-                            Ok(_) => {
-                                // we're done exiting the loop
-                                break;
-                            }
-                            Err(Error::Interrupted) => {
-                                return Ok(());
-                            }
-                            Err(Error::NotReady) => {
-                                // Retry
-                                continue;
-                            }
-                            Err(e) => {
-                                return Err(e);
-                            }
-                        }
+                    if !Self::wait_for_completion(&initiator, Duration::from_millis(10), &running)?
+                    {
+                        // Interrupted while waiting for completion, exit gracefully
+                        return Ok(());
                     }
 
                     index += count as u64;
@@ -413,6 +380,33 @@ impl<'a> InitiatorEndpoint<'a> {
             }
         }
         Ok(())
+    }
+
+    fn wait_for_completion<S: initiator::states::InitiatorOperational>(
+        initiator: &Initiator<S>,
+        duration: Duration,
+        running: &AtomicBool,
+    ) -> Result<bool, mxl::Error> {
+        loop {
+            if !running.load(atomic::Ordering::SeqCst) {
+                return Ok(false);
+            }
+            match initiator.make_progress(duration) {
+                Ok(_) => {
+                    return Ok(true);
+                }
+                Err(Error::Interrupted) => {
+                    return Ok(false);
+                }
+                Err(Error::NotReady) => {
+                    // Retry
+                    continue;
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
     }
 }
 

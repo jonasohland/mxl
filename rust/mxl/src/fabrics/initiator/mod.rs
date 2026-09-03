@@ -7,13 +7,13 @@ mod samples;
 
 use crate::{
     error::{Error, Result},
-    fabrics::instance::FabricsInstanceContext,
+    fabrics::{TargetInfo, instance::FabricsInstanceContext},
 };
 
 pub use config::Config;
 use mxl_sys::types::{FabricsInitiator, FabricsInitiatorConfig};
 
-use std::{marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, sync::Arc, time::Duration};
 
 use states::*;
 
@@ -36,7 +36,14 @@ pub mod states {
     impl InitiatorState for Grain {}
     impl InitiatorState for Samples {}
 
+    /// State of the initiator. This is used to ensure that the initiator is in a valid state before calling certain functions.
     pub trait InitiatorState {}
+
+    /// In this state, the initiator can add/remove targets and make progress.
+    pub trait InitiatorOperational: InitiatorState {}
+
+    impl InitiatorOperational for Grain {}
+    impl InitiatorOperational for Samples {}
 }
 
 /// Wrapper class that holds a reference count to the Fabrics Instance and the actual initiator instance.
@@ -112,6 +119,58 @@ impl Initiator<Initializing> {
                 _marker: PhantomData,
             }))
         }
+    }
+}
+
+impl<S: InitiatorOperational> Initiator<S> {
+    /// Add a target to the initiator. This will allow the initiator to send data to the target in subsequent calls.
+    /// This function is always non-blocking. If additional connection setup is required
+    /// by the underlying implementation, it will only happen during a call to make_progress*().
+    pub fn add_target(&self, target: &TargetInfo) -> Result<()> {
+        Error::from_status(unsafe {
+            self.instance
+                .ctx
+                .api()
+                .fabrics_initiator_add_target(self.instance.inner, target.inner)
+        })
+    }
+
+    /// Remove a target from the initiator. This function is always non-blocking. If any additional communication for a graceful shutdown is
+    /// required it will happen during a call to make_progress*(). It is guaranteed that no new grain/samples transfer operations will
+    /// be queued for this target during calls to transfer() after the target was removed, but it is only guaranteed that
+    /// the connection shutdown has completed after make_progress*() no longer returns Error::NotReady.
+    pub fn remove_target(&self, target: &TargetInfo) -> Result<()> {
+        Error::from_status(unsafe {
+            self.instance
+                .ctx
+                .api()
+                .fabrics_initiator_remove_target(self.instance.inner, target.inner)
+        })
+    }
+
+    /// This function must be called regularly for the initiator to make progress on queued transfer operations, connection establishment
+    /// operations and connection shutdown operations.
+    pub fn make_progress_non_blocking(&self) -> Result<()> {
+        Error::from_status(unsafe {
+            self.instance
+                .ctx
+                .api()
+                .fabrics_initiator_make_progress_non_blocking(self.instance.inner)
+        })
+    }
+
+    /// This function must be called regularly for the initiator to make progress on queued transfer operations, connection establishment
+    /// operations and connection shutdown operations.
+    pub fn make_progress(&self, timeout: Duration) -> Result<()> {
+        Error::from_status(unsafe {
+            self.instance
+                .ctx
+                .api()
+                .fabrics_initiator_make_progress_blocking(
+                    self.instance.inner,
+                    u16::try_from(timeout.as_millis()).map_err(|_| Error::InvalidArg)?,
+                )
+        })
     }
 }
 
