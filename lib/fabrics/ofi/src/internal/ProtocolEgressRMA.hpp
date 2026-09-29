@@ -74,6 +74,14 @@ namespace mxl::lib::fabrics::ofi
         std::optional<std::vector<LocalRegion>> _localRegions{};
     };
 
+    /** \brief Return the largest scatter-gather list that RMASampleEgressProtocol::transferSamples() builds for a layout.
+     *
+     * The list has one entry for the bounce buffer entry header and one entry per channel. When the transferred range wraps
+     * around the end of the ring buffer, each channel needs a second entry.
+     */
+    [[nodiscard]]
+    std::size_t maxSampleTransferIovCount(DataLayout::Continuous const& layout) noexcept;
+
     //
     // RMASampleEgressProtocol below
     class RMASampleEgressProtocol /*final*/ : public EgressProtocol

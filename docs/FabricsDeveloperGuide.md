@@ -188,6 +188,8 @@ The `in_options` parameter accepts a JSON string. Currently the following option
 | --- | --- | --- |
 | `cqDepth` | number >= 1 | Depth of the initiator's completion queue. Each posted write produces one completion, so increase this when many writes are in flight at once, for example with many targets or many slices per grain. |
 
+For continuous flows the initiator sizes the transfer from the flow's channel count. A sample transfer is submitted as a single scatter-gather list with one entry for the bounce buffer header and one entry per channel, or two per channel when the range wraps around the end of the ring buffer. With the verbs provider the initiator queries the device's `max_sge` through libibverbs and requests an `iov_limit` that fits the whole list, capped at that maximum. Without this, the verbs provider uses `FI_VERBS_TX_IOV_LIMIT`, which defaults to 4. When the list is longer than the `iov_limit`, the transfer is split into several writes, and the completion queue depth is multiplied by the number of writes per transfer. For example, 64 channels need up to 129 entries. On a device with a `max_sge` of 30 this is 5 writes per transfer, so the default depth of 8 becomes 40.
+
 Select an interface from `mxlFabricsGetInterfaces()` that is compatible with the target's interface (same provider, matching capabilities).
 
 After setup, connect to one or more targets by adding them:

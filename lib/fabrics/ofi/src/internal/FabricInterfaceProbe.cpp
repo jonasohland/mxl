@@ -161,7 +161,8 @@ namespace mxl::lib::fabrics::ofi
         return list;
     }
 
-    std::pair<FabricInfo, ProviderConfig> selectSourceInterface(::mxlFabricsInterfaceConfig const& interfaceConfig, bool isTarget)
+    std::pair<FabricInfo, ProviderConfig> selectSourceInterface(::mxlFabricsInterfaceConfig const& interfaceConfig, bool isTarget,
+        std::optional<std::size_t> txIovLimit)
     {
         auto provider = providerFromAPI(interfaceConfig.provider);
         if (!provider)
@@ -188,7 +189,7 @@ namespace mxl::lib::fabrics::ofi
         auto fabricAddress = FabricAddress::parse(
             *provider, optStringFromCStr(interfaceConfig.address.node), optStringFromCStr(interfaceConfig.address.service));
 
-        auto sourceInterfaces = FabricInfoList::getSourceInterfaces(providerConfig, fabricAddress);
+        auto sourceInterfaces = FabricInfoList::getSourceInterfaces(providerConfig, fabricAddress, txIovLimit);
         if (std::ranges::distance(sourceInterfaces) == 0)
         {
             throw Exception::noFabric("no supported interfaces found");

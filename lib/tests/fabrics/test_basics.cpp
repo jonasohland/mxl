@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <algorithm>
 #include <random>
@@ -1305,4 +1306,178 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Fabrics: Initiator s
     REQUIRE(mxlReleaseFlowReader(instance, reader) == MXL_STATUS_OK);
     REQUIRE(mxlReleaseFlowWriter(instance, writer) == MXL_STATUS_OK);
     REQUIRE(mxlDestroyInstance(instance) == MXL_STATUS_OK);
+}
+
+namespace
+{
+    /** \brief Return the test value of a sample, derived from its channel and its position in the transferred range. */
+    float testSampleValue(std::size_t channel, std::size_t sample)
+    {
+        return static_cast<float>((channel * 1000) + sample);
+    }
+
+    /** \brief Fill every channel of an opened sample range with testSampleValue(). */
+    void writeTestPattern(mxlMutableWrappedMultiBufferSlice const& slices)
+    {
+        for (auto channel = std::size_t{0}; channel < slices.count; ++channel)
+        {
+            auto sample = std::size_t{0};
+            for (auto const& fragment : slices.base.fragments)
+            {
+                auto* const samples = reinterpret_cast<float*>(static_cast<std::uint8_t*>(fragment.pointer) + (channel * slices.stride));
+                for (auto i = std::size_t{0}; i < fragment.size / sizeof(float); ++i)
+                {
+                    samples[i] = testSampleValue(channel, sample++);
+                }
+            }
+        }
+    }
+
+    /** \brief Require that every channel of a sample range holds the values written by writeTestPattern(). */
+    void requireTestPattern(mxlWrappedMultiBufferSlice const& slices, std::size_t count)
+    {
+        for (auto channel = std::size_t{0}; channel < slices.count; ++channel)
+        {
+            auto sample = std::size_t{0};
+            for (auto const& fragment : slices.base.fragments)
+            {
+                auto const* const samples = reinterpret_cast<float const*>(
+                    static_cast<std::uint8_t const*>(fragment.pointer) + (channel * slices.stride));
+                for (auto i = std::size_t{0}; i < fragment.size / sizeof(float); ++i)
+                {
+                    REQUIRE(samples[i] == testSampleValue(channel, sample++));
+                }
+            }
+            REQUIRE(sample == count);
+        }
+    }
+
+    /** \brief Connect an initiator to a target, transfer one sample range and wait until the target has received it. */
+    void transferSamplesToTarget(mxlFabricsTarget target, mxlFabricsInitiator initiator, std::uint64_t headIndex, std::size_t count)
+    {
+        auto readIndex = std::uint64_t{0};
+        auto readCount = std::size_t{0};
+        auto targetProgress = [&]()
+        {
+            mxlFabricsTargetReadSamplesNonBlocking(target, &readIndex, &readCount);
+        };
+        auto initiatorProgress = [&]()
+        {
+            requireProgressStatus([&]() { return mxlFabricsInitiatorMakeProgressNonBlocking(initiator); }, "initiator");
+        };
+
+        waitForConnection(targetProgress, [&]() { return mxlFabricsInitiatorMakeProgressNonBlocking(initiator); });
+        waitForTransferStart(targetProgress, initiatorProgress, [&]() { return mxlFabricsInitiatorTransferSamples(initiator, headIndex, count); });
+        waitForTransferCompletion(initiatorProgress, [&]() { return mxlFabricsTargetReadSamplesNonBlocking(target, &readIndex, &readCount); });
+
+        REQUIRE(readIndex == headIndex);
+        REQUIRE(readCount == count);
+    }
+
+    /** \brief Transfer a range of a 64-channel flow that wraps around the end of the ring buffer, and check that the samples arrive
+     * unchanged in every channel.
+     * The scatter-gather list has 1 + 2 * 64 entries, which is more than any provider accepts in one write, so the initiator
+     * splits the transfer into several writes and scales its completion queue depth.
+     */
+    void transferWrappedSamplesWithManyChannels(std::string const& domain, mxlFabricsProvider provider, std::string const& node)
+    {
+        constexpr auto channelCount = 64U;
+        constexpr auto count = std::size_t{48};
+
+        auto flowJson = picojson::value{};
+        REQUIRE(picojson::parse(flowJson, mxl::tests::readFile("../data/audio_flow.json")).empty());
+        auto root = flowJson.get<picojson::object>();
+        root.at("channel_count") = picojson::value{static_cast<double>(channelCount)};
+
+        auto engine = std::mt19937{std::random_device{}()};
+        auto uuidGen = uuids::uuid_random_generator{engine};
+        auto const sourceId = uuids::to_string(uuidGen());
+        auto const targetId = uuids::to_string(uuidGen());
+        root.at("id") = picojson::value{sourceId};
+        auto const sourceDef = picojson::value{root}.serialize();
+        root.at("id") = picojson::value{targetId};
+        auto const targetDef = picojson::value{root}.serialize();
+
+        auto instance = mxlCreateInstance(domain.c_str(), "");
+        auto fabrics = mxlFabricsInstance{};
+        REQUIRE(mxlFabricsCreateInstance(instance, nullptr, &fabrics) == MXL_STATUS_OK);
+
+        auto sourceWriter = mxlFlowWriter{};
+        auto configInfo = mxlFlowConfigInfo{};
+        REQUIRE(mxlCreateFlowWriter(instance, sourceDef.c_str(), nullptr, &sourceWriter, &configInfo, nullptr) == MXL_STATUS_OK);
+        auto targetWriter = mxlFlowWriter{};
+        REQUIRE(mxlCreateFlowWriter(instance, targetDef.c_str(), nullptr, &targetWriter, nullptr, nullptr) == MXL_STATUS_OK);
+
+        // The range [headIndex - count, headIndex) crosses the end of the ring buffer.
+        auto const headIndex = std::uint64_t{configInfo.continuous.bufferLength} + (count / 2);
+        auto writeSlices = mxlMutableWrappedMultiBufferSlice{};
+        REQUIRE(mxlFlowWriterOpenSamples(sourceWriter, headIndex, count, &writeSlices) == MXL_STATUS_OK);
+        REQUIRE(writeSlices.base.fragments[1].size > 0);
+        writeTestPattern(writeSlices);
+        REQUIRE(mxlFlowWriterCommitSamples(sourceWriter) == MXL_STATUS_OK);
+
+        auto sourceReader = mxlFlowReader{};
+        REQUIRE(mxlCreateFlowReader(instance, sourceId.c_str(), "", &sourceReader) == MXL_STATUS_OK);
+
+        auto const interface = mxlFabricsInterfaceConfig{
+            .version = MXL_FABRICS_API_VERSION,
+            .provider = provider,
+            .caps = {.version = MXL_FABRICS_API_VERSION, .flags = MXL_FABRICS_IFACE_CAP_REMOTE_WRITE, .maxMessageSize = 0},
+            .address = {.node = node.c_str(), .service = nullptr},
+            .attr = nullptr,
+        };
+
+        auto target = mxlFabricsTarget{};
+        REQUIRE(mxlFabricsCreateTarget(fabrics, &target) == MXL_STATUS_OK);
+        auto targetConfig = mxlFabricsTargetConfig{.version = MXL_FABRICS_API_VERSION, .interface = interface, .writer = targetWriter};
+        auto targetInfo = mxlFabricsTargetInfo{};
+        REQUIRE(mxlFabricsTargetSetup(target, &targetConfig, nullptr, &targetInfo) == MXL_STATUS_OK);
+
+        auto initiator = mxlFabricsInitiator{};
+        REQUIRE(mxlFabricsCreateInitiator(fabrics, &initiator) == MXL_STATUS_OK);
+        auto initiatorConfig = mxlFabricsInitiatorConfig{.version = MXL_FABRICS_API_VERSION, .interface = interface, .reader = sourceReader};
+        REQUIRE(mxlFabricsInitiatorSetup(initiator, &initiatorConfig, nullptr) == MXL_STATUS_OK);
+        REQUIRE(mxlFabricsInitiatorAddTarget(initiator, targetInfo) == MXL_STATUS_OK);
+
+        transferSamplesToTarget(target, initiator, headIndex, count);
+
+        auto commitSlices = mxlMutableWrappedMultiBufferSlice{};
+        REQUIRE(mxlFlowWriterOpenSamples(targetWriter, headIndex, count, &commitSlices) == MXL_STATUS_OK);
+        REQUIRE(mxlFlowWriterCommitSamples(targetWriter) == MXL_STATUS_OK);
+
+        auto targetReader = mxlFlowReader{};
+        REQUIRE(mxlCreateFlowReader(instance, targetId.c_str(), "", &targetReader) == MXL_STATUS_OK);
+        auto readSlices = mxlWrappedMultiBufferSlice{};
+        REQUIRE(mxlFlowReaderGetSamplesNonBlocking(targetReader, headIndex, count, &readSlices) == MXL_STATUS_OK);
+        REQUIRE(readSlices.count == channelCount);
+        requireTestPattern(readSlices, count);
+
+        REQUIRE(mxlFabricsDestroyInitiator(fabrics, initiator) == MXL_STATUS_OK);
+        REQUIRE(mxlFabricsDestroyTarget(fabrics, target) == MXL_STATUS_OK);
+        mxlFabricsFreeTargetInfo(targetInfo);
+        REQUIRE(mxlFabricsDestroyInstance(fabrics) == MXL_STATUS_OK);
+        REQUIRE(mxlReleaseFlowReader(instance, targetReader) == MXL_STATUS_OK);
+        REQUIRE(mxlReleaseFlowReader(instance, sourceReader) == MXL_STATUS_OK);
+        REQUIRE(mxlReleaseFlowWriter(instance, targetWriter) == MXL_STATUS_OK);
+        REQUIRE(mxlReleaseFlowWriter(instance, sourceWriter) == MXL_STATUS_OK);
+        REQUIRE(mxlDestroyInstance(instance) == MXL_STATUS_OK);
+    }
+}
+
+TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Fabrics: Transfer wrapped samples with many channels (tcp)",
+    "[Fabrics][Transfer][Flows][Samples][iov]")
+{
+    transferWrappedSamplesWithManyChannels(domain, MXL_FABRICS_PROVIDER_TCP, "127.0.0.1");
+}
+
+// Needs RDMA hardware. Set MXL_FABRICS_TEST_VERBS_NODE to the address of a local RDMA interface to run it.
+TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Fabrics: Transfer wrapped samples with many channels (verbs)",
+    "[Fabrics][Transfer][Flows][Samples][iov]")
+{
+    auto const* node = std::getenv("MXL_FABRICS_TEST_VERBS_NODE");
+    if (node == nullptr)
+    {
+        SKIP("MXL_FABRICS_TEST_VERBS_NODE is not set");
+    }
+    transferWrappedSamplesWithManyChannels(domain, MXL_FABRICS_PROVIDER_VERBS, node);
 }

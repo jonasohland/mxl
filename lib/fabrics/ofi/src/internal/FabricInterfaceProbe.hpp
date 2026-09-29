@@ -24,8 +24,10 @@ namespace mxl::lib::fabrics::ofi
      * (REMOTE_WRITE or SEND_RECEIVE) is set, REMOTE_WRITE is applied with a warning. Returns the
      * matched fabric info and its resolved provider configuration.
      * \param isTarget true for target (FI_REMOTE_WRITE), false for initiator (FI_WRITE).
+     * \param txIovLimit When set, requested as tx_attr->iov_limit. \see FabricInfoList::getSourceInterfaces()
      * \throws Exception::noFabric if no matching interface is found or capabilities are unsupported.
      */
     [[nodiscard]]
-    std::pair<FabricInfo, ProviderConfig> selectSourceInterface(::mxlFabricsInterfaceConfig const& interfaceConfig, bool isTarget);
+    std::pair<FabricInfo, ProviderConfig> selectSourceInterface(::mxlFabricsInterfaceConfig const& interfaceConfig, bool isTarget,
+        std::optional<std::size_t> txIovLimit = std::nullopt);
 }

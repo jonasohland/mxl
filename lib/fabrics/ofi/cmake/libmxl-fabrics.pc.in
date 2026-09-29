@@ -8,6 +8,6 @@ Version: @PROJECT_VERSION@
 Requires: libmxl libfabric
 Description: Media eXchange Layer SDK Fabrics library
 Libs: -L${libdir} -lmxl-fabrics
-Requires.private: spdlog
+Requires.private: spdlog libibverbs
 Libs.private: -pthread
 Cflags: -I${includedir} @MXL_PKGCONFIG_EXTRA_CFLAGS@

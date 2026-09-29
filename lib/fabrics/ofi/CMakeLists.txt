@@ -6,6 +6,7 @@ message ("-- Building fabrics library with libfabric/ofi")
 find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(libfabric REQUIRED IMPORTED_TARGET libfabric)
+pkg_check_modules(libibverbs REQUIRED IMPORTED_TARGET libibverbs)
 
 if (NOT TARGET spdlog::spdlog)
     find_package(spdlog CONFIG REQUIRED)
@@ -61,12 +62,14 @@ target_sources(mxl-fabrics-objects
             src/internal/SliceRange.cpp
             src/internal/Target.cpp
             src/internal/TargetInfo.cpp
+            src/internal/VerbsDevice.cpp
     )
 target_link_libraries(mxl-fabrics-objects
         PRIVATE
             mxl-internal-headers
             mxl-fabrics-headers
             PkgConfig::libfabric
+            PkgConfig::libibverbs
 )
 set_target_properties(mxl-fabrics-objects
         PROPERTIES
@@ -113,6 +116,7 @@ target_link_libraries(mxl-fabrics
         PRIVATE
             spdlog::spdlog
             fmt::fmt
+            PkgConfig::libibverbs
       )
 
 # Add common linker options

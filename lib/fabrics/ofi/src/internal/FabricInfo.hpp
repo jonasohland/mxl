@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <rdma/fabric.h>
@@ -227,9 +228,15 @@ namespace mxl::lib::fabrics::ofi
         [[nodiscard]]
         static FabricInfoList get();
 
-        /** \brief Calls fi_getinfo with FI_SOURCE to get source interface information. Uses hints derived from the provider config value. */
+        /** \brief Calls fi_getinfo with FI_SOURCE to get source interface information. Uses hints derived from the provider config value.
+         * \param providerConfig The provider configuration the hints are derived from.
+         * \param sourceAddress The optional local address to bind to.
+         * \param txIovLimit When set, passed as the tx_attr->iov_limit hint. Providers skip interfaces that cannot support this many
+         * scatter-gather entries per operation.
+         */
         [[nodiscard]]
-        static FabricInfoList getSourceInterfaces(ProviderConfig const& providerConfig, std::optional<FabricAddress> const& sourceAddress);
+        static FabricInfoList getSourceInterfaces(ProviderConfig const& providerConfig, std::optional<FabricAddress> const& sourceAddress,
+            std::optional<std::size_t> txIovLimit = std::nullopt);
 
         /** \brief Take ownership over a fi_info raw pointer.
          */

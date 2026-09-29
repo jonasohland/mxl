@@ -15,7 +15,7 @@ This guide walks through building the demo tools, discovering network interfaces
 
 ## 1. Building the demo applications
 
-Enable the libfabric-based Fabrics implementation and build:
+The Fabrics implementation needs libfabric and libibverbs, both found through pkg-config. Enable the libfabric-based Fabrics implementation and build:
 
 ```bash
 cmake --preset Linux-GCC-Release -DMXL_ENABLE_FABRICS_OFI=ON .

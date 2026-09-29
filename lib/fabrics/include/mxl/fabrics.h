@@ -284,6 +284,11 @@ extern "C"
      *  - "cqDepth" (number >= 1): the depth of the initiator's completion queue. The queue receives one completion per posted
      *    write, so increase this when many writes are in flight at once (many targets, many slices per grain). When omitted,
      *    an implementation default is used.
+     *
+     * For continuous flows, a sample transfer is one scatter-gather list with an entry per channel, or two when the range wraps
+     * around the ring buffer. With the verbs provider the initiator requests an iov_limit large enough for that list, up to the
+     * max_sge reported by libibverbs for the device. When a transfer still needs more than one write, the completion queue depth
+     * (from "cqDepth" or the default) is multiplied by the number of writes per transfer.
      * \return The result code. \see mxlStatus
      */
     MXL_EXPORT

@@ -172,7 +172,8 @@ namespace mxl::lib::fabrics::ofi
         return FabricInfoList{info};
     }
 
-    FabricInfoList FabricInfoList::getSourceInterfaces(ProviderConfig const& providerConfig, std::optional<FabricAddress> const& sourceAddress)
+    FabricInfoList FabricInfoList::getSourceInterfaces(ProviderConfig const& providerConfig, std::optional<FabricAddress> const& sourceAddress,
+        std::optional<std::size_t> txIovLimit)
     {
         auto info = std::add_pointer_t<::fi_info>{nullptr};
         auto hints = FabricInfo::empty();
@@ -189,6 +190,10 @@ namespace mxl::lib::fabrics::ofi
         hints->domain_attr->mr_mode = providerConfig.getSupportedMemoryRegistrationModes();
         hints->ep_attr->type = providerConfig.getEndpointType();
         hints->caps = providerConfig.getCaps();
+        if (txIovLimit)
+        {
+            hints->tx_attr->iov_limit = *txIovLimit;
+        }
 
         if (sourceAddress)
         {

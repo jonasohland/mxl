@@ -20,7 +20,8 @@ namespace mxl::lib::fabrics::ofi
         /** \brief Desired completion-queue depth.
          *
          * When left empty the implementation default
-         * (CompletionQueue::Attributes::DEFAULT_SIZE) is used.
+         * (CompletionQueue::Attributes::DEFAULT_SIZE) is used. For continuous flows, InitiatorWrapper::setup()
+         * multiplies the depth by the number of writes posted per sample transfer.
          */
         std::optional<std::size_t> cqDepth;
     };
@@ -140,6 +141,11 @@ namespace mxl::lib::fabrics::ofi
          * This method initializes the underlying initiator implementation
          * based on the provided configuration.
          *
+         * For continuous flows the tx iov_limit and the completion queue depth are sized from the channel count.
+         * With the verbs provider, the iov_limit is raised so that a sample transfer fits in one write, up to the
+         * max_sge reported by libibverbs. When a transfer still needs several writes, the completion queue depth is
+         * multiplied by that number of writes.
+         *
          * \param config The configuration to use for setting up the initiator.
          * \param options Optional tuning parameters (e.g. completion queue depth).
          */
@@ -173,6 +179,10 @@ namespace mxl::lib::fabrics::ofi
         /** \copydoc Initiator::makeProgressBlocking()
          */
         Initiator::MakeProgressResult makeProgressBlocking(std::chrono::steady_clock::duration);
+
+    private:
+        /** \brief Create the RC or RDM initiator for the selected fabric info. */
+        void setupInner(mxlFabricsInitiatorConfig const& config, FabricInfoView info, InitiatorSetupOptions const& options);
 
     private:
         std::unique_ptr<Initiator> _inner; /**< The underlying initiator implementation. */

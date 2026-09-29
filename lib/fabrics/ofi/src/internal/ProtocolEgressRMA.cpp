@@ -130,6 +130,11 @@ namespace mxl::lib::fabrics::ofi
         return std::make_unique<MakeUniqueEnabler>(token, std::move(remoteInfo), _layout, *_localRegions);
     }
 
+    std::size_t maxSampleTransferIovCount(DataLayout::Continuous const& layout) noexcept
+    {
+        return 1 + (2 * layout.channelCount);
+    }
+
     RMASampleEgressProtocol::RMASampleEgressProtocol(Completion::Token token, TargetInfo info, DataLayout::Continuous layout, LocalRegion localRegion,
         std::size_t bounceBufferEntryCount)
         : _token{token}
