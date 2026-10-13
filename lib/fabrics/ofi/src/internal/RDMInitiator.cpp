@@ -359,12 +359,13 @@ namespace mxl::lib::fabrics::ofi
         if (auto completion = _endpoint.completionQueue()->readBlocking(timeout); completion)
         {
             processCompletion(*completion);
+            pollCQ();
         }
     }
 
     void RDMInitiator::pollCQ()
     {
-        if (auto completion = _endpoint.completionQueue()->read(); completion)
+        while (auto completion = _endpoint.completionQueue()->read())
         {
             processCompletion(*completion);
         }
