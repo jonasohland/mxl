@@ -24,7 +24,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="zensical-0.0.70">
+      <meta name="generator" content="zensical-0.0.71">
     
     
       
@@ -59,6 +59,8 @@
       
     
     
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
     <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
     
       
@@ -75,7 +77,7 @@
     
     
     
-    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="indigo">
   
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
@@ -134,7 +136,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
     
       <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
@@ -144,7 +146,7 @@
     
     
     
-    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="custom" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
     
       <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
@@ -1192,7 +1194,7 @@
 <h2 id="discrete-grain-io">Discrete Grain I/O</h2>
 <p>Grain I/O can be 'partial'. In other words, a FlowWriter can write the bytes of a grain progressively (as slices for example).</p>
 <p>The following example demonstrates how a FlowWriter may write a grain as slices using multiple <code>mxlFlowWriterCommitGrain()</code> calls. The important field here is the mxlGrainInfo.committedSize: it tells us how many bytes in the grain are valid. A complete grain will have <code>mxlGrainInfo.committedSize == mxlGrainInfo.grainSize</code>. It is imperative that FlowReaders <em>always</em> take into consideration the <code>mxlGrainInfo.committedSize</code> field before making use of the grain buffer. The <code>mxlFlowReaderGetGrain</code> function will return as soon as new data is committed to the grain.</p>
-<h3 id="example-grain-io-from-the-unit-tests">Example Grain I/O (from the <a href="https://github.com/jonasohland/mxl/blob/main/lib/tests/test_flows.cpp">unit tests</a>)</h3>
+<h3 id="example-grain-io-from-the-unit-tests">Example Grain I/O (from the <a href="https://github.com/dmf-mxl/mxl/blob/main/lib/tests/test_flows.cpp">unit tests</a>)</h3>
 <div class="highlight"><pre><span></span><code><span class="w">    </span><span class="c1">///</span>
 <span class="w">    </span><span class="c1">/// Write and read a grain in 8 slices</span>
 <span class="w">    </span><span class="c1">///</span>
@@ -1411,8 +1413,44 @@ to synchronize on, like so:</p>
 <p>Video grains can be of two different formats: video/v210 for video without transparency and video/v210a for fill and key signals (video with alpha transparency).</p>
 <h3 id="videov210">video/v210</h3>
 <p>The <code>video/v210</code> format is an uncompressed buffer format carrying 10 bit 4:2:2 video. A detailed description of the format can be found <a href="https://wiki.multimedia.cx/index.php/V210">here</a> and <a href="https://developer.apple.com/library/archive/technotes/tn2162/_index.html#//apple_ref/doc/uid/DTS40013070-CH1-TNTAG8-V210__4_2_2_COMPRESSION_TYPE">here</a>.</p>
+<div class="highlight"><pre><span></span><code>32-bit Word Structure (Little-Endian), 4 words = 1 group of 6 pixels (16 bytes):
+┌──────┬───────┬───────────────────────────────┬───────────────────────────────┬───────────────────────────────┐
+│ Word │ 31 30 │ 29 28 27 26 25 24 23 22 21 20 │ 19 18 17 16 15 14 13 12 11 10 │  9  8  7  6  5  4  3  2  1  0 │
+├──────┼───────┼───────────────────────────────┼───────────────────────────────┼───────────────────────────────┤
+│  0   │ unused│             Cr 0              │              Y 0              │             Cb 0              │
+│  1   │ unused│              Y 2              │             Cb 1              │              Y 1              │
+│  2   │ unused│             Cb 2              │              Y 3              │             Cr 1              │
+│  3   │ unused│              Y 5              │             Cr 2              │              Y 4              │
+└──────┴───────┴───────────────────────────────┴───────────────────────────────┴───────────────────────────────┘
+Pixel Mapping:
+┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────┐
+│ Pixel 0 │ Pixel 1 │ Pixel 2 │ Pixel 3 │ Pixel 4 │ Pixel 5 │
+│   Y 0   │   Y 1   │   Y 2   │   Y 3   │   Y 4   │   Y 5   │
+├─────────┴─────────┼─────────┴─────────┼─────────┴─────────┤
+│     Cb 0, Cr 0    │     Cb 1, Cr 1    │     Cb 2, Cr 2    │
+└───────────────────┴───────────────────┴───────────────────┘
+Line Structure:
+┌──────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+│  Group 0 │  Group 1 │  Group 2 │    ...   │  Group N │  Padding │
+│ 6 pixels │ 6 pixels │ 6 pixels │          │ 2/4/6 px │          │
+└──────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
+                                                                  ↑
+                                                          128-byte aligned
+Example (1280x720):
+- Width: 1280 pixels
+- Line length: ⌈1280/48⌉ × 128 = 27 × 128 = 3456 bytes
+- Groups used: ⌈1280/6⌉ = 214 groups (3424 bytes)
+- Last group: 2 pixels (word 0, plus Y 1 in bits 0-9 of word 1)
+- Padding: 32 bytes (2 groups) to reach 128-byte alignment
+
+Key points:
+• Each 32-bit word contains 3 samples (10 bits each); bits 30-31 unused
+• Each 16-byte group carries 6 pixels: 6 luma + 3 Cb + 3 Cr samples
+• Each Cb/Cr pair is shared by two horizontally adjacent pixels
+• Lines are padded to a multiple of 48 pixels (128 bytes)
+</code></pre></div>
 <h3 id="videov210a-v210-alpha">video/v210a (v210 + alpha)</h3>
-<p>The <code>video/v210a</code> format contains both fill and key inside a single grain.  The fill part starts at byte 0 of the grain and follows the v210 definition above. The key buffer is found immediately after the fill buffer.  Samples are organized in blocks of 32 bit values in little-endian.  Each block contains 3 luma samples, one each in bits 0 - 9, 10 - 19 and 20 - 29, the remaining two bits are unused.  The start of each line is aligned to a multiple of 4 bytes, where unused blocks are padded with 0.  The last block of a line might have more padding than just the last 2 bits if the width is not divisible by 3.  For example, 1280x720 resolution has padding for bits 20 to 31 on the last block.</p>
+<p>The <code>video/v210a</code> format contains both fill and key inside a single grain. The fill part starts at byte 0 of the grain and follows the v210 definition above. The key buffer is found immediately after the fill buffer. Samples are organized in blocks of 32 bit values in little-endian. Each block contains 3 alpha samples, one each in bits 0 - 9, 10 - 19 and 20 - 29, the remaining two bits are unused. The start of each line is aligned to a multiple of 4 bytes, where unused blocks are padded with 0. The last block of a line might have more padding than just the last 2 bits if the width is not divisible by 3. For example, 1280x720 resolution has padding for bits 20 to 31 on the last block.</p>
 <p>Alpha samples are 'straight' (not premultiplied) and follow the same data range as the fill.  For example, if the fill is <em>video range</em> (64 to 960) then the samples of the key are also <em>video range</em>.</p>
 <div class="highlight"><pre><span></span><code>video/v210a Grain Structure:
 ┌────────────────────────────────────────────────────────────────┐
@@ -1423,31 +1461,31 @@ to synchronize on, like so:</p>
 │                       (alpha channel)                          │
 └────────────────────────────────────────────────────────────────┘
 
+KEY BUFFER:
+
 32-bit Block Structure (Little-Endian):
-┌───────────────────────────────────────────────────────────────────────────────────────────────────────┐
+┌───────┬───────────────────────────────┬───────────────────────────────┬───────────────────────────────┐
 │ 31 30 │ 29 28 27 26 25 24 23 22 21 20 │ 19 18 17 16 15 14 13 12 11 10 │  9  8  7  6  5  4  3  2  1  0 │
 ├───────┼───────────────────────────────┼───────────────────────────────┼───────────────────────────────┤
-│unused │         Luma Sample 2         │         Luma Sample 1         │         Luma Sample 0         │
-│  bits │         (bits 20-29)          │         (bits 10-19)          │           (bits 0-9)          │
+│ unused│        Alpha Sample 2         │        Alpha Sample 1         │        Alpha Sample 0         │
 └───────┴───────────────────────────────┴───────────────────────────────┴───────────────────────────────┘
 
 Line Structure:
-┌─────────┬─────────┬─────────┬─────────┬─────────┬─────────┐
-│ Block 0 │ Block 1 │ Block 2 │   ...   │ Block N │ Padding │
-│ 3 luma  │ 3 luma  │ 3 luma  │         │ 1-3 luma│ (zeros) │
-└─────────┴─────────┴─────────┴─────────┴─────────┴─────────┘
-                                                            ↑
-                                                      4-byte aligned
+┌──────────┬──────────┬──────────┬──────────┬──────────┐
+│  Block 0 │  Block 1 │  Block 2 │    ...   │  Block N │
+│  3 alpha │  3 alpha │  3 alpha │          │ 1-3 alpha│
+└──────────┴──────────┴──────────┴──────────┴──────────┘
+                                                       ↑
+                                                 4-byte aligned
 
 Example (1280x720):
 - Width: 1280 pixels
 - Blocks per line: ⌈1280/3⌉ = 427 blocks
-- Last block: 1 pixel luma sample + zero padding in bits 10-31
-
+- Last block: 1 pixel alpha sample + zero padding in bits 10-31
 
 Key points:
 • Fill buffer (v210) comes first, followed immediately by key buffer (alpha)
-• Each 32-bit block contains 3 luma samples (10 bits each)
+• Each 32-bit block contains 3 alpha samples (10 bits each)
 • Lines are 4-byte aligned with zero padding
 </code></pre></div>
 <h2 id="audio">Audio</h2>
