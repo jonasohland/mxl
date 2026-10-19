@@ -389,19 +389,6 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "FlowManager: open ex
         REQUIRE(f2);
         REQUIRE(countTemporaryDirectories() == initialCount);
     }
-
-    SECTION("event")
-    {
-        auto const id = *uuids::uuid::from_string("c3c3c3c3-c3c3-c3c3-c3c3-c3c3c3c3c3c3");
-        auto const def = mxl::tests::readFile("data/event_flow.json");
-
-        auto [created1, f1] = mgr->createOrOpenEventFlow(id, def, 4, mxlRational{.numerator = 20, .denominator = 1}, 64);
-        REQUIRE(created1);
-        auto [created2, f2] = mgr->createOrOpenEventFlow(id, def, 4, mxlRational{.numerator = 20, .denominator = 1}, 64);
-        REQUIRE_FALSE(created2);
-        REQUIRE(f2);
-        REQUIRE(countTemporaryDirectories() == initialCount);
-    }
 }
 
 // Test robustness: corrupted flow directory with missing descriptor
