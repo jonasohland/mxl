@@ -50,8 +50,7 @@ namespace mxl::lib::fabrics::ofi
          */
         void shutdown(Endpoint& ep);
 
-        /** \brief Complete the removal once all outstanding writes have completed or RemoveTimeout has elapsed.
-         *
+        /** \brief Complete the removal as soon as all outstanding writes have completed, or when RemoveTimeout has elapsed.
          * Removes the address vector entry and moves the target to the done state. In any other state than the removing state, this is a
          * no-op.
          */
