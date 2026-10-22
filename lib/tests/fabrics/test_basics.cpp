@@ -543,15 +543,15 @@ TEST_CASE_PERSISTENT_FIXTURE(mxl::tests::mxlDomainFixture, "Fabrics connectionle
         [&]() { return mxlFabricsInitiatorTransferGrain(initiator, 0, 0, 1); });
     REQUIRE(mxlFabricsInitiatorRemoveTarget(initiator, targetInfo) == MXL_STATUS_OK);
 
-    // The removal is complete once the initiator no longer reports pending work.
+    // poll for one second (less than the internal deadline) to make sure that it completes before the internal deadline has elapsed
     pollUntilSuccess(
         [&]()
         {
             mxlFabricsTargetReadGrainNonBlocking(target, &dummyIndex);
             return mxlFabricsInitiatorMakeProgressNonBlocking(initiator) == MXL_STATUS_OK;
         },
-        POLL_TIMEOUT,
-        "Initiator did not finish removing the target in 5 seconds");
+        std::chrono::seconds(1),
+        "Initiator did not finish removing the target in 1 second");
 
     // The same target can be added again and receives data.
     REQUIRE(mxlFabricsInitiatorAddTarget(initiator, targetInfo) == MXL_STATUS_OK);
