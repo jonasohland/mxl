@@ -199,6 +199,7 @@ namespace mxl::lib::fabrics::ofi
                         if (event && event.value().isShutdown())
                         {
                             MXL_INFO("Remote endpoint has shutdown the connection.");
+                            _proto->shutdown();
                             catchAndLogFabricError([&]() { state.ep.shutdown(); },
                                 "Failed to shut down the endpoint after the remote endpoint closed it");
                             return Draining{.ep = std::move(state.ep)};
@@ -231,16 +232,7 @@ namespace mxl::lib::fabrics::ofi
         // empty. Completions of receive buffers that were cancelled by the shutdown produce no result.
         while (auto completion = state.ep.completionQueue()->read())
         {
-            try
-            {
-                result = _proto->read(state.ep, *completion);
-            }
-            catch (FabricException const& ex)
-            {
-                // The protocol posts a new receive buffer before it decodes the completion. Some providers refuse new receive buffers on a
-                // closed connection.
-                MXL_WARN("Failed to read a completion after the connection was shut down: {}", ex.what());
-            }
+            result = _proto->read(state.ep, *completion);
 
             if (result)
             {
