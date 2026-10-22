@@ -220,7 +220,7 @@ namespace mxl::lib
             // Check if this flow is already being watched
             for (auto const& [wd, rec] : _watches)
             {
-                if (rec == record)
+                if (rec.id == record.id)
                 {
                     existingWd = wd;
                     record.flowData = rec.flowData;
@@ -233,10 +233,6 @@ namespace mxl::lib
                 MXL_DEBUG("Record for {} not found, creating one.", uuids::to_string(record.id));
 
 #ifdef __APPLE__
-                < < < < < < < HEAD existingWd = ::open(record.fileName.c_str(), O_EVTONLY);
-||||||| parent of 9eedc31d (Register access file watches immediately on macOS)
-                existingWd = ::open(record.fileName.c_str(), O_EVTONLY | O_CLOEXEC);
-=======
                 existingWd = ::open(record.fileName.c_str(), O_EVTONLY | O_CLOEXEC);
                 if (existingWd != -1)
                 {
@@ -256,7 +252,6 @@ namespace mxl::lib
                         existingWd = -1;
                     }
                 }
->>>>>>> 9eedc31d (Register access file watches immediately on macOS)
 #elif defined __linux__
                 // if not found, add the watch and add it to the maps
                 existingWd = ::inotify_add_watch(_inotifyFd, record.fileName.c_str(), IN_ACCESS | IN_ATTRIB);
