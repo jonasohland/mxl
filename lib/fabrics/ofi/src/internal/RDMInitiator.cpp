@@ -89,14 +89,15 @@ namespace mxl::lib::fabrics::ofi
             return;
         }
 
-        if (std::chrono::steady_clock::now() >= state->deadline)
+        if (_proto->hasPendingWork())
         {
+            if (std::chrono::steady_clock::now() < state->deadline)
+            {
+                return;
+            }
+
             MXL_WARN("Writes to the removed target did not complete within {} ms, removing it anyway.",
                 std::chrono::duration_cast<std::chrono::milliseconds>(RemoveTimeout).count());
-        }
-        else
-        {
-            return;
         }
 
         ep.addressVector()->remove(state->fiAddr);
