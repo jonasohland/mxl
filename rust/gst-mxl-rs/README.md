@@ -33,10 +33,11 @@ The following elements are included:
 
 ### mxlsink
 
-| Property  | Description                                                |
-| --------- | ---------------------------------------------------------- |
-| `flow-id` | UUID of the flow to create.                                |
-| `domain`  | Filesystem path to the MXL domain directory.               |
+| Property         | Description                                                                                                                                                                                         |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flow-id`        | UUID of the flow to create.                                                                                                                                                                         |
+| `domain`         | Filesystem path to the MXL domain directory.                                                                                                                                                        |
+| `timestamp-mode` | How buffers map to grain indices. `running-time` (default) uses the running time. `pts` (legacy) uses the raw buffer PTS. |
 
 The flow's media type is based on the upstream caps.
 `video/x-raw, format=v210` results in a `video/v210` video flow.

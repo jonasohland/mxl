@@ -5,6 +5,7 @@ use std::{collections::HashMap, process, str::FromStr};
 
 use crate::mxlsink::imp::CAT;
 use gst::StructureRef;
+use gst::glib;
 use gst::prelude::*;
 use gst_audio::AudioInfo;
 use gstreamer as gst;
@@ -24,6 +25,29 @@ pub(crate) const DEFAULT_FLOW_ID: &str = "";
 pub(crate) const DEFAULT_DOMAIN: &str = "";
 pub(crate) const GROUPHINT_TAG: &str = "urn:x-nmos:tag:grouphint/v1.0";
 
+/// How `mxlsink` turns a buffer's timestamp into an MXL timestamp, and so into
+/// the grain or sample index it is written to.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, glib::Enum)]
+#[repr(i32)]
+#[enum_type(name = "GstMxlSinkTimestampMode")]
+pub enum TimestampMode {
+    /// Legacy: `base_time + PTS + D`, the mapping `mxlsink` used before this
+    /// mode existed. Matches `RunningTime` when the upstream segment starts at 0
+    /// (live sources); otherwise grains land early or late, e.g. by a file's
+    /// first PTS, across seeks and loops, or by the 1000 h offset that video
+    /// encoders and `livesync` add. Kept for backward compatibility.
+    #[enum_value(name = "Raw buffer PTS (legacy)", nick = "pts")]
+    Pts = 0,
+    /// `base_time + running time + D`. Grains land when the sink renders them,
+    /// whatever segment upstream sends (for example `tsdemux` file playback).
+    #[default]
+    #[enum_value(
+        name = "Running time (grains land when they are rendered)",
+        nick = "running-time"
+    )]
+    RunningTime = 1,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct Settings {
     /// UUID of the MXL flow.
@@ -36,6 +60,8 @@ pub(crate) struct Settings {
     pub description: String,
     /// `urn:x-nmos:tag:grouphint/v1.0` value. Empty keeps the built-in default.
     pub group_hint: String,
+    /// How buffer timestamps map to MXL timestamps.
+    pub timestamp_mode: TimestampMode,
 }
 
 impl Default for Settings {
@@ -46,6 +72,7 @@ impl Default for Settings {
             label: String::new(),
             description: String::new(),
             group_hint: String::new(),
+            timestamp_mode: TimestampMode::default(),
         }
     }
 }

@@ -14,7 +14,7 @@
 use gst::glib;
 use gst::prelude::*;
 use gst::subclass::prelude::*;
-use gst_base::prelude::BaseSinkExt;
+use gst_base::prelude::{BaseSinkExt, BaseSinkExtManual};
 use gst_base::subclass::prelude::*;
 use gstreamer as gst;
 use gstreamer_audio as gst_audio;
@@ -36,6 +36,7 @@ use crate::mxlsink::state::DEFAULT_FLOW_ID;
 use crate::mxlsink::state::FlowState;
 use crate::mxlsink::state::Settings;
 use crate::mxlsink::state::State;
+use crate::mxlsink::state::TimestampMode;
 use crate::mxlsink::state::init_state_with_audio;
 use crate::mxlsink::state::init_state_with_data;
 use crate::mxlsink::state::init_state_with_video;
@@ -102,6 +103,18 @@ impl ObjectImpl for MxlSink {
                     )
                     .mutable_ready()
                     .build(),
+                glib::ParamSpecEnum::builder_with_default(
+                    "timestamp-mode",
+                    TimestampMode::RunningTime,
+                )
+                .nick("Timestamp Mode")
+                .blurb(
+                    "How buffer timestamps map to MXL time. `running-time` \
+                     (default) uses the running time and \
+                     `pts` (legacy) uses the raw buffer PTS",
+                )
+                .mutable_ready()
+                .build(),
             ]
         });
 
@@ -180,6 +193,13 @@ impl ObjectImpl for MxlSink {
                         .flatten()
                         .unwrap_or_default();
                 }
+                "timestamp-mode" => {
+                    if let Ok(mode) = value.get::<TimestampMode>() {
+                        settings.timestamp_mode = mode;
+                    } else {
+                        gst::error!(CAT, imp = self, "Invalid type for timestamp-mode property");
+                    }
+                }
                 other => {
                     gst::error!(CAT, imp = self, "Unknown property '{}'", other);
                 }
@@ -201,6 +221,7 @@ impl ObjectImpl for MxlSink {
                 "label" => settings.label.to_value(),
                 "description" => settings.description.to_value(),
                 "group-hint" => settings.group_hint.to_value(),
+                "timestamp-mode" => settings.timestamp_mode.to_value(),
                 _ => {
                     gst::error!(CAT, imp = self, "Unknown property {}", pspec.name());
                     glib::Value::from(&"")
@@ -377,21 +398,40 @@ impl BaseSinkImpl for MxlSink {
             }
         };
 
+        let pts = buffer.pts().ok_or(gst::FlowError::Error)?;
+        let base_time = self.obj().base_time().ok_or(gst::FlowError::Error)?;
+        let timestamp_mode = self
+            .settings
+            .lock()
+            .map_err(|_| gst::FlowError::Error)?
+            .timestamp_mode;
+        let mxl_ts = match timestamp_mode {
+            TimestampMode::Pts => pts
+                .nseconds()
+                .checked_add(base_time.nseconds())
+                .and_then(|timestamp| timestamp.checked_add(offset))
+                .ok_or(gst::FlowError::Error)?,
+            TimestampMode::RunningTime => {
+                let running_time = self
+                    .obj()
+                    .segment()
+                    .downcast_ref::<gst::ClockTime>()
+                    .and_then(|segment| segment.to_running_time_full(pts));
+                let mxl_ts = running_time.and_then(|running_time| {
+                    mxl_timestamp(base_time.nseconds() as i128 + offset as i128, running_time)
+                });
+                let Some(mxl_ts) = mxl_ts else {
+                    return Ok(gst::FlowSuccess::Ok);
+                };
+                mxl_ts
+            }
+        };
+
         let mut context = self.context.lock().map_err(|_| gst::FlowError::Error)?;
         let state = context.state.as_mut().ok_or(gst::FlowError::Error)?;
-        // Borrow the element for the duration of this render call so
-        // the format-specific paths can read its base time via
-        // `Element::base_time()` without `State` having to cache a
-        // strong ref (which would form a refcount cycle).
-        let element = self.obj();
-        let element: &gst::Element = element.upcast_ref();
         match &state.flow_state {
-            Some(FlowState::Discrete(_)) => {
-                render_discrete::discrete(state, element, buffer, offset)
-            }
-            Some(FlowState::Continuous(_)) => {
-                render_continuous::continuous(state, element, buffer, offset)
-            }
+            Some(FlowState::Discrete(_)) => render_discrete::discrete(state, buffer, mxl_ts),
+            Some(FlowState::Continuous(_)) => render_continuous::continuous(state, buffer, mxl_ts),
             None => Err(gst::FlowError::Error),
         }
     }
@@ -468,6 +508,17 @@ impl BaseSinkImpl for MxlSink {
     ) -> Result<(), gst::LoggableError> {
         self.parent_propose_allocation(query)
     }
+}
+
+pub(crate) fn mxl_timestamp(
+    anchor: i128,
+    running_time: gst::Signed<gst::ClockTime>,
+) -> Option<u64> {
+    let running_time = match running_time {
+        gst::Signed::Positive(rt) => rt.nseconds() as i128,
+        gst::Signed::Negative(rt) => -(rt.nseconds() as i128),
+    };
+    u64::try_from(anchor.checked_add(running_time)?).ok()
 }
 
 fn init_mxl_instance(
