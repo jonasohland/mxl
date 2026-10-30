@@ -22,8 +22,6 @@ mod render_discrete;
 mod sink_tests;
 mod state;
 
-pub use state::TimestampMode;
-
 glib::wrapper! {
     pub struct MxlSink(ObjectSubclass<imp::MxlSink>) @extends gst_base::PushSrc, gst_base::BaseSink, gst::Element, gst::Object;
 }

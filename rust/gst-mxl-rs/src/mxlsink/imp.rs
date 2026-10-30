@@ -36,7 +36,6 @@ use crate::mxlsink::state::DEFAULT_FLOW_ID;
 use crate::mxlsink::state::FlowState;
 use crate::mxlsink::state::Settings;
 use crate::mxlsink::state::State;
-use crate::mxlsink::state::TimestampMode;
 use crate::mxlsink::state::init_state_with_audio;
 use crate::mxlsink::state::init_state_with_data;
 use crate::mxlsink::state::init_state_with_video;
@@ -103,18 +102,6 @@ impl ObjectImpl for MxlSink {
                     )
                     .mutable_ready()
                     .build(),
-                glib::ParamSpecEnum::builder_with_default(
-                    "timestamp-mode",
-                    TimestampMode::RunningTime,
-                )
-                .nick("Timestamp Mode")
-                .blurb(
-                    "How buffer timestamps map to MXL time. `running-time` \
-                     (default) uses the running time and \
-                     `pts` (legacy) uses the raw buffer PTS",
-                )
-                .mutable_ready()
-                .build(),
             ]
         });
 
@@ -193,13 +180,6 @@ impl ObjectImpl for MxlSink {
                         .flatten()
                         .unwrap_or_default();
                 }
-                "timestamp-mode" => {
-                    if let Ok(mode) = value.get::<TimestampMode>() {
-                        settings.timestamp_mode = mode;
-                    } else {
-                        gst::error!(CAT, imp = self, "Invalid type for timestamp-mode property");
-                    }
-                }
                 other => {
                     gst::error!(CAT, imp = self, "Unknown property '{}'", other);
                 }
@@ -221,7 +201,6 @@ impl ObjectImpl for MxlSink {
                 "label" => settings.label.to_value(),
                 "description" => settings.description.to_value(),
                 "group-hint" => settings.group_hint.to_value(),
-                "timestamp-mode" => settings.timestamp_mode.to_value(),
                 _ => {
                     gst::error!(CAT, imp = self, "Unknown property {}", pspec.name());
                     glib::Value::from(&"")
@@ -400,31 +379,28 @@ impl BaseSinkImpl for MxlSink {
 
         let pts = buffer.pts().ok_or(gst::FlowError::Error)?;
         let base_time = self.obj().base_time().ok_or(gst::FlowError::Error)?;
-        let timestamp_mode = self
-            .settings
-            .lock()
-            .map_err(|_| gst::FlowError::Error)?
-            .timestamp_mode;
-        let mxl_ts = match timestamp_mode {
-            TimestampMode::Pts => pts
-                .nseconds()
-                .checked_add(base_time.nseconds())
-                .and_then(|timestamp| timestamp.checked_add(offset))
-                .ok_or(gst::FlowError::Error)?,
-            TimestampMode::RunningTime => {
-                let running_time = self
-                    .obj()
-                    .segment()
-                    .downcast_ref::<gst::ClockTime>()
-                    .and_then(|segment| segment.to_running_time_full(pts));
-                let mxl_ts = running_time.and_then(|running_time| {
-                    mxl_timestamp(base_time.nseconds() as i128 + offset as i128, running_time)
-                });
-                let Some(mxl_ts) = mxl_ts else {
-                    return Ok(gst::FlowSuccess::Ok);
-                };
-                mxl_ts
-            }
+        let segment = self.obj().segment();
+        let Some(segment) = segment.downcast_ref::<gst::ClockTime>() else {
+            gst::element_imp_error!(
+                self,
+                gst::CoreError::Negotiation,
+                ["Segment is not in TIME format: {:?}", segment.format()]
+            );
+            return Err(gst::FlowError::Error);
+        };
+        let running_time = segment.to_running_time_full(pts);
+        let mxl_ts = running_time.and_then(|running_time| {
+            mxl_timestamp(base_time.nseconds() as i128 + offset as i128, running_time)
+        });
+        let Some(mxl_ts) = mxl_ts else {
+            gst::warning!(
+                CAT,
+                imp = self,
+                "Dropping buffer with PTS {} (running time {:?}) outside MXL timestamp range",
+                pts,
+                running_time
+            );
+            return Ok(gst::FlowSuccess::Ok);
         };
 
         let mut context = self.context.lock().map_err(|_| gst::FlowError::Error)?;

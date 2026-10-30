@@ -1,16 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Contributors to the Media eXchange Layer project.
 // SPDX-License-Identifier: Apache-2.0
 
-//! Integration tests for where `mxlsink` places grains in time, per
-//! `timestamp-mode`.
+//! Integration tests for where `mxlsink` places grains in time.
 //!
 //! Live sources start their segment at 0, where a buffer's PTS and running time
-//! agree; demuxers such as `tsdemux` start it at the media's first PTS. These
-//! tests feed such a segment and check where the grains land:
-//! - `running-time` (default) maps by the running time `GstBaseSink` syncs on,
-//!   so grains land at MXL now.
-//! - `pts` (legacy) keeps the raw PTS timeline, so grains land a segment-start
-//!   ahead of MXL now.
+//! agree. Demuxers such as `tsdemux` start it at the media's first PTS. These
+//! tests feed such a segment and check that grains are written by the running
+//! time `GstBaseSink` syncs on, so they land at MXL now.
 
 #[macro_use]
 mod common;
@@ -32,7 +28,7 @@ const GRAIN_RATE: Rational = Rational {
 };
 const WIDTH: u32 = 2;
 const HEIGHT: u32 = 2;
-/// Far enough from 0 that a PTS-based mapping would land ~250 grains ahead.
+/// Far enough from 0 that a PTS-based mapping would land 250 grains ahead.
 const SEGMENT_START: gst::ClockTime = gst::ClockTime::from_seconds(10);
 
 struct Producer {
@@ -42,13 +38,9 @@ struct Producer {
     segment: gst::FormattedSegment<gst::ClockTime>,
 }
 
-/// `appsrc` → video `mxlsink` in the given `timestamp-mode` (`None` leaves the
-/// property at its default), with every sample carrying a segment that starts
-/// at [`SEGMENT_START`] (as `tsdemux` would send).
-fn build_producer(flow_id: &str, domain: &str, timestamp_mode: Option<&str>) -> Producer {
-    let timestamp_mode = timestamp_mode
-        .map(|mode| format!(" timestamp-mode={mode}"))
-        .unwrap_or_default();
+/// `appsrc` → video `mxlsink`, with every sample carrying a segment that
+/// starts at [`SEGMENT_START`] (as `tsdemux` would send).
+fn build_producer(flow_id: &str, domain: &str) -> Producer {
     let frame_bytes = gst_video::VideoInfo::builder(gst_video::VideoFormat::V210, WIDTH, HEIGHT)
         .fps(gst::Fraction::new(FPS, 1))
         .build()
@@ -57,7 +49,7 @@ fn build_producer(flow_id: &str, domain: &str, timestamp_mode: Option<&str>) -> 
     let desc = format!(
         "appsrc name=src format=time handle-segment-change=true \
            caps=video/x-raw,format=v210,width={WIDTH},height={HEIGHT},framerate={FPS}/1 \
-         ! mxlsink flow-id={flow_id} domain={domain}{timestamp_mode}"
+         ! mxlsink flow-id={flow_id} domain={domain}"
     );
     let pipeline = gst::parse::launch(&desc)
         .expect("parse producer")
@@ -125,11 +117,11 @@ fn mxl_instance(domain: &str) -> MxlInstance {
 
 /// Push ten frames from [`SEGMENT_START`], wait for them to render, and return
 /// how many grains the flow's head index is ahead of MXL now.
-fn head_minus_now_after_segment_start(timestamp_mode: Option<&str>, test: &str) -> i64 {
+fn head_minus_now_after_segment_start(test: &str) -> i64 {
     let flow_id = uuid::Uuid::new_v4().to_string();
     let domain_guard = TestDomainGuard::new(test);
     let domain = domain_guard.domain();
-    let producer = build_producer(&flow_id, &domain, timestamp_mode);
+    let producer = build_producer(&flow_id, &domain);
 
     producer
         .pipeline
@@ -159,49 +151,26 @@ fn head_minus_now_after_segment_start(timestamp_mode: Option<&str>, test: &str) 
     head - now
 }
 
-/// `running-time` is the default: with the property left unset, a segment
-/// starting at 10 s must not push grains 10 s into the future. The head index
-/// right after the last frame renders has to be at MXL now.
+/// A segment starting at 10 s must not push grains 10 s into the future. The
+/// head index right after the last frame renders has to be at MXL now.
 #[test]
-fn default_mode_is_running_time_and_writes_grains_at_now() {
+fn segment_start_offset_writes_grains_at_now() {
     init();
     if let Some(reason) = skip_reason(&["appsrc", "mxlsink"]) {
         skip!(reason);
     }
-    let sink = gst::ElementFactory::make("mxlsink")
-        .build()
-        .expect("mxlsink");
-    let default_mode = sink.property::<gstmxl::mxlsink::TimestampMode>("timestamp-mode");
-    assert_eq!(default_mode, gstmxl::mxlsink::TimestampMode::RunningTime);
-
-    let ahead = head_minus_now_after_segment_start(None, "default_mode");
+    let ahead = head_minus_now_after_segment_start("segment_start_offset");
     assert!(
         ahead.abs() <= 2,
-        "default mode: head should be within 2 grains of now, was {ahead} ahead"
+        "head should be within 2 grains of now, was {ahead} ahead"
     );
 }
 
-/// Legacy `pts` mode keeps the original mapping: the raw PTS timeline is
-/// preserved, so a segment starting at 10 s puts grains 10 s (250 grains) ahead.
-#[test]
-fn pts_mode_keeps_pts_timeline() {
-    init();
-    if let Some(reason) = skip_reason(&["appsrc", "mxlsink"]) {
-        skip!(reason);
-    }
-    let ahead = head_minus_now_after_segment_start(Some("pts"), "pts_mode");
-    let expected = (SEGMENT_START.nseconds() / FRAME_NS) as i64;
-    assert!(
-        (ahead - expected).abs() <= 2,
-        "pts mode: head should be ~{expected} grains ahead of now, was {ahead}"
-    );
-}
-
-/// In `running-time` mode, a frame that starts half a frame before the segment
-/// start is still rendered by `GstBaseSink`. It must be written (not dropped, no
+/// A frame that starts half a frame before the segment start is still rendered
+/// by `GstBaseSink`. It must be written (not dropped, no
 /// error) in the grain just before the next frame's.
 #[test]
-fn running_time_mode_writes_buffer_straddling_segment_start_in_sequence() {
+fn writes_buffer_straddling_segment_start_in_sequence() {
     init();
     if let Some(reason) = skip_reason(&["appsrc", "mxlsink"]) {
         skip!(reason);
@@ -209,7 +178,7 @@ fn running_time_mode_writes_buffer_straddling_segment_start_in_sequence() {
     let flow_id = uuid::Uuid::new_v4().to_string();
     let domain_guard = TestDomainGuard::new("segment_straddle");
     let domain = domain_guard.domain();
-    let producer = build_producer(&flow_id, &domain, Some("running-time"));
+    let producer = build_producer(&flow_id, &domain);
 
     producer
         .pipeline
