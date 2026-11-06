@@ -1,0 +1,110 @@
+# SPDX-FileCopyrightText: 2026 Contributors to the Media eXchange Layer project.
+# SPDX-License-Identifier: Apache-2.0
+
+# Opens a pull request against nix-patches for each new upstream release tag.
+#
+# A release tag is vX.Y.Z with no suffix, at MIN_VERSION or newer. For each tag
+# that is not in nix/releases.json and has no pull request branch yet, the job
+# adds the tagged commit and its source hash to nix/releases.json, builds the
+# new package with its tests, and opens a pull request that reports the
+# result. A release that fails to build may need patches in
+# nix/patches/<version>/.
+#
+# The pull request commit has no Signed-off-by trailer. Amend it with your own
+# before merging, and merge with rebase or squash: the sync-upstream workflow
+# drops merge commits from nix-patches.
+#
+# GITHUB_TOKEN creates the pull request, which needs "Allow GitHub Actions to
+# create and approve pull requests" in the repository settings.
+
+name: Release tags
+
+on:
+  schedule:
+    - cron: "43 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-tags
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: dmf-mxl/mxl
+  BASE_BRANCH: nix-patches
+  MIN_VERSION: 1.1.0
+
+jobs:
+  release-tags:
+    if: github.repository == 'jonasohland/mxl'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.BASE_BRANCH }}
+          fetch-depth: 0
+
+      - uses: cachix/install-nix-action@v31
+
+      - name: Open pull requests for new tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          tags=$(git ls-remote --tags --refs "https://github.com/$UPSTREAM.git" 'refs/tags/v*' \
+            | awk '{ sub("refs/tags/", "", $2); print $2 }' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V || true)
+
+          for tag in $tags; do
+            version=${tag#v}
+            branch="release-tags/$tag"
+
+            if [ "$(printf '%s\n' "$MIN_VERSION" "$version" | sort -V | head -n1)" != "$MIN_VERSION" ]; then
+              continue
+            fi
+            if jq -e --arg v "$version" 'has($v)' nix/releases.json > /dev/null; then
+              continue
+            fi
+            if git ls-remote --exit-code --heads origin "$branch" > /dev/null; then
+              echo "$tag: $branch exists"
+              continue
+            fi
+
+            echo "::group::$tag"
+            git checkout -q -B "$branch" "origin/$BASE_BRANCH"
+
+            # The flake fetcher and fetchFromGitHub both unpack the GitHub
+            # archive of the commit, so the hash is the same.
+            prefetch=$(nix flake prefetch --json "github:$UPSTREAM/$tag")
+            rev=$(jq -r .locked.rev <<< "$prefetch")
+            hash=$(jq -r .hash <<< "$prefetch")
+
+            jq --arg v "$version" --arg rev "$rev" --arg hash "$hash" \
+              '.[$v] = { rev: $rev, hash: $hash }
+               | to_entries | sort_by(.key | split(".") | map(tonumber)) | from_entries' \
+              nix/releases.json > releases.json.new
+            mv releases.json.new nix/releases.json
+
+            attr="mxl_${version//./_}"
+            if nix build -L ".#$attr" > build.log 2>&1; then
+              result="\`nix build .#$attr\` passed, including the tests."
+            else
+              result="\`nix build .#$attr\` failed. The release may need patches in \`nix/patches/$version/\`."$'\n\n'"<details><summary>Last 80 lines of the build log</summary>"$'\n\n```\n'"$(tail -n 80 build.log)"$'\n```\n\n'"</details>"
+            fi
+            rm -f build.log result
+
+            git commit -q -m "nix: add MXL $version release" nix/releases.json
+            git push -q origin "HEAD:refs/heads/$branch"
+
+            body="Adds upstream tag [\`$tag\`](https://github.com/$UPSTREAM/releases/tag/$tag) (\`$rev\`) to \`nix/releases.json\`."$'\n\n'"$result"$'\n\n'"Amend the commit with your sign-off, then merge with rebase or squash."
+            gh pr create --base "$BASE_BRANCH" --head "$branch" \
+              --title "nix: add MXL $version release" --body "$body"
+            echo "::endgroup::"
+          done

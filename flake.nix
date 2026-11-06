@@ -47,6 +47,42 @@
       mxlVersion = builtins.head (
         builtins.match ".*set\\(mxl_VERSION ([0-9.]+)\\).*" (builtins.readFile ./CMakeLists.txt)
       );
+      # Same format as git rev-parse --short=12 HEAD in CMakeLists.txt.
+      shortRev = rev: builtins.substring 0 12 rev;
+      selfGitHash =
+        if self ? rev then
+          shortRev self.rev
+        else if self ? dirtyRev then
+          "${shortRev self.dirtyRev}-dirty"
+        else
+          null;
+
+      # Upstream release tags, built from the tagged source with the recipe in
+      # nix/mxl.nix. Each entry has the tagged commit and the hash of its
+      # source. Patches in nix/patches/<version>/ are applied to that release.
+      # The release-tags workflow adds new tags.
+      releases = lib.importJSON ./nix/releases.json;
+      releasePatches =
+        version:
+        let
+          dir = ./nix/patches + "/${version}";
+        in
+        lib.optionals (builtins.pathExists dir) (
+          map (name: dir + "/${name}") (
+            lib.sort lib.lessThan (
+              lib.attrNames (lib.filterAttrs (_: type: type == "regular") (builtins.readDir dir))
+            )
+          )
+        );
+      # mxl_1_1_0 for each release, and mxl_1_1 for the newest release of
+      # each major.minor line.
+      releaseAttr = version: "mxl_${lib.replaceStrings [ "." ] [ "_" ] version}";
+      releaseLines = lib.mapAttrs' (
+        line: versions:
+        lib.nameValuePair (releaseAttr line) (releaseAttr (lib.last (lib.sort lib.versionOlder versions)))
+      ) (lib.groupBy lib.versions.majorMinor (lib.attrNames releases));
+      releaseAttrs = map releaseAttr (lib.attrNames releases);
+
       rustVersion = (builtins.fromTOML (builtins.readFile ./rust/Cargo.toml)).workspace.package.version;
 
       cmakeSrc = fs.toSource {
@@ -87,54 +123,77 @@
       ];
     in
     {
-      overlays.default = final: prev: {
-        picojson = final.callPackage ./nix/picojson.nix { };
-        pcapplusplus = final.callPackage ./nix/pcapplusplus.nix { };
+      overlays.default =
+        final: prev:
+        {
+          picojson = final.callPackage ./nix/picojson.nix { };
+          pcapplusplus = final.callPackage ./nix/pcapplusplus.nix { };
 
-        mxl = final.callPackage ./nix/mxl.nix {
-          src = cmakeSrc;
-          version = mxlVersion;
-        };
+          mxl = final.callPackage ./nix/mxl.nix {
+            src = cmakeSrc;
+            version = mxlVersion;
+            gitHash = selfGitHash;
+          };
 
-        gst-plugins-mxl = final.callPackage ./nix/gst-plugins.nix {
-          src = rustSrc;
-          version = rustVersion;
-          rustToolchain = rustToolchainFor final;
-        };
+          gst-plugins-mxl = final.callPackage ./nix/gst-plugins.nix {
+            src = rustSrc;
+            version = rustVersion;
+            rustToolchain = rustToolchainFor final;
+          };
 
-        # gst-launch-1.0 and gst-inspect-1.0 with the MXL plugins and the
-        # common upstream plugins on the plugin path.
-        gst-mxl-env = final.symlinkJoin {
-          name = "gst-mxl-env-${rustVersion}";
-          paths = [ final.gst_all_1.gstreamer.bin ];
-          nativeBuildInputs = [ final.makeWrapper ];
-          postBuild = ''
-            for tool in "$out"/bin/gst-*; do
-              wrapProgram "$tool" \
-                --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${
-                  lib.makeSearchPathOutput "lib" "lib/gstreamer-1.0" (
-                    [
-                      final.gst-plugins-mxl
-                      final.mxl
-                    ]
-                    ++ final.mxl.gstRuntimePlugins
-                  )
-                }"
-            done
-          '';
-          meta.mainProgram = "gst-launch-1.0";
-        };
-      };
+          # gst-launch-1.0 and gst-inspect-1.0 with the MXL plugins and the
+          # common upstream plugins on the plugin path.
+          gst-mxl-env = final.symlinkJoin {
+            name = "gst-mxl-env-${rustVersion}";
+            paths = [ final.gst_all_1.gstreamer.bin ];
+            nativeBuildInputs = [ final.makeWrapper ];
+            postBuild = ''
+              for tool in "$out"/bin/gst-*; do
+                wrapProgram "$tool" \
+                  --prefix GST_PLUGIN_SYSTEM_PATH_1_0 : "${
+                    lib.makeSearchPathOutput "lib" "lib/gstreamer-1.0" (
+                      [
+                        final.gst-plugins-mxl
+                        final.mxl
+                      ]
+                      ++ final.mxl.gstRuntimePlugins
+                    )
+                  }"
+              done
+            '';
+            meta.mainProgram = "gst-launch-1.0";
+          };
+        }
+        // lib.mapAttrs' (
+          version: release:
+          lib.nameValuePair (releaseAttr version) (
+            final.mxl.override {
+              inherit version;
+              src = final.fetchFromGitHub {
+                owner = "dmf-mxl";
+                repo = "mxl";
+                inherit (release) rev hash;
+              };
+              patches = releasePatches version;
+              gitHash = shortRev release.rev;
+            }
+          )
+        ) releases
+        // lib.mapAttrs (_: target: final.${target}) releaseLines;
 
-      packages = forAllSystems (pkgs: {
-        inherit (pkgs)
-          mxl
-          gst-plugins-mxl
-          gst-mxl-env
-          picojson
-          ;
-        default = pkgs.mxl;
-      });
+      packages = forAllSystems (
+        pkgs:
+        {
+          inherit (pkgs)
+            mxl
+            gst-plugins-mxl
+            gst-mxl-env
+            picojson
+            ;
+          default = pkgs.mxl;
+        }
+        // lib.getAttrs (releaseAttrs ++ lib.attrNames releaseLines) pkgs
+      );
 
       # nix run .#<tool> for each tool, plus gst-launch and gst-inspect with
       # the MXL plugins loaded.
@@ -208,9 +267,13 @@
         }
       );
 
-      checks = forAllSystems (pkgs: {
-        inherit (pkgs) mxl gst-plugins-mxl gst-mxl-env;
-      });
+      checks = forAllSystems (
+        pkgs:
+        {
+          inherit (pkgs) mxl gst-plugins-mxl gst-mxl-env;
+        }
+        // lib.getAttrs releaseAttrs pkgs
+      );
 
       formatter = forAllSystems (pkgs: pkgs.nixfmt);
     };
