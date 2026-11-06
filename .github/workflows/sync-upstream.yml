@@ -15,6 +15,12 @@
 # a fixed committer and --committer-date-is-author-date, so an unchanged stack
 # on an unchanged base gives the same commit IDs and nothing is pushed.
 #
+# The patch stack is also rebased onto each branch of this fork in
+# FORK_BRANCHES and pushed as nix/<branch>. This makes fixes that are not
+# upstream yet available through the flake. Remove a branch from the list
+# when it is merged or deleted; a listed branch that does not exist makes the
+# job fail.
+#
 # This file must be on the default branch of the fork, because scheduled
 # workflows only run from there.
 #
@@ -36,6 +42,9 @@ env:
   UPSTREAM_URL: https://github.com/dmf-mxl/mxl.git
   PATCH_BRANCH: nix-patches
   TARGET_PREFIX: nix
+  # Space-separated branch names of this fork.
+  FORK_BRANCHES: >-
+    fix/gst-mxl-rs-timestamp-mode
 jobs:
   sync:
     if: github.repository == 'jonasohland/mxl'
@@ -93,17 +102,32 @@ jobs:
             fi
           done
 
-          # Patch stack on main and the newest release branch.
+          # Patch stack on main, the newest release branch and the fork
+          # branches. Each entry is <remote>/<branch>.
           latest=$(git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/upstream/release/ | sort -V | tail -n1)
           base=$(git merge-base "origin/$PATCH_BRANCH" upstream/main)
           echo "Patch stack: $(git rev-list --count "$base..origin/$PATCH_BRANCH") commits on $PATCH_BRANCH"
 
-          for b in main $latest; do
+          onto_list="upstream/main ${latest:+upstream/$latest}"
+          for b in $FORK_BRANCHES; do
+            if git rev-parse -q --verify "refs/remotes/origin/$b" > /dev/null; then
+              close_issue "Sync: fork branch $b does not exist"
+              onto_list="$onto_list origin/$b"
+            else
+              failed=1
+              open_issue "Sync: fork branch $b does not exist" "\`$b\` is listed in FORK_BRANCHES in \`.github/workflows/sync-upstream.yml\` but is not a branch of this fork. Remove it from the list."
+            fi
+          done
+
+          for onto in $onto_list; do
+            remote=${onto%%/*}
+            b=${onto#*/}
+            if [ "$remote" = upstream ]; then where="upstream"; else where="fork branch"; fi
             target="$TARGET_PREFIX/$b"
             title="Sync: $PATCH_BRANCH does not rebase onto $b"
             git checkout -q --detach "origin/$PATCH_BRANCH"
 
-            if git rebase --committer-date-is-author-date --onto "upstream/$b" "$base"; then
+            if git rebase --committer-date-is-author-date --onto "$onto" "$base"; then
               old=$(git rev-parse -q --verify "refs/remotes/origin/$target" || true)
               new=$(git rev-parse HEAD)
               if [ "$old" = "$new" ]; then
@@ -119,7 +143,7 @@ jobs:
               stopped_at=$(git log -1 --format='%h %s' REBASE_HEAD 2>/dev/null || true)
               git rebase --abort || git reset -q --hard
               failed=1
-              open_issue "$title" "Rebasing \`$PATCH_BRANCH\` onto upstream \`$b\` stops with conflicts at \`$stopped_at\`. \`$target\` was not updated."$'\n\n'"Conflicting files:"$'\n'"$conflicts"
+              open_issue "$title" "Rebasing \`$PATCH_BRANCH\` onto $where \`$b\` stops with conflicts at \`$stopped_at\`. \`$target\` was not updated."$'\n\n'"Conflicting files:"$'\n'"$conflicts"
             fi
           done
 
