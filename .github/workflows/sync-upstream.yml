@@ -60,7 +60,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          set -uo pipefail
+          # Actions runs this script with bash -e. Turn that off so that one
+          # failed branch or issue call does not stop the other branches. The
+          # job still fails at the end if anything failed.
+          set +e -uo pipefail
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -68,26 +71,30 @@ jobs:
           git remote add upstream "$UPSTREAM_URL"
           git fetch --no-tags upstream \
             '+refs/heads/main:refs/remotes/upstream/main' \
-            '+refs/heads/release/*:refs/remotes/upstream/release/*'
+            '+refs/heads/release/*:refs/remotes/upstream/release/*' || exit 1
 
           failed=0
 
           # Each problem has one open issue. It is created once and closed by
-          # the first run that no longer has the problem.
+          # the first run that no longer has the problem. A failed issue call
+          # is reported as a warning, and the problem is still in the log.
           issue_number() {
             gh issue list --state open --limit 100 --json number,title \
               --jq ".[] | select(.title == \"$1\") | .number" | head -n1
           }
           open_issue() {
+            echo "::error::$1"
             if [ -z "$(issue_number "$1")" ]; then
-              gh issue create --title "$1" --body "$2"$'\n\n'"First seen in $RUN_URL"
+              gh issue create --title "$1" --body "$2"$'\n\n'"First seen in $RUN_URL" \
+                || echo "::warning::Could not open an issue for: $1"
             fi
           }
           close_issue() {
             local n
             n=$(issue_number "$1")
             if [ -n "$n" ]; then
-              gh issue close "$n" --comment "Resolved in $RUN_URL"
+              gh issue close "$n" --comment "Resolved in $RUN_URL" \
+                || echo "::warning::Could not close issue #$n"
             fi
           }
 
