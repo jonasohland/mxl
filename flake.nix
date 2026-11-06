@@ -238,6 +238,14 @@
             # Dependencies come from the Nix dev shell.
             set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
           '';
+          # The Clang presets link with -fuse-ld=lld. Without this, clang uses
+          # the host's ld.lld, which does not add the run paths of Nix
+          # libraries, and the binaries fail to load them. Only ld.lld is
+          # linked, so the GCC presets keep GNU ld.
+          wrappedLld = pkgs.runCommand "ld.lld-wrapped" { } ''
+            mkdir -p "$out/bin"
+            ln -s ${llvm.bintools}/bin/ld.lld "$out/bin/ld.lld"
+          '';
         in
         {
           default = pkgs.mkShell {
@@ -254,6 +262,7 @@
               pkgs.cargo-outdated
               llvm.clang
               llvm.clang-tools
+              wrappedLld
               pkgs.ccache
               pkgs.doxygen
               pkgs.gdb
