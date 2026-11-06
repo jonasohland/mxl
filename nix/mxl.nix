@@ -19,6 +19,7 @@
   libfabric,
   libuuid,
   microsoft-gsl,
+  pcapplusplus,
   picojson,
   spdlog,
   stduuid,
@@ -71,7 +72,9 @@ stdenv.mkDerivation {
     libuuid
   ];
 
-  checkInputs = [ catch2_3 ];
+  # The tests on release/v1.1 read pcap files with PcapPlusPlus on Linux. The
+  # tests on main do not look for it.
+  checkInputs = [ catch2_3 ] ++ lib.optional stdenv.hostPlatform.isLinux pcapplusplus;
 
   cmakeFlags = [
     (lib.cmakeBool "BUILD_DOCS" false)

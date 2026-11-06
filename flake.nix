@@ -89,6 +89,7 @@
     {
       overlays.default = final: prev: {
         picojson = final.callPackage ./nix/picojson.nix { };
+        pcapplusplus = final.callPackage ./nix/pcapplusplus.nix { };
 
         mxl = final.callPackage ./nix/mxl.nix {
           src = cmakeSrc;
