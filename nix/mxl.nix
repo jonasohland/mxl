@@ -90,7 +90,9 @@ stdenv.mkDerivation {
   cmakeFlags = [
     (lib.cmakeBool "BUILD_DOCS" false)
     (lib.cmakeBool "BUILD_TESTS" true)
-    (lib.cmakeBool "MXL_ENABLE_FABRICS_OFI" enableFabrics)
+    # ON or OFF instead of lib.cmakeBool's TRUE or FALSE, because the
+    # pkg-config consumer test only accepts ON or OFF for this value.
+    (lib.cmakeFeature "MXL_ENABLE_FABRICS_OFI" (if enableFabrics then "ON" else "OFF"))
   ]
   ++ lib.optional (targetArch != null) (lib.cmakeFeature "MXL_TARGET_ARCH" targetArch);
 
@@ -99,13 +101,10 @@ stdenv.mkDerivation {
   doCheck = true;
   enableParallelChecking = false;
   # Some tests create files in $HOME, which is not writable in the sandbox.
-  # The pkg-config consumer test takes the vcpkg install directory and triplet
-  # as arguments, which do not exist in this build.
   checkPhase = ''
     runHook preCheck
     export HOME="$(mktemp -d)"
-    ctest --output-on-failure --parallel 1 \
-      --exclude-regex "^pkg-config C consumer can link and run$"
+    ctest --output-on-failure --parallel 1
     runHook postCheck
   '';
 
