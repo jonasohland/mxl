@@ -25,6 +25,12 @@
   stduuid,
   src,
   version,
+  # Patches for this source, for example a release in releases.json.
+  patches ? [ ],
+  # Written into the version string as the commit ID. CMakeLists.txt reads it
+  # from .git, which is not part of the source in a Nix build, and falls back
+  # to "unknown".
+  gitHash ? null,
   # The OFI fabrics backend needs libfabric, which is only packaged for Linux.
   enableFabrics ? stdenv.hostPlatform.isLinux,
   # null keeps the CMake default (x86-64-v3 or armv8.5-a). An empty string
@@ -46,7 +52,12 @@ let
 in
 stdenv.mkDerivation {
   pname = "mxl";
-  inherit version src;
+  inherit version src patches;
+
+  postPatch = lib.optionalString (gitHash != null) ''
+    substituteInPlace CMakeLists.txt \
+      --replace-fail 'set(GIT_HASH "unknown")' 'set(GIT_HASH "${gitHash}")'
+  '';
 
   nativeBuildInputs = [
     cmake
