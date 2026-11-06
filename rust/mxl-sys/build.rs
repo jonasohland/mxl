@@ -41,7 +41,22 @@ fn get_bindgen_specs() -> BindgenSpecs {
                 .to_string(),
         );
     }
-    if cfg!(not(feature = "mxl-not-built")) {
+    // MXL_PREBUILT_DIR names the install prefix of an MXL build that already
+    // exists, for example a distribution package. The headers and libraries
+    // under that prefix are used and lib/ is not built with CMake.
+    println!("cargo:rerun-if-env-changed=MXL_PREBUILT_DIR");
+    let prebuilt_dir = env::var_os("MXL_PREBUILT_DIR")
+        .filter(|_| cfg!(not(feature = "mxl-not-built")))
+        .map(PathBuf::from);
+
+    if let Some(prefix) = prebuilt_dir {
+        includes_dirs.push(prefix.join("include").to_string_lossy().to_string());
+        println!("cargo:rustc-link-search={}", prefix.join("lib").display());
+        println!("cargo:rustc-link-lib=mxl");
+        if cfg!(feature = "mxl-fabrics-ofi") {
+            println!("cargo:rustc-link-lib=mxl-fabrics");
+        }
+    } else if cfg!(not(feature = "mxl-not-built")) {
         let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
         let build_version_dir = out_dir.join("include").to_string_lossy().to_string();
 
