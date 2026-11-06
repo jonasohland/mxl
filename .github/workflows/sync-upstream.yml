@@ -1,0 +1,126 @@
+# SPDX-FileCopyrightText: 2026 Contributors to the Media eXchange Layer project.
+# SPDX-License-Identifier: Apache-2.0
+
+# Keeps jonasohland/mxl in sync with dmf-mxl/mxl.
+#
+# main and every release/* branch are fast-forwarded to upstream. They are
+# never force-pushed, so a branch that has diverged makes the job fail.
+#
+# The commits on the nix-patches branch that are not on upstream main are the
+# patch stack. It is rebased onto upstream main and the newest release branch,
+# and the results are pushed as nix/main and nix/release/<version>. Git cannot
+# have a branch named nix next to branches named nix/*, which is why the source
+# branch has a different name. Keep nix-patches linear: the rebase drops merge
+# commits. The rebase uses
+# a fixed committer and --committer-date-is-author-date, so an unchanged stack
+# on an unchanged base gives the same commit IDs and nothing is pushed.
+#
+# This file must be on the default branch of the fork, because scheduled
+# workflows only run from there.
+#
+# Pushing upstream commits that change .github/workflows needs the Workflows
+# permission, which GITHUB_TOKEN cannot have. SYNC_TOKEN is a fine-grained
+# token for this repository with Contents and Workflows set to read and write.
+name: Sync upstream
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+env:
+  UPSTREAM_URL: https://github.com/dmf-mxl/mxl.git
+  PATCH_BRANCH: nix-patches
+  TARGET_PREFIX: nix
+jobs:
+  sync:
+    if: github.repository == 'jonasohland/mxl'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.PATCH_BRANCH }}
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN }}
+      - name: Sync branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -uo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add upstream "$UPSTREAM_URL"
+          git fetch --no-tags upstream \
+            '+refs/heads/main:refs/remotes/upstream/main' \
+            '+refs/heads/release/*:refs/remotes/upstream/release/*'
+
+          failed=0
+
+          # Each problem has one open issue. It is created once and closed by
+          # the first run that no longer has the problem.
+          issue_number() {
+            gh issue list --state open --limit 100 --json number,title \
+              --jq ".[] | select(.title == \"$1\") | .number" | head -n1
+          }
+          open_issue() {
+            if [ -z "$(issue_number "$1")" ]; then
+              gh issue create --title "$1" --body "$2"$'\n\n'"First seen in $RUN_URL"
+            fi
+          }
+          close_issue() {
+            local n
+            n=$(issue_number "$1")
+            if [ -n "$n" ]; then
+              gh issue close "$n" --comment "Resolved in $RUN_URL"
+            fi
+          }
+
+          # Mirrors. A plain push refuses anything but a fast-forward.
+          for b in $(git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/upstream/); do
+            title="Sync: $b has diverged from upstream"
+            if git push origin "refs/remotes/upstream/$b:refs/heads/$b"; then
+              close_issue "$title"
+            else
+              failed=1
+              open_issue "$title" "Pushing upstream \`$b\` to the fork was rejected. The fork's \`$b\` has commits that are not upstream. Move them to another branch and reset \`$b\` to upstream."
+            fi
+          done
+
+          # Patch stack on main and the newest release branch.
+          latest=$(git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/upstream/release/ | sort -V | tail -n1)
+          base=$(git merge-base "origin/$PATCH_BRANCH" upstream/main)
+          echo "Patch stack: $(git rev-list --count "$base..origin/$PATCH_BRANCH") commits on $PATCH_BRANCH"
+
+          for b in main $latest; do
+            target="$TARGET_PREFIX/$b"
+            title="Sync: $PATCH_BRANCH does not rebase onto $b"
+            git checkout -q --detach "origin/$PATCH_BRANCH"
+
+            if git rebase --committer-date-is-author-date --onto "upstream/$b" "$base"; then
+              old=$(git rev-parse -q --verify "refs/remotes/origin/$target" || true)
+              new=$(git rev-parse HEAD)
+              if [ "$old" = "$new" ]; then
+                echo "$target is up to date"
+              elif ! git push --force-with-lease="refs/heads/$target:$old" origin "HEAD:refs/heads/$target"; then
+                failed=1
+                continue
+              fi
+              close_issue "$title"
+            else
+              # shellcheck disable=SC2016 # literal backticks for Markdown
+              conflicts=$(git diff --name-only --diff-filter=U | sed 's/^/- `/; s/$/`/')
+              stopped_at=$(git log -1 --format='%h %s' REBASE_HEAD 2>/dev/null || true)
+              git rebase --abort || git reset -q --hard
+              failed=1
+              open_issue "$title" "Rebasing \`$PATCH_BRANCH\` onto upstream \`$b\` stops with conflicts at \`$stopped_at\`. \`$target\` was not updated."$'\n\n'"Conflicting files:"$'\n'"$conflicts"
+            fi
+          done
+
+          exit "$failed"
