@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2026 Contributors to the Media eXchange Layer project.
+# SPDX-License-Identifier: Apache-2.0
+#
+# <catch.hpp> is the Catch2 v2 header, which only the vcpkg Catch2 port
+# provides. The other tests use the Catch2 v3 headers. Fixed on main.
+
+diff --git a/lib/tests/fabrics/test_sliced.cpp b/lib/tests/fabrics/test_sliced.cpp
+index ebacee17..140a7f7b 100644
+--- a/lib/tests/fabrics/test_sliced.cpp
++++ b/lib/tests/fabrics/test_sliced.cpp
+@@ -11,7 +11,8 @@
+ #include <stdexcept>
+ #include <string>
+ #include <utility>
+-#include <catch.hpp>
++#include <catch2/catch_template_test_macros.hpp>
++#include <catch2/catch_test_macros.hpp>
+ #include <unistd.h>
+ #include <fmt/base.h>
+ #include <mxl/fabrics.h>
